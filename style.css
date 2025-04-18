@@ -1,3 +1,41 @@
+#mastery-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 10px;
+}
+.char-master {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  margin: 4px;
+}
+.char-master svg {
+  width: 48px;
+  height: 48px;
+  transform: rotate(-90deg);
+}
+.char-master circle.bg {
+  fill: none;
+  stroke: #333;
+  stroke-width: 4;
+}
+.char-master circle.fg {
+  fill: none;
+  stroke: #00e676;
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease;
+}
+.char-master .char-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+  color: #e0e0e0;
+  user-select: none;
+}
 body {
   margin: 0;
   padding: 0;

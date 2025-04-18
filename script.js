@@ -13,6 +13,42 @@
   let charPoints = {};
   // timestamp when current character was played
   let questionStartTime = null;
+  // DOM container for mastery display
+  const masteryContainer = document.getElementById('mastery-container');
+
+  // Build the mastery circles for each char
+  function generateMasteryDisplay() {
+    masteryContainer.innerHTML = '';
+    const level = window.trainingLevels.find(l => l.id === selectedId) || { chars };
+    level.chars.forEach(c => {
+      // SVG circle: radius and circumference
+      const r = 18;
+      const cfs = 2 * Math.PI * r;
+      const div = document.createElement('div');
+      div.className = 'char-master';
+      div.dataset.char = c;
+      div.innerHTML = `
+        <svg><circle class="bg" cx="24" cy="24" r="${r}" stroke-dasharray="${cfs}" stroke-dashoffset="0" />
+        <circle class="fg" cx="24" cy="24" r="${r}" stroke-dasharray="${cfs}" stroke-dashoffset="${cfs}" /></svg>
+        <span class="char-label">${c.toUpperCase()}</span>
+      `;
+      masteryContainer.appendChild(div);
+    });
+  }
+
+  // Update each circle fill by charPoints
+  function updateMasteryDisplay() {
+    masteryContainer.querySelectorAll('.char-master').forEach(el => {
+      const c = el.dataset.char;
+      const pts = charPoints[c] || 0;
+      const frac = Math.min(pts / targetPoints, 1);
+      const circle = el.querySelector('circle.fg');
+      const r = circle.getAttribute('r');
+      const cfs = 2 * Math.PI * r;
+      const offset = cfs * (1 - frac);
+      circle.style.strokeDashoffset = offset;
+    });
+  }
   // default character set (a-z, 0-9)
   const defaultChars = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
   // current character set for this test (may vary by level)
@@ -139,6 +175,8 @@
     startTime = Date.now();
     // Clear mistakes
     for (const k in mistakesMap) delete mistakesMap[k];
+    // Render mastery circles
+    generateMasteryDisplay();
     // UI setup
     resultsDiv.innerHTML = '';
     statusDiv.style.display = '';
@@ -219,6 +257,7 @@
       else if (delta < maxThreshold) pts = (maxThreshold - delta) / maxThreshold;
       // award and clamp
       charPoints[currentChar] = Math.min(targetPoints, charPoints[currentChar] + pts);
+      updateMasteryDisplay();
       statusDiv.textContent = 'Correct!';
       statusDiv.classList.remove('error');
       statusDiv.classList.add('success');
@@ -234,6 +273,7 @@
       waitingForInput = false;
       // incorrect: lose one point
       charPoints[currentChar] = Math.max(0, charPoints[currentChar] - 1);
+      updateMasteryDisplay();
       // checkpoint strike logic
       if (strikeLimit !== null) {
         strikeCount++;
