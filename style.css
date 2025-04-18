@@ -84,6 +84,22 @@ body {
 #status.error {
   color: #ff1744;
 }
+/* Strike indicators for checkpoint levels */
+#strikes {
+  margin-top: 10px;
+  min-height: 24px;
+  display: none;
+  justify-content: center;
+  align-items: center;
+}
+.strike {
+  font-size: 24px;
+  color: #777;
+  margin: 0 4px;
+}
+.strike.used {
+  color: #ff1744;
+}
 #results {
   font-size: 24px;
   margin-top: 20px;

@@ -95,6 +95,7 @@
   const hintButton = document.getElementById('hint-button');
   const hintDiv = document.getElementById('hint');
   const actionHints = document.getElementById('action-hints');
+  const strikesDiv = document.getElementById('strikes');
   // load completed levels from localStorage
   let completedLevels = JSON.parse(localStorage.getItem('morseCompleted') || '[]');
   // determine initial selected level: first incomplete or last
@@ -171,6 +172,27 @@
     // Initialize level and mastery state
     const lvl = (window.trainingLevels || []).find(l => l.id === selectedId) || { chars: defaultChars, type: 'standard' };
     chars = [...lvl.chars];
+    // configure strikes for checkpoint levels
+    if (lvl.type === 'checkpoint' && typeof lvl.strikeLimit === 'number') {
+      strikeLimit = lvl.strikeLimit;
+    } else {
+      strikeLimit = null;
+    }
+    strikeCount = 0;
+    // initialize strike display
+    if (strikeLimit !== null) {
+      strikesDiv.style.display = 'flex';
+      strikesDiv.innerHTML = '';
+      for (let i = 1; i <= strikeLimit; i++) {
+        const span = document.createElement('span');
+        span.className = 'strike';
+        span.dataset.strike = i;
+        span.textContent = '✕';
+        strikesDiv.appendChild(span);
+      }
+    } else {
+      strikesDiv.style.display = 'none';
+    }
     // Reset per-char points
     charPoints = {};
     chars.forEach(c => { charPoints[c] = 0; });
@@ -244,7 +266,7 @@
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      finishTest();
+      finishTest(false);
       return;
     }
     if (!waitingForInput) return;
@@ -285,8 +307,11 @@
       // checkpoint strike logic
       if (strikeLimit !== null) {
         strikeCount++;
+        // update strike indicators
+        const span = strikesDiv.querySelector(`.strike[data-strike="${strikeCount}"]`);
+        if (span) span.classList.add('used');
         if (strikeCount >= strikeLimit) {
-          finishTest();
+          finishTest(false);
           return;
         }
       }
@@ -319,8 +344,10 @@
       }
     }
   }
-  function finishTest() {
+  function finishTest(completed = true) {
     testActive = false;
+    // hide strike indicators
+    strikesDiv.style.display = 'none';
     const endTime = Date.now();
     const elapsedSec = (endTime - startTime) / 1000;
     const struggles = Object.entries(mistakesMap)
@@ -334,7 +361,12 @@
     const pad = n => n.toString().padStart(2, '0');
     const displayTime = `${pad(minutes)}:${pad(secondsInt)}`;
     const tooltipTime = `${totalSec.toFixed(2)}s`;
-    let html = `<p>Level Complete!</p>`;
+    let html = '';
+    if (completed) {
+      html += `<p>Level Complete!</p>`;
+    } else {
+      html += `<p>Level Incomplete</p>`;
+    }
     html += `<p>Time: <span title="${tooltipTime}">${displayTime}</span></p>`;
     html += `<p>Replays: ${replayCount}</p>`;
     if (struggles.length > 0) {
@@ -353,11 +385,13 @@
     waitingForInput = false;
     document.removeEventListener('keydown', handleKeydown);
     // mark current level completed and persist
-    if (!completedLevels.includes(selectedId)) {
-      completedLevels.push(selectedId);
-      localStorage.setItem('morseCompleted', JSON.stringify(completedLevels));
-      const completedEl = document.querySelector(`.level-item[data-id="${selectedId}"]`);
-      if (completedEl) completedEl.classList.add('completed');
+    if (completed) {
+      if (!completedLevels.includes(selectedId)) {
+        completedLevels.push(selectedId);
+        localStorage.setItem('morseCompleted', JSON.stringify(completedLevels));
+        const completedEl = document.querySelector(`.level-item[data-id=\"${selectedId}\"]`);
+        if (completedEl) completedEl.classList.add('completed');
+      }
     }
     // show summary action hints: replay current or next lesson
     actionHints.textContent = 'Tab: Repeat Lesson, Enter: Next Lesson';
