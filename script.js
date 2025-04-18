@@ -31,26 +31,31 @@
   const replayButton = document.getElementById('replay-button');
   const hintButton = document.getElementById('hint-button');
   const hintDiv = document.getElementById('hint');
+  const actionHints = document.getElementById('action-hints');
   // initialize speed slider display
   speedSlider.value = wpm;
   speedLabel.textContent = wpm + ' WPM';
 
   startButton.addEventListener('click', startTest);
   menuToggle.addEventListener('click', () => {
-    menu.classList.toggle('open');
+    const isOpen = menu.classList.toggle('open');
+    menuToggle.classList.toggle('open', isOpen);
+    // use arrow icon when open
+    menuToggle.textContent = isOpen ? '<' : '☰';
   });
   speedSlider.addEventListener('input', (e) => {
     wpm = parseInt(e.target.value, 10);
     unit = 1200 / wpm;
     speedLabel.textContent = wpm + ' WPM';
   });
-  replayButton.addEventListener('click', () => {
+  function replayCurrent() {
     if (!audioContext) return;
     waitingForInput = false;
     playMorse(currentChar).then(() => {
       waitingForInput = true;
     });
-  });
+  }
+  replayButton.addEventListener('click', replayCurrent);
   hintButton.addEventListener('click', () => {
     const symbols = morseMap[currentChar];
     const visual = symbols
@@ -61,6 +66,20 @@
   });
 
   function startTest() {
+    // reset test state variables
+    currentIndex = 0;
+    firstTryCount = 0;
+    // clear mistakes map
+    for (const k in mistakesMap) delete mistakesMap[k];
+    // clear UI
+    resultsDiv.innerHTML = '';
+    progressDiv.style.display = '';
+    statusDiv.style.display = '';
+    statusDiv.textContent = '';
+    // set up action hints and key handling
+    actionHints.textContent = 'Tab: Replay, Esc: End Test';
+    document.addEventListener('keydown', handleKeydown);
+    // hide start button
     startButton.style.display = 'none';
     progressDiv.textContent = `Character 0 of ${totalChars}`;
     // initialize speed controls
@@ -92,6 +111,17 @@
   }
 
   function handleKeydown(e) {
+    // Tab to replay, Escape to bail out
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      replayCurrent();
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      finishTest();
+      return;
+    }
     if (!waitingForInput) return;
     const key = e.key.toLowerCase();
     if (key.length !== 1 || !chars.includes(key)) {
@@ -120,18 +150,27 @@
     }
   }
 
+  // handler for starting a new test from summary via Tab
+  function handleSummaryKeydown(e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      document.removeEventListener('keydown', handleSummaryKeydown);
+      startTest();
+    }
+  }
   function finishTest() {
+    const attempted = currentIndex;
     const endTime = Date.now();
     const elapsedSec = (endTime - startTime) / 1000;
-    const accuracy = ((firstTryCount / totalChars) * 100).toFixed(2);
-    const wpm = ((totalChars / 5) / (elapsedSec / 60)).toFixed(2);
+    const accuracy = ((firstTryCount / attempted) * 100).toFixed(2);
+    const wpmResult = ((attempted / 5) / (elapsedSec / 60)).toFixed(2);
     const struggles = Object.entries(mistakesMap)
       .filter(([c, count]) => count > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
     let html = `<p>Test complete!</p>`;
     html += `<p>Accuracy: ${accuracy}%</p>`;
-    html += `<p>Speed: ${wpm} WPM</p>`;
+    html += `<p>Speed: ${wpmResult} WPM</p>`;
     if (struggles.length > 0) {
       html += '<p>Characters you struggled with:</p><ul>';
       struggles.forEach(([c, count]) => {
@@ -147,6 +186,9 @@
     hintDiv.textContent = '';
     waitingForInput = false;
     document.removeEventListener('keydown', handleKeydown);
+    // switch action hints to new-test mode
+    actionHints.textContent = 'Tab: New Test';
+    document.addEventListener('keydown', handleSummaryKeydown);
   }
 
   function playMorse(char) {
@@ -180,5 +222,4 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  document.addEventListener('keydown', handleKeydown);
 })();
