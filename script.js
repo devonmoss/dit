@@ -1,5 +1,18 @@
 (function() {
-  const totalChars = 50;
+  // legacy total questions (placeholder to avoid undefined)
+  let totalChars = 50;
+  let currentIndex = 0;
+  // number of points required to master each character
+  const targetPoints = 3;
+  // thresholds (in seconds)
+  const fastThreshold = 0.5;
+  const maxThreshold = 4.0;
+  // weight for already mastered chars in question pool
+  const completedWeight = 0.2;
+  // character mastery points
+  let charPoints = {};
+  // timestamp when current character was played
+  let questionStartTime = null;
   // default character set (a-z, 0-9)
   const defaultChars = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
   // current character set for this test (may vary by level)
@@ -12,7 +25,7 @@
     '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....',
     '6':'-....','7':'--...','8':'---..','9':'----.'
   };
-  let currentIndex = 0;
+  // let currentIndex = 0; // retired: using mastery-based flow
   let strikeLimit = null;
   let strikeCount = 0;
   let firstTryCount = 0;
@@ -114,57 +127,67 @@
   });
 
   function startTest() {
-  // select character set and rules based on selected level
-  const lvl = (window.trainingLevels || []).find(l => l.id === selectedId) || { chars: defaultChars, type: 'standard', strikeLimit: null };
-  chars = [...lvl.chars];
-  if (lvl.type === 'checkpoint') {
-    strikeLimit = lvl.strikeLimit || null;
-    strikeCount = 0;
-  } else {
-    strikeLimit = null;
-  }
-  // reset test state variables
-    currentIndex = 0;
+    // Initialize level and mastery state
+    const lvl = (window.trainingLevels || []).find(l => l.id === selectedId) || { chars: defaultChars, type: 'standard' };
+    chars = [...lvl.chars];
+    // Reset per-char points
+    charPoints = {};
+    chars.forEach(c => { charPoints[c] = 0; });
+    // Reset misc counters
     firstTryCount = 0;
-    // clear mistakes map
+    replayCount = 0;
+    startTime = Date.now();
+    // Clear mistakes
     for (const k in mistakesMap) delete mistakesMap[k];
-    // clear UI
+    // UI setup
     resultsDiv.innerHTML = '';
-    progressDiv.style.display = '';
     statusDiv.style.display = '';
     statusDiv.textContent = '';
-    // reset replay count and set up action hints and key handling
-    replayCount = 0;
+    startButton.style.display = 'none';
+    document.getElementById('controls').style.display = 'block';
     actionHints.textContent = 'Tab: Replay, Esc: End Test';
     document.addEventListener('keydown', handleKeydown);
-    // hide start button
-    startButton.style.display = 'none';
-    progressDiv.textContent = `Character 0 of ${totalChars}`;
-    // initialize speed controls
-    speedLabel.textContent = wpm + ' WPM';
-    speedSlider.value = wpm;
-    // show replay/hint controls
-    document.getElementById('controls').style.display = 'block';
-    startTime = Date.now();
+    // Initialize audio
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    nextChar();
+    // Show initial progress
+    updateProgress();
+    // Ask first question
+    nextQuestion();
   }
 
-  async function nextChar() {
-    if (currentIndex >= totalChars) {
-      finishTest();
-      return;
+  // pick next char based on mastery weights
+  function pickNextChar() {
+    const pool = [];
+    chars.forEach(c => {
+      const w = (charPoints[c] >= targetPoints ? completedWeight : 1);
+      pool.push({ char: c, weight: w });
+    });
+    const totalW = pool.reduce((sum, p) => sum + p.weight, 0);
+    let r = Math.random() * totalW;
+    for (const p of pool) {
+      if (r < p.weight) return p.char;
+      r -= p.weight;
     }
-    currentIndex++;
-    progressDiv.textContent = `Character ${currentIndex} of ${totalChars}`;
-    currentChar = chars[Math.floor(Math.random() * chars.length)];
+    return pool[pool.length - 1].char;
+  }
+  // update progress display: Mastered X/Y
+  function updateProgress() {
+    const mastered = chars.filter(c => charPoints[c] >= targetPoints).length;
+    progressDiv.textContent = `Mastered: ${mastered}/${chars.length}`;
+    // If all mastered, finish
+    if (mastered === chars.length) {
+      finishTest();
+    }
+  }
+  async function nextQuestion() {
+    currentChar = pickNextChar();
     currentMistakes = 0;
     statusDiv.textContent = '';
-    statusDiv.classList.remove('success');
-    statusDiv.classList.remove('error');
-    waitingForInput = false;
+    statusDiv.classList.remove('success', 'error');
     hintDiv.textContent = '';
+    waitingForInput = false;
     await playMorse(currentChar);
+    questionStartTime = Date.now();
     waitingForInput = true;
   }
 
@@ -187,13 +210,20 @@
     }
     if (key === currentChar) {
       waitingForInput = false;
-      if (currentMistakes === 0) {
-        firstTryCount++;
-      }
+      // first-try count
+      if (currentMistakes === 0) firstTryCount++;
+      // calculate response time
+      const delta = (Date.now() - questionStartTime) / 1000;
+      let pts = 0;
+      if (delta <= fastThreshold) pts = 1;
+      else if (delta < maxThreshold) pts = (maxThreshold - delta) / maxThreshold;
+      // award and clamp
+      charPoints[currentChar] = Math.min(targetPoints, charPoints[currentChar] + pts);
       statusDiv.textContent = 'Correct!';
       statusDiv.classList.remove('error');
       statusDiv.classList.add('success');
-      setTimeout(nextChar, unit);
+      updateProgress();
+      setTimeout(nextQuestion, unit);
     } else {
       // incorrect: increment mistakes, replay sound
       currentMistakes++;
@@ -202,6 +232,8 @@
       statusDiv.classList.remove('success');
       statusDiv.classList.add('error');
       waitingForInput = false;
+      // incorrect: lose one point
+      charPoints[currentChar] = Math.max(0, charPoints[currentChar] - 1);
       // checkpoint strike logic
       if (strikeLimit !== null) {
         strikeCount++;
@@ -210,9 +242,8 @@
           return;
         }
       }
-      playMorse(currentChar).then(() => {
-        waitingForInput = true;
-      });
+      // replay
+      playMorse(currentChar).then(() => { waitingForInput = true; });
     }
   }
 
@@ -238,10 +269,8 @@
     }
   }
   function finishTest() {
-    const attempted = currentIndex;
     const endTime = Date.now();
     const elapsedSec = (endTime - startTime) / 1000;
-    const accuracy = ((firstTryCount / attempted) * 100).toFixed(2);
     const struggles = Object.entries(mistakesMap)
       .filter(([c, count]) => count > 0)
       .sort((a, b) => b[1] - a[1])
@@ -253,10 +282,8 @@
     const pad = n => n.toString().padStart(2, '0');
     const displayTime = `${pad(minutes)}:${pad(secondsInt)}`;
     const tooltipTime = `${totalSec.toFixed(2)}s`;
-    let html = `<p>Test complete!</p>`;
-    html += `<p>Accuracy: ${accuracy}%</p>`;
+    let html = `<p>Level Complete!</p>`;
     html += `<p>Time: <span title="${tooltipTime}">${displayTime}</span></p>`;
-    html += `<p>Completed: ${attempted}/${totalChars}</p>`;
     html += `<p>Replays: ${replayCount}</p>`;
     if (struggles.length > 0) {
       html += '<p>Characters you struggled with:</p><ul>';
