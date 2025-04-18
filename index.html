@@ -9,6 +9,8 @@
 <body>
   <button id="menu-toggle">☰</button>
   <div id="menu">
+    <label for="level-select">Level:</label>
+    <select id="level-select"></select>
     <label for="speed-slider">Speed: <span id="speed-label"></span></label>
     <input type="range" id="speed-slider" min="5" max="40" step="1">
   </div>
@@ -24,6 +26,7 @@
     <div id="results"></div>
   </div>
   <div id="action-hints"></div>
+  <script src="levels.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

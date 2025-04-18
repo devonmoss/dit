@@ -1,6 +1,9 @@
 (function() {
   const totalChars = 50;
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
+  // default character set (a-z, 0-9)
+  const defaultChars = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
+  // current character set for this test (may vary by level)
+  let chars = [...defaultChars];
   const morseMap = {
     'a':'.-','b':'-...','c':'-.-.','d':'-..','e':'.','f':'..-.','g':'--.',
     'h':'....','i':'..','j':'.---','k':'-.-','l':'.-..','m':'--','n':'-.',
@@ -10,13 +13,16 @@
     '6':'-....','7':'--...','8':'---..','9':'----.'
   };
   let currentIndex = 0;
+  let strikeLimit = null;
+  let strikeCount = 0;
   let firstTryCount = 0;
   const mistakesMap = {};
   let currentChar = '';
   let currentMistakes = 0;
   let startTime = null;
   let waitingForInput = false;
-  let wpm = 20; // words per minute
+  let replayCount = 0; // user-initiated replays
+  let wpm = 20; // words per minute (controls speed)
   let unit = 1200 / wpm; // duration of one morse unit in ms
   let audioContext = null;
 
@@ -32,6 +38,19 @@
   const hintButton = document.getElementById('hint-button');
   const hintDiv = document.getElementById('hint');
   const actionHints = document.getElementById('action-hints');
+  // populate level selector
+  const levelSelect = document.getElementById('level-select');
+  if (window.trainingLevels && Array.isArray(window.trainingLevels)) {
+    window.trainingLevels.forEach(level => {
+      const opt = document.createElement('option');
+      opt.value = level.id;
+      opt.textContent = level.name;
+      levelSelect.appendChild(opt);
+    });
+    // default to last level (full-set checkpoint)
+    const lastLevel = window.trainingLevels[window.trainingLevels.length - 1];
+    if (lastLevel) levelSelect.value = lastLevel.id;
+  }
   // initialize speed slider display
   speedSlider.value = wpm;
   speedLabel.textContent = wpm + ' WPM';
@@ -50,6 +69,8 @@
   });
   function replayCurrent() {
     if (!audioContext) return;
+    // count user-triggered replay
+    replayCount++;
     waitingForInput = false;
     playMorse(currentChar).then(() => {
       waitingForInput = true;
@@ -66,6 +87,26 @@
   });
 
   function startTest() {
+    // select character set and rules based on selected level
+    const selectedId = levelSelect.value;
+    if (!window.trainingLevels) {
+      chars = [...defaultChars];
+      strikeLimit = null;
+    } else {
+      const lvl = window.trainingLevels.find(l => l.id === selectedId);
+      if (lvl) {
+        chars = [...lvl.chars];
+        if (lvl.type === 'checkpoint') {
+          strikeLimit = lvl.strikeLimit || null;
+          strikeCount = 0;
+        } else {
+          strikeLimit = null;
+        }
+      } else {
+        chars = [...defaultChars];
+        strikeLimit = null;
+      }
+    }
     // reset test state variables
     currentIndex = 0;
     firstTryCount = 0;
@@ -76,7 +117,8 @@
     progressDiv.style.display = '';
     statusDiv.style.display = '';
     statusDiv.textContent = '';
-    // set up action hints and key handling
+    // reset replay count and set up action hints and key handling
+    replayCount = 0;
     actionHints.textContent = 'Tab: Replay, Esc: End Test';
     document.addEventListener('keydown', handleKeydown);
     // hide start button
@@ -144,6 +186,14 @@
       statusDiv.classList.remove('success');
       statusDiv.classList.add('error');
       waitingForInput = false;
+      // checkpoint strike logic
+      if (strikeLimit !== null) {
+        strikeCount++;
+        if (strikeCount >= strikeLimit) {
+          finishTest();
+          return;
+        }
+      }
       playMorse(currentChar).then(() => {
         waitingForInput = true;
       });
@@ -163,14 +213,22 @@
     const endTime = Date.now();
     const elapsedSec = (endTime - startTime) / 1000;
     const accuracy = ((firstTryCount / attempted) * 100).toFixed(2);
-    const wpmResult = ((attempted / 5) / (elapsedSec / 60)).toFixed(2);
     const struggles = Object.entries(mistakesMap)
       .filter(([c, count]) => count > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
+    // format time as MM:SS with hover tooltip for precise seconds
+    const totalSec = elapsedSec;
+    const minutes = Math.floor(totalSec / 60);
+    const secondsInt = Math.floor(totalSec % 60);
+    const pad = n => n.toString().padStart(2, '0');
+    const displayTime = `${pad(minutes)}:${pad(secondsInt)}`;
+    const tooltipTime = `${totalSec.toFixed(2)}s`;
     let html = `<p>Test complete!</p>`;
     html += `<p>Accuracy: ${accuracy}%</p>`;
-    html += `<p>Speed: ${wpmResult} WPM</p>`;
+    html += `<p>Time: <span title="${tooltipTime}">${displayTime}</span></p>`;
+    html += `<p>Completed: ${attempted}/${totalChars}</p>`;
+    html += `<p>Replays: ${replayCount}</p>`;
     if (struggles.length > 0) {
       html += '<p>Characters you struggled with:</p><ul>';
       struggles.forEach(([c, count]) => {
