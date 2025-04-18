@@ -24,6 +24,12 @@ body {
 #start-button:hover {
   background-color: #2a2a2a;
 }
+/* current level display */
+#current-level {
+  font-size: 16px;
+  color: #888;
+  margin-top: 10px;
+}
 #progress {
   font-size: 20px;
   margin-top: 20px;
@@ -89,6 +95,36 @@ body {
 }
 #menu.open {
   left: 0;
+}
+#levels-list-container {
+  display: none;
+  margin-top: 20px;
+  overflow-y: auto;
+  max-height: calc(100vh - 160px);
+}
+#menu.open #levels-list-container {
+  display: block;
+}
+#levels-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.level-item {
+  padding: 8px;
+  font-size: 16px;
+  color: #777;
+  cursor: pointer;
+}
+.level-item.completed {
+  color: #e0e0e0;
+}
+.level-item.selected {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+}
+.level-item:hover {
+  background-color: #3a3a3a;
 }
 /* Hide slider and label when menu is closed */
 #menu label,

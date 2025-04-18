@@ -22,7 +22,11 @@
   let startTime = null;
   let waitingForInput = false;
   let replayCount = 0; // user-initiated replays
-  let wpm = 20; // words per minute (controls speed)
+  // load preferred speed from localStorage or default to 20 WPM
+  let wpm = (function() {
+    const stored = parseInt(localStorage.getItem('morseWpm'), 10);
+    return (stored && !isNaN(stored)) ? stored : 20;
+  })();
   let unit = 1200 / wpm; // duration of one morse unit in ms
   let audioContext = null;
 
@@ -38,18 +42,39 @@
   const hintButton = document.getElementById('hint-button');
   const hintDiv = document.getElementById('hint');
   const actionHints = document.getElementById('action-hints');
-  // populate level selector
-  const levelSelect = document.getElementById('level-select');
+  // load completed levels from localStorage
+  let completedLevels = JSON.parse(localStorage.getItem('morseCompleted') || '[]');
+  // determine initial selected level: first incomplete or last
+  let selectedId = (window.trainingLevels && Array.isArray(window.trainingLevels))
+    ? (window.trainingLevels.find(l => !completedLevels.includes(l.id)) || window.trainingLevels[window.trainingLevels.length-1]).id
+    : null;
+  // populate levels list in sidebar
+  const levelsList = document.getElementById('levels-list');
   if (window.trainingLevels && Array.isArray(window.trainingLevels)) {
     window.trainingLevels.forEach(level => {
-      const opt = document.createElement('option');
-      opt.value = level.id;
-      opt.textContent = level.name;
-      levelSelect.appendChild(opt);
+      const li = document.createElement('li');
+      li.textContent = level.name;
+      li.dataset.id = level.id;
+      li.classList.add('level-item');
+      if (completedLevels.includes(level.id)) li.classList.add('completed');
+      if (selectedId === level.id) li.classList.add('selected');
+      li.addEventListener('click', () => selectLevel(level.id));
+      levelsList.appendChild(li);
     });
-    // default to last level (full-set checkpoint)
-    const lastLevel = window.trainingLevels[window.trainingLevels.length - 1];
-    if (lastLevel) levelSelect.value = lastLevel.id;
+  }
+  // current level display
+  const currentLevelDiv = document.getElementById('current-level');
+  function updateCurrentLevelDisplay() {
+    const lvl = window.trainingLevels.find(l => l.id === selectedId);
+    currentLevelDiv.textContent = lvl ? lvl.name : '';
+  }
+  updateCurrentLevelDisplay();
+  function selectLevel(id) {
+    selectedId = id;
+    document.querySelectorAll('.level-item').forEach(el =>
+      el.classList.toggle('selected', el.dataset.id === id)
+    );
+    updateCurrentLevelDisplay();
   }
   // initialize speed slider display
   speedSlider.value = wpm;
@@ -66,6 +91,8 @@
     wpm = parseInt(e.target.value, 10);
     unit = 1200 / wpm;
     speedLabel.textContent = wpm + ' WPM';
+    // persist preference
+    localStorage.setItem('morseWpm', wpm);
   });
   function replayCurrent() {
     if (!audioContext) return;
@@ -87,27 +114,16 @@
   });
 
   function startTest() {
-    // select character set and rules based on selected level
-    const selectedId = levelSelect.value;
-    if (!window.trainingLevels) {
-      chars = [...defaultChars];
-      strikeLimit = null;
-    } else {
-      const lvl = window.trainingLevels.find(l => l.id === selectedId);
-      if (lvl) {
-        chars = [...lvl.chars];
-        if (lvl.type === 'checkpoint') {
-          strikeLimit = lvl.strikeLimit || null;
-          strikeCount = 0;
-        } else {
-          strikeLimit = null;
-        }
-      } else {
-        chars = [...defaultChars];
-        strikeLimit = null;
-      }
-    }
-    // reset test state variables
+  // select character set and rules based on selected level
+  const lvl = (window.trainingLevels || []).find(l => l.id === selectedId) || { chars: defaultChars, type: 'standard', strikeLimit: null };
+  chars = [...lvl.chars];
+  if (lvl.type === 'checkpoint') {
+    strikeLimit = lvl.strikeLimit || null;
+    strikeCount = 0;
+  } else {
+    strikeLimit = null;
+  }
+  // reset test state variables
     currentIndex = 0;
     firstTryCount = 0;
     // clear mistakes map
@@ -200,12 +216,25 @@
     }
   }
 
-  // handler for starting a new test from summary via Tab
+  // handler for summary action keys: Tab to repeat, Enter to next lesson
   function handleSummaryKeydown(e) {
     if (e.key === 'Tab') {
       e.preventDefault();
       document.removeEventListener('keydown', handleSummaryKeydown);
+      // repeat same level
       startTest();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      document.removeEventListener('keydown', handleSummaryKeydown);
+      // advance to next level if available
+      if (window.trainingLevels && Array.isArray(window.trainingLevels)) {
+        const idx = window.trainingLevels.findIndex(l => l.id === selectedId);
+        if (idx >= 0 && idx < window.trainingLevels.length - 1) {
+          const next = window.trainingLevels[idx + 1];
+          selectLevel(next.id);
+          startTest();
+        }
+      }
     }
   }
   function finishTest() {
@@ -244,8 +273,15 @@
     hintDiv.textContent = '';
     waitingForInput = false;
     document.removeEventListener('keydown', handleKeydown);
-    // switch action hints to new-test mode
-    actionHints.textContent = 'Tab: New Test';
+    // mark current level completed and persist
+    if (!completedLevels.includes(selectedId)) {
+      completedLevels.push(selectedId);
+      localStorage.setItem('morseCompleted', JSON.stringify(completedLevels));
+      const completedEl = document.querySelector(`.level-item[data-id="${selectedId}"]`);
+      if (completedEl) completedEl.classList.add('completed');
+    }
+    // show summary action hints: replay current or next lesson
+    actionHints.textContent = 'Tab: Repeat Lesson, Enter: Next Lesson';
     document.addEventListener('keydown', handleSummaryKeydown);
   }
 

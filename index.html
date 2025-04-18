@@ -9,13 +9,15 @@
 <body>
   <button id="menu-toggle">☰</button>
   <div id="menu">
-    <label for="level-select">Level:</label>
-    <select id="level-select"></select>
     <label for="speed-slider">Speed: <span id="speed-label"></span></label>
     <input type="range" id="speed-slider" min="5" max="40" step="1">
+    <div id="levels-list-container">
+      <ul id="levels-list"></ul>
+    </div>
   </div>
   <div id="container">
     <button id="start-button">Start</button>
+    <div id="current-level"></div>
     <div id="progress"></div>
     <div id="status"></div>
     <div id="controls">
