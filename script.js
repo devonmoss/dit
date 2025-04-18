@@ -9,10 +9,14 @@
   const maxThreshold = 4.0;
   // weight for already mastered chars in question pool
   const completedWeight = 0.2;
+  // delay after feedback (correct or incorrect) before next action (ms)
+  const feedbackDelay = 750;
   // character mastery points
   let charPoints = {};
   // timestamp when current character was played
   let questionStartTime = null;
+  // flag indicating an active test session
+  let testActive = false;
   // DOM container for mastery display
   const masteryContainer = document.getElementById('mastery-container');
 
@@ -163,6 +167,7 @@
   });
 
   function startTest() {
+    testActive = true;
     // Initialize level and mastery state
     const lvl = (window.trainingLevels || []).find(l => l.id === selectedId) || { chars: defaultChars, type: 'standard' };
     chars = [...lvl.chars];
@@ -182,6 +187,7 @@
     statusDiv.style.display = '';
     statusDiv.textContent = '';
     startButton.style.display = 'none';
+    progressDiv.style.display = '';
     document.getElementById('controls').style.display = 'block';
     actionHints.textContent = 'Tab: Replay, Esc: End Test';
     document.addEventListener('keydown', handleKeydown);
@@ -262,7 +268,9 @@
       statusDiv.classList.remove('error');
       statusDiv.classList.add('success');
       updateProgress();
-      setTimeout(nextQuestion, unit);
+      if (testActive) {
+        setTimeout(nextQuestion, feedbackDelay);
+      }
     } else {
       // incorrect: increment mistakes, replay sound
       currentMistakes++;
@@ -282,8 +290,11 @@
           return;
         }
       }
-      // replay
-      playMorse(currentChar).then(() => { waitingForInput = true; });
+      // play incorrect feedback sound, delay, then replay character
+      playErrorSound()
+        .then(() => wait(feedbackDelay))
+        .then(() => playMorse(currentChar))
+        .then(() => { waitingForInput = true; });
     }
   }
 
@@ -309,6 +320,7 @@
     }
   }
   function finishTest() {
+    testActive = false;
     const endTime = Date.now();
     const elapsedSec = (endTime - startTime) / 1000;
     const struggles = Object.entries(mistakesMap)
@@ -382,5 +394,22 @@
   function wait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+  // play a gentle tone for incorrect answers
+  function playErrorSound() {
+    return new Promise((resolve) => {
+      if (!audioContext) return resolve();
+      const duration = 150; // error beep duration in ms
+      const osc = audioContext.createOscillator();
+      osc.frequency.value = 300;
+      osc.type = 'sine';
+      osc.connect(audioContext.destination);
+      osc.start();
+      setTimeout(() => {
+        osc.stop();
+        resolve();
+      }, duration);
+    });
+  }
 
 })();
+  

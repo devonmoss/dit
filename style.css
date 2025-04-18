@@ -75,6 +75,8 @@ body {
 #status {
   font-size: 32px;
   margin-top: 20px;
+  line-height: 32px;
+  min-height: 32px;
 }
 #status.success {
   color: #00e676;
