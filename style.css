@@ -1,0 +1,95 @@
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #121212;
+  color: #e0e0e0;
+  font-family: monospace;
+}
+#container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  text-align: center;
+}
+#start-button {
+  font-size: 24px;
+  padding: 20px 40px;
+  cursor: pointer;
+  background-color: #1f1f1f;
+  border: none;
+  color: #e0e0e0;
+}
+#start-button:hover {
+  background-color: #2a2a2a;
+}
+#progress {
+  font-size: 20px;
+  margin-top: 20px;
+}
+#status {
+  font-size: 32px;
+  margin-top: 20px;
+}
+#status.success {
+  color: #00e676;
+}
+#status.error {
+  color: #ff1744;
+}
+#results {
+  font-size: 24px;
+  margin-top: 20px;
+}
+
+#controls {
+  display: none;
+  margin-top: 20px;
+}
+#controls button {
+  margin: 0 5px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #1f1f1f;
+  border: none;
+  color: #e0e0e0;
+  cursor: pointer;
+}
+#controls button:hover {
+  background-color: #2a2a2a;
+}
+#hint {
+  margin-top: 10px;
+  font-size: 24px;
+  color: #e0e0e0;
+  min-height: 1.2em;
+}
+#menu {
+  position: fixed;
+  left: -220px;
+  top: 0;
+  bottom: 0;
+  width: 220px;
+  background-color: #1f1f1f;
+  padding: 20px;
+  transition: left 0.3s ease;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+  z-index: 100;
+}
+#menu.open {
+  left: 0;
+}
+#menu-toggle {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translate(-100%, -50%);
+  background-color: #1f1f1f;
+  color: #e0e0e0;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 18px;
+  z-index: 101;
+}

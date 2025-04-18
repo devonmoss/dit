@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Morse Code Trainer</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <button id="menu-toggle">☰</button>
+  <div id="menu">
+    <label for="speed-slider">Speed: <span id="speed-label"></span></label>
+    <input type="range" id="speed-slider" min="5" max="40" step="1">
+  </div>
+  <div id="container">
+    <button id="start-button">Start</button>
+    <div id="progress"></div>
+    <div id="status"></div>
+    <div id="controls">
+      <button id="replay-button">Replay</button>
+      <button id="hint-button">Hint</button>
+    </div>
+    <div id="hint"></div>
+    <div id="results"></div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
