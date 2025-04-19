@@ -15,6 +15,8 @@
   let charPoints = {};
   // timestamp when current character was played
   let questionStartTime = null;
+  // record of response times for each question in current test
+  let responseTimes = [];
   // flag indicating an active test session
   let testActive = false;
   // DOM container for mastery display
@@ -181,7 +183,7 @@
     // fetch progress records
     const { data, error } = await window.supabaseClient
       .from('progress')
-      .select('level_id, time_sec, replays, mistakes, created_at')
+      .select('level_id, time_sec, replays, mistakes, times, created_at')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
     if (error) {
@@ -192,7 +194,7 @@
     // build dashboard HTML
     let html = '<button id="back-to-trainer">Back to Trainer</button>';
     html += '<h2>My Progress</h2>';
-    html += '<table><thead><tr><th>Date</th><th>Level</th><th>Time</th><th>Replays</th><th>Mistakes</th></tr></thead><tbody>';
+    html += '<table><thead><tr><th>Date</th><th>Level</th><th>Time</th><th>Replays</th><th>Mistakes</th><th>Avg Times</th></tr></thead><tbody>';
     data.forEach(row => {
       const date = new Date(row.created_at).toLocaleString();
       const totalSec = row.time_sec;
@@ -201,7 +203,10 @@
       const time = `${mm}:${ss}`;
       const mistakesList = Object.entries(row.mistakes || {})
         .map(([c, count]) => `${c.toUpperCase()}:${count}`).join(', ');
-      html += `<tr><td>${date}</td><td>${row.level_id}</td><td>${time}</td><td>${row.replays}</td><td>${mistakesList}</td></tr>`;
+      // average response times per character
+      const timesList = Object.entries(row.times || {})
+        .map(([c, t]) => `${c.toUpperCase()}:${t.toFixed(2)}s`).join(', ');
+      html += `<tr><td>${date}</td><td>${row.level_id}</td><td>${time}</td><td>${row.replays}</td><td>${mistakesList}</td><td>${timesList}</td></tr>`;
     });
     html += '</tbody></table>';
     progressDashboard.innerHTML = html;
@@ -254,6 +259,8 @@
     firstTryCount = 0;
     replayCount = 0;
     startTime = Date.now();
+    // reset response times log
+    responseTimes = [];
     // Clear mistakes
     for (const k in mistakesMap) delete mistakesMap[k];
     // Render mastery circles
@@ -334,6 +341,8 @@
       if (currentMistakes === 0) firstTryCount++;
       // calculate response time
       const delta = (Date.now() - questionStartTime) / 1000;
+      // log response time for summary
+      responseTimes.push({ char: currentChar, time: delta });
       let pts = 0;
       if (delta <= fastThreshold) pts = 1;
       else if (delta < maxThreshold) pts = (maxThreshold - delta) / maxThreshold;
@@ -430,50 +439,90 @@
       });
       html += '</ul>';
     }
-    resultsDiv.innerHTML = html;
+    // hide UI elements
     progressDiv.style.display = 'none';
     statusDiv.style.display = 'none';
-    // hide replay/hint controls
     document.getElementById('controls').style.display = 'none';
     hintDiv.textContent = '';
     waitingForInput = false;
     document.removeEventListener('keydown', handleKeydown);
-    // mark current level completed and persist locally
-    if (completed) {
-      if (!completedLevels.includes(selectedId)) {
-        completedLevels.push(selectedId);
-        localStorage.setItem('morseCompleted', JSON.stringify(completedLevels));
-        const completedEl = document.querySelector(`.level-item[data-id=\"${selectedId}\"]`);
-        if (completedEl) completedEl.classList.add('completed');
-      }
+    // mark current level completed locally
+    if (completed && !completedLevels.includes(selectedId)) {
+      completedLevels.push(selectedId);
+      localStorage.setItem('morseCompleted', JSON.stringify(completedLevels));
+      const completedEl = document.querySelector(`.level-item[data-id="${selectedId}"]`);
+      if (completedEl) completedEl.classList.add('completed');
     }
-    // persist test results to Supabase if user is logged in
+    // compute average response time per character for this test
+    const charTimesMap = {};
+    responseTimes.forEach(rt => {
+      if (!charTimesMap[rt.char]) charTimesMap[rt.char] = [];
+      charTimesMap[rt.char].push(rt.time);
+    });
+    const avgTimes = {};
+    Object.entries(charTimesMap).forEach(([c, timesArr]) => {
+      avgTimes[c] = timesArr.reduce((sum, t) => sum + t, 0) / timesArr.length;
+    });
+    // asynchronously build summary with average times and optional history, then persist results
     (async () => {
-      try {
-        const {
-          data: { session }
-        } = await window.supabaseClient.auth.getSession();
-        if (session && session.user) {
-          const result = await window.supabaseClient
-            .from('progress')
-            .insert([
-              {
-                user_id: session.user.id,
-                level_id: selectedId,
-                time_sec: elapsedSec,
-                replays: replayCount,
-                mistakes: mistakesMap
-              }
-            ]);
-          if (result.error) console.error('Supabase insert error:', result.error);
+      // determine login session
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      let userHistAvg = null;
+      if (session && session.user) {
+        // fetch past progress times for this level
+        const { data: prev, error: errPrev } = await window.supabaseClient
+          .from('progress')
+          .select('times')
+          .eq('user_id', session.user.id)
+          .eq('level_id', selectedId);
+        if (prev && !errPrev) {
+          const histMap = {};
+          prev.forEach(r => {
+            if (r.times) {
+              Object.entries(r.times).forEach(([ch, t]) => {
+                if (!histMap[ch]) histMap[ch] = [];
+                histMap[ch].push(t);
+              });
+            }
+          });
+          userHistAvg = {};
+          Object.entries(histMap).forEach(([ch, arr]) => {
+            userHistAvg[ch] = arr.reduce((s, x) => s + x, 0) / arr.length;
+          });
         }
-      } catch (e) {
-        console.error('Error persisting results:', e);
       }
+      // build average times table
+      html += '<div id="char-times"><h3>Average Response Times</h3>';
+      html += '<table class="times-table"><thead><tr><th>Char</th><th>This Test</th>';
+      if (userHistAvg) html += '<th>Your Avg</th>';
+      html += '</tr></thead><tbody>';
+      Object.keys(avgTimes).sort().forEach(ch => {
+        html += '<tr>';
+        html += `<td>${ch.toUpperCase()}</td>`;
+        html += `<td>${avgTimes[ch].toFixed(2)}s</td>`;
+        if (userHistAvg && userHistAvg[ch] != null) {
+          html += `<td>${userHistAvg[ch].toFixed(2)}s</td>`;
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      // render summary
+      resultsDiv.innerHTML = html;
+      // persist test results to Supabase if logged in
+      if (session && session.user) {
+        try {
+          const { error: insertErr } = await window.supabaseClient
+            .from('progress')
+            .insert([{ user_id: session.user.id, level_id: selectedId, time_sec: elapsedSec, replays: replayCount, mistakes: mistakesMap, times: avgTimes }]);
+          if (insertErr) console.error('Supabase insert error:', insertErr);
+        } catch (e) {
+          console.error('Error persisting results:', e);
+        }
+      }
+      // show summary action hints
+      actionHints.textContent = 'Tab: Repeat Lesson, Enter: Next Lesson';
+      document.addEventListener('keydown', handleSummaryKeydown);
     })();
-    // show summary action hints: replay current or next lesson
-    actionHints.textContent = 'Tab: Repeat Lesson, Enter: Next Lesson';
-    document.addEventListener('keydown', handleSummaryKeydown);
   }
 
   function playMorse(char) {
