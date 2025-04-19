@@ -19,6 +19,8 @@
   let responseTimes = [];
   // flag indicating an active test session
   let testActive = false;
+  // flag for guided send test mode
+  let guidedSendActive = false;
   // DOM container for mastery display
   const masteryContainer = document.getElementById("mastery-container");
 
@@ -116,12 +118,12 @@
   })();
   let unit = 1200 / wpm; // duration of one morse unit in ms
   let audioContext = null;
-  let gainNode = null;  // Add gain node for volume control
-  
+  let gainNode = null; // Add gain node for volume control
+
   // load preferred volume from localStorage or default to 75
-  let volume = (function() {
-    const stored = parseInt(localStorage.getItem('morseVolume'), 10);
-    return (stored && !isNaN(stored)) ? stored : 75;
+  let volume = (function () {
+    const stored = parseInt(localStorage.getItem("morseVolume"), 10);
+    return stored && !isNaN(stored) ? stored : 75;
   })();
 
   const startButton = document.getElementById("start-button");
@@ -178,11 +180,16 @@
       .querySelectorAll(".level-item")
       .forEach((el) => el.classList.toggle("selected", el.dataset.id === id));
     updateCurrentLevelDisplay();
+    // start new send test when in send mode
+    if (currentMode === "send") {
+      if (guidedSendActive) finishSendTest();
+      startSendTest();
+    }
   }
   // initialize speed slider display
   speedSlider.value = wpm;
   speedLabel.textContent = wpm + " WPM";
-  
+
   // initialize volume slider display
   volumeSlider.value = volume;
   volumeLabel.textContent = volume + "%";
@@ -202,13 +209,13 @@
     localStorage.setItem("morseWpm", wpm);
   });
 
-  volumeSlider.addEventListener('input', (e) => {
+  volumeSlider.addEventListener("input", (e) => {
     volume = parseInt(e.target.value, 10);
-    volumeLabel.textContent = volume + '%';
+    volumeLabel.textContent = volume + "%";
     if (gainNode) {
       gainNode.gain.value = volume / 100;
     }
-    localStorage.setItem('morseVolume', volume);
+    localStorage.setItem("morseVolume", volume);
   });
   function replayCurrent() {
     if (!audioContext) return;
@@ -295,7 +302,45 @@
   // Sending Trainer UI elements
   const sendingBtn = document.getElementById("sending-button");
   const sendingDiv = document.getElementById("sending-trainer");
+  // Mode toggle setup (Copy vs Send)
+  const modeCopyRadio = document.getElementById("mode-copy");
+  const modeSendRadio = document.getElementById("mode-send");
+  let currentMode = "copy";
+  modeCopyRadio.addEventListener("change", () => {
+    if (modeCopyRadio.checked) setMode("copy");
+  });
+  modeSendRadio.addEventListener("change", () => {
+    if (modeSendRadio.checked) setMode("send");
+  });
+  function setMode(mode) {
+    if (mode === currentMode) return;
+    if (mode === "send" && testActive) finishTest(false);
+    if (mode === "copy" && guidedSendActive) finishSendTest();
+    currentMode = mode;
+    renderMode();
+    if (currentMode === "send") startSendTest();
+  }
+  function renderMode() {
+    if (currentMode === "copy") {
+      containerDiv.style.display = "flex";
+      actionHints.style.display = "block";
+      sendingDiv.style.display = "none";
+      progressDashboard.style.display = "none";
+      startButton.style.display = "inline-block";
+    } else {
+      containerDiv.style.display = "none";
+      actionHints.style.display = "none";
+      sendingDiv.style.display = "flex";
+      progressDashboard.style.display = "none";
+      startButton.style.display = "none";
+    }
+  }
+  // initialize mode view
+  renderMode();
+
   const backFromSendingBtn = document.getElementById("back-from-sending");
+  // const sendingDiv = document.getElementById("sending-trainer");
+  // const backFromSendingBtn = document.getElementById("back-from-sending");
   const sendSpeedSlider = document.getElementById("send-speed-slider");
   const sendSpeedLabel = document.getElementById("send-speed-label");
   const keyerOutput = document.getElementById("keyer-output");
@@ -364,19 +409,163 @@
   });
   // called when a word has been fully sent (after word gap)
   function handleWordComplete(word) {
-    console.log('Word complete:', word);
+    console.log("Word complete:", word);
     // clear word buffer for next word
+  }
+  // Save original sending handler for free-run sending
+  const originalHandleWordComplete = handleWordComplete;
+  // Guided send test state and elements
+  let sendChars = [];
+  let sendCharPoints = {};
+  let sendCurrentChar = "";
+  let sendCurrentMistakes = 0;
+  let sendQuestionStartTime = null;
+  const sendMasteryContainer = document.getElementById(
+    "send-mastery-container",
+  );
+  const sendCurrentLevelDiv = document.getElementById("send-current-level");
+  const sendCurrentCharDiv = document.getElementById("send-current-char");
+  const sendProgressDiv = document.getElementById("send-progress");
+  const sendStatusDiv = document.getElementById("send-status");
+  // Pick next send character weighted by mastery
+  function pickNextSendChar() {
+    const pool = sendChars.map((c) => ({
+      char: c,
+      weight: sendCharPoints[c] >= targetPoints ? completedWeight : 1,
+    }));
+    const totalW = pool.reduce((sum, p) => sum + p.weight, 0);
+    let r = Math.random() * totalW;
+    for (const p of pool) {
+      if (r < p.weight) return p.char;
+      r -= p.weight;
+    }
+    return pool[pool.length - 1].char;
+  }
+  // Render mastery circles for send mode
+  function generateSendMasteryDisplay() {
+    sendMasteryContainer.innerHTML = "";
+    sendChars.forEach((c) => {
+      const r = 18;
+      const cfs = 2 * Math.PI * r;
+      const div = document.createElement("div");
+      div.className = "char-master";
+      div.dataset.char = c;
+      div.innerHTML = `
+        <svg><circle class="bg" cx="24" cy="24" r="${r}" stroke-dasharray="${cfs}" stroke-dashoffset="0" />
+        <circle class="fg" cx="24" cy="24" r="${r}" stroke-dasharray="${cfs}" stroke-dashoffset="${cfs}" /></svg>
+        <span class="char-label">${c.toUpperCase()}</span>
+      `;
+      sendMasteryContainer.appendChild(div);
+    });
+  }
+  // Update mastery circles fill
+  function updateSendMasteryDisplay() {
+    sendMasteryContainer.querySelectorAll(".char-master").forEach((el) => {
+      const c = el.dataset.char;
+      const pts = sendCharPoints[c] || 0;
+      const frac = Math.min(pts / targetPoints, 1);
+      const circle = el.querySelector("circle.fg");
+      const r = circle.getAttribute("r");
+      const cfs = 2 * Math.PI * r;
+      const offset = cfs * (1 - frac);
+      circle.style.strokeDashoffset = offset;
+    });
+  }
+  // Update progress text and finish when all mastered
+  function updateSendProgress() {
+    const mastered = sendChars.filter(
+      (c) => sendCharPoints[c] >= targetPoints,
+    ).length;
+    sendProgressDiv.textContent = `Mastered: ${mastered}/${sendChars.length}`;
+    if (mastered === sendChars.length) finishSendTest();
+  }
+  // Advance to next send question
+  function nextSendQuestion() {
+    sendCurrentChar = pickNextSendChar();
+    sendCurrentMistakes = 0;
+    const lvl = window.trainingLevels.find((l) => l.id === selectedId) || {};
+    sendCurrentLevelDiv.textContent = lvl.name || "";
+    sendCurrentCharDiv.textContent = sendCurrentChar.toUpperCase();
+    sendStatusDiv.textContent = "";
+    sendQuestionStartTime = Date.now();
+  }
+  // Start guided send test
+  function startSendTest() {
+    guidedSendActive = true;
+    const lvl = window.trainingLevels.find((l) => l.id === selectedId) || {
+      chars: defaultChars,
+    };
+    sendChars = [...lvl.chars];
+    sendCharPoints = {};
+    sendChars.forEach((c) => (sendCharPoints[c] = 0));
+    keyerOutput.textContent = "";
+    decodedDiv.textContent = "";
+    generateSendMasteryDisplay();
+    updateSendMasteryDisplay();
+    updateSendProgress();
+    // enable sending loop
+    sendingMode = true;
+    document.addEventListener("keydown", sendKeydown);
+    document.addEventListener("keyup", sendKeyup);
+    // override handler
+    handleWordComplete = guidedSendHandleWordComplete;
+    nextSendQuestion();
+    sendLoop();
+  }
+  // Finish guided send test
+  function finishSendTest() {
+    guidedSendActive = false;
+    sendingMode = false;
+    document.removeEventListener("keydown", sendKeydown);
+    document.removeEventListener("keyup", sendKeyup);
+    handleWordComplete = originalHandleWordComplete;
+    sendStatusDiv.textContent = "Complete!";
+    sendStatusDiv.classList.add("success");
+  }
+  // Custom handler for guided send completion of each letter
+  function guidedSendHandleWordComplete(word) {
+    if (!guidedSendActive) {
+      return originalHandleWordComplete(word);
+    }
+    if (!word) return;
+    const letter = word[0];
+    if (letter === sendCurrentChar) {
+      if (sendCurrentMistakes === 0) {
+        // first-try success (could track)
+      }
+      sendCharPoints[sendCurrentChar] = Math.min(
+        sendCharPoints[sendCurrentChar] + 1,
+        targetPoints,
+      );
+      updateSendMasteryDisplay();
+      updateSendProgress();
+      sendStatusDiv.textContent = "✓";
+      sendStatusDiv.classList.add("success");
+      setTimeout(() => {
+        sendStatusDiv.textContent = "";
+        sendStatusDiv.classList.remove("success");
+        nextSendQuestion();
+      }, feedbackDelay);
+    } else {
+      sendCurrentMistakes++;
+      sendStatusDiv.textContent = "✕";
+      sendStatusDiv.classList.add("error");
+      setTimeout(() => {
+        sendStatusDiv.textContent = "";
+        sendStatusDiv.classList.remove("error");
+      }, feedbackDelay);
+    }
   }
   // Paddle key handlers: handle initial press and queue taps
   function sendKeydown(e) {
     if (!sendingMode) return;
     if (e.key === "ArrowLeft") {
       e.preventDefault();
-      if (!keyState.ArrowLeft) sendQueue.push('.');
+      if (!keyState.ArrowLeft) sendQueue.push(".");
       keyState.ArrowLeft = true;
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
-      if (!keyState.ArrowRight) sendQueue.push('-');
+      if (!keyState.ArrowRight) sendQueue.push("-");
       keyState.ArrowRight = true;
     }
   }
@@ -398,28 +587,28 @@
       if (gap >= sendUnit * 7 && (codeBuffer || wordBuffer)) {
         // decode pending letter
         if (codeBuffer) {
-          const letter = invMorseMap[codeBuffer] || '?';
+          const letter = invMorseMap[codeBuffer] || "?";
           decodedDiv.textContent += letter;
           wordBuffer += letter;
-          codeBuffer = '';
+          codeBuffer = "";
         }
         // word complete: evaluate and clear displays
-        if (typeof handleWordComplete === 'function') {
+        if (typeof handleWordComplete === "function") {
           handleWordComplete(wordBuffer);
         }
-        keyerOutput.textContent = '';
-        decodedDiv.textContent = '';
-        wordBuffer = '';
+        keyerOutput.textContent = "";
+        decodedDiv.textContent = "";
+        wordBuffer = "";
         lastTime = now;
         await wait(10);
         continue;
       }
       // letter gap detection: >=3 units
       if (gap >= sendUnit * 3 && codeBuffer) {
-        const letter = invMorseMap[codeBuffer] || '?';
+        const letter = invMorseMap[codeBuffer] || "?";
         decodedDiv.textContent += letter;
         wordBuffer += letter;
-        codeBuffer = '';
+        codeBuffer = "";
         lastTime = now;
       }
       // determine next symbol: queued taps first
@@ -433,11 +622,11 @@
           await wait(10);
           continue;
         } else if (left && right) {
-          symbol = lastSymbol === '.' ? '-' : '.';
+          symbol = lastSymbol === "." ? "-" : ".";
         } else if (left) {
-          symbol = '.';
+          symbol = ".";
         } else {
-          symbol = '-';
+          symbol = "-";
         }
       }
       // play and display symbol
@@ -815,7 +1004,7 @@
       const osc = audioContext.createOscillator();
       osc.frequency.value = 600;
       osc.type = "sine";
-      osc.connect(gainNode);  // Connect to gain node instead of destination
+      osc.connect(gainNode); // Connect to gain node instead of destination
       osc.start();
       setTimeout(() => {
         osc.stop();
@@ -835,7 +1024,7 @@
       const osc = audioContext.createOscillator();
       osc.frequency.value = 300;
       osc.type = "sine";
-      osc.connect(gainNode);  // Connect to gain node instead of destination
+      osc.connect(gainNode); // Connect to gain node instead of destination
       osc.start();
       setTimeout(() => {
         osc.stop();
@@ -844,4 +1033,3 @@
     });
   }
 })();
-
