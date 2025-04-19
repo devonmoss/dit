@@ -281,6 +281,8 @@
   let sendingMode = false;
   // track paddle key states for squeeze functionality
   const keyState = { ArrowLeft: false, ArrowRight: false };
+  // queue of user-triggered symbols to support taps during play
+  const sendQueue = [];
   // inverse Morse map for decoding
   const invMorseMap = Object.fromEntries(
     Object.entries(morseMap).map(([k, v]) => [v, k]),
@@ -340,12 +342,17 @@
     clearTimeout(decodeLetterTimer);
     clearTimeout(decodeWordTimer);
   });
-  // Paddle key handlers: set key state
+  // Paddle key handlers: handle initial press and queue taps
   function sendKeydown(e) {
     if (!sendingMode) return;
-    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    if (e.key === "ArrowLeft") {
       e.preventDefault();
-      keyState[e.key] = true;
+      if (!keyState.ArrowLeft) sendQueue.push('.');
+      keyState.ArrowLeft = true;
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      if (!keyState.ArrowRight) sendQueue.push('-');
+      keyState.ArrowRight = true;
     }
   }
   function sendKeyup(e) {
@@ -355,27 +362,30 @@
       keyState[e.key] = false;
     }
   }
-  // Main send loop: handles squeeze and decoding
+  // Main send loop: handles queued taps, squeeze auto-keying, and decoding
   async function sendLoop() {
     let lastSymbol = null;
     while (sendingMode) {
-      // check paddle states
-      const left = keyState.ArrowLeft;
-      const right = keyState.ArrowRight;
-      // if no paddle is pressed, wait briefly and retry
-      if (!left && !right) {
-        await wait(10);
-        continue;
-      }
-      // determine symbol: squeeze or single paddle
-      let symbol;
-      if (left && right) {
-        // squeeze: alternate from last
-        symbol = lastSymbol === "." ? "-" : ".";
-      } else if (left) {
-        symbol = ".";
+      let symbol = null;
+      // process any queued taps first
+      if (sendQueue.length > 0) {
+        symbol = sendQueue.shift();
       } else {
-        symbol = "-";
+        const left = keyState.ArrowLeft;
+        const right = keyState.ArrowRight;
+        // if no paddle is pressed, small pause
+        if (!left && !right) {
+          await wait(10);
+          continue;
+        }
+        // determine symbol: squeeze or single paddle
+        if (left && right) {
+          symbol = lastSymbol === '.' ? '-' : '.';
+        } else if (left) {
+          symbol = '.';
+        } else {
+          symbol = '-';
+        }
       }
       lastSymbol = symbol;
       // play and display symbol
