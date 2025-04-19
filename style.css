@@ -3,7 +3,8 @@
   flex-wrap: wrap;
   justify-content: center;
   margin: 10px auto 0;
-  max-width: 80%;
+  width: 100%;
+  max-width: 600px;
 }
 .char-master {
   position: relative;
@@ -240,12 +241,13 @@ body {
   background-color: #2a2a2a;
 }
 /* Progress Dashboard view */
+/* Progress Dashboard view */
 #progress-dashboard {
   display: none;
   flex-direction: column;
   justify-content: flex-start;
   align-items: flex-start;
-  padding: 20px;
+  padding: 20px 20px 20px 60px; /* leave space for sidebar toggle */
   height: calc(100vh - 40px);
   overflow-y: auto;
   color: #e0e0e0;
@@ -274,6 +276,7 @@ body {
   padding: 6px 12px;
   cursor: pointer;
   margin-bottom: 12px;
+  margin-left: 60px;
 }
 #progress-dashboard button#back-to-trainer:hover {
   background-color: #00c150;
@@ -540,7 +543,7 @@ body {
 #back-from-sending {
   position: absolute;
   top: 10px;
-  left: 10px;
+  left: 60px;
   z-index: 102;
   background-color: #00e676;
   color: #121212;
