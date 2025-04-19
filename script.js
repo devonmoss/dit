@@ -225,6 +225,99 @@
       actionHints.style.display = 'block';
     });
   });
+  // Sending Trainer UI elements
+  const sendingBtn = document.getElementById('sending-button');
+  const sendingDiv = document.getElementById('sending-trainer');
+  const backFromSendingBtn = document.getElementById('back-from-sending');
+  const sendSpeedSlider = document.getElementById('send-speed-slider');
+  const sendSpeedLabel = document.getElementById('send-speed-label');
+  const keyerOutput = document.getElementById('keyer-output');
+  const sendClearBtn = document.getElementById('send-clear-button');
+  let sendingMode = false;
+  // symbol currently being auto-sent (for key hold)
+  let sendingSymbol = null;
+  let sendWpm = (function() {
+    const stored = parseInt(localStorage.getItem('morseSendWpm'), 10);
+    return (stored && !isNaN(stored)) ? stored : 20;
+  })();
+  let sendUnit = 1200 / sendWpm;
+  // Initialize send speed UI
+  sendSpeedSlider.value = sendWpm;
+  sendSpeedLabel.textContent = sendWpm;
+  sendSpeedSlider.addEventListener('input', e => {
+    sendWpm = parseInt(e.target.value, 10);
+    sendUnit = 1200 / sendWpm;
+    sendSpeedLabel.textContent = sendWpm;
+    localStorage.setItem('morseSendWpm', sendWpm);
+  });
+  sendingBtn.addEventListener('click', () => {
+    // Open sending trainer view
+    sendingMode = true;
+    containerDiv.style.display = 'none';
+    progressDashboard.style.display = 'none';
+    actionHints.style.display = 'none';
+    menu.classList.remove('open');
+    menuToggle.classList.remove('open');
+    menuToggle.textContent = '☰';
+    sendingDiv.style.display = 'flex';
+    // capture key events
+    document.addEventListener('keydown', handleSendingKeydown);
+    document.addEventListener('keyup', handleSendingKeyup);
+  });
+  backFromSendingBtn.addEventListener('click', () => {
+    // Close sending trainer view
+    sendingMode = false;
+    sendingDiv.style.display = 'none';
+    containerDiv.style.display = 'flex';
+    actionHints.style.display = 'block';
+    document.removeEventListener('keydown', handleSendingKeydown);
+    document.removeEventListener('keyup', handleSendingKeyup);
+  });
+  sendClearBtn.addEventListener('click', () => {
+    keyerOutput.textContent = '';
+  });
+  // Stop sending when paddle released
+  function handleSendingKeyup(e) {
+    if (!sendingMode) return;
+    if ((e.key === 'ArrowLeft' && sendingSymbol === '.') || (e.key === 'ArrowRight' && sendingSymbol === '-')) {
+      sendingSymbol = null;
+    }
+  }
+  // Loop sending while key is held
+  function startSendingLoop(symbol) {
+    if (!sendingMode || sendingSymbol !== symbol) return;
+    playSendSymbol(symbol).then(() => {
+      keyerOutput.textContent += symbol;
+      return wait(sendUnit);
+    }).then(() => startSendingLoop(symbol));
+  }
+  // Handle paddle press (start sending loop)
+  function handleSendingKeydown(e) {
+    if (!sendingMode) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      const symbol = e.key === 'ArrowLeft' ? '.' : '-';
+      if (sendingSymbol !== symbol) {
+        sendingSymbol = symbol;
+        startSendingLoop(symbol);
+      }
+    }
+  }
+  function playSendSymbol(symbol) {
+    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    return new Promise(resolve => {
+      const duration = symbol === '.' ? sendUnit : sendUnit * 3;
+      const osc = audioContext.createOscillator();
+      osc.frequency.value = 600;
+      osc.type = 'sine';
+      osc.connect(audioContext.destination);
+      osc.start();
+      setTimeout(() => {
+        osc.stop();
+        resolve();
+      }, duration);
+    });
+  }
 
   function startTest() {
     testActive = true;

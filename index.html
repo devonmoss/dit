@@ -34,6 +34,7 @@
       <ul id="levels-list"></ul>
     </div>
     <button id="view-progress-button">My Progress</button>
+    <button id="sending-button">Sending Trainer</button>
     </div>
     <div id="container">
       <button id="start-button">Start</button>
@@ -51,6 +52,15 @@
     </div>
   <div id="action-hints"></div>
   <div id="progress-dashboard" style="display:none;"></div>
+  <!-- Sending Trainer view -->
+  <div id="sending-trainer" style="display:none;">
+    <button id="back-from-sending">← Back</button>
+    <h2>Sending Trainer</h2>
+    <label for="send-speed-slider">Speed: <span id="send-speed-label"></span> WPM</label>
+    <input type="range" id="send-speed-slider" min="5" max="40" step="1">
+    <div id="keyer-output" class="keyer-output"></div>
+    <button id="send-clear-button">Clear</button>
+  </div>
   </div> <!-- /#app -->
   <!-- Supabase configuration: replace placeholders with your project values -->
   <script>
