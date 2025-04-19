@@ -30,26 +30,29 @@
     <div id="menu">
       <label for="speed-slider">Speed: <span id="speed-label"></span></label>
       <input type="range" id="speed-slider" min="5" max="40" step="1">
-    <div id="levels-list-container">
-      <ul id="levels-list"></ul>
-    </div>
+      <label for="volume-slider">Volume: <span id="volume-label"></span></label>
+      <input type="range" id="volume-slider" min="0" max="100" step="1">
+      <div id="levels-list-container">
+        <ul id="levels-list"></ul>
+      </div>
       <button id="view-progress-button">My Progress</button>
       <button id="sending-button">WIP: Sending Trainer</button>
     </div>
-    <div id="container">
-      <button id="start-button">Start</button>
-      <div id="current-level"></div>
-      <div id="mastery-container"></div>
-      <div id="progress"></div>
-      <div id="status"></div>
-      <div id="strikes"></div>
-      <div id="controls">
-        <button id="replay-button">Replay</button>
-        <button id="hint-button">Hint</button>
-      </div>
-      <div id="hint"></div>
-      <div id="results"></div>
+  </div>
+  <div id="container">
+    <button id="start-button">Start</button>
+    <div id="current-level"></div>
+    <div id="mastery-container"></div>
+    <div id="progress"></div>
+    <div id="status"></div>
+    <div id="strikes"></div>
+    <div id="controls">
+      <button id="replay-button">Replay</button>
+      <button id="hint-button">Hint</button>
     </div>
+    <div id="hint"></div>
+    <div id="results"></div>
+  </div>
   <div id="action-hints"></div>
   <div id="progress-dashboard" style="display:none;"></div>
   <!-- Sending Trainer view -->

@@ -116,6 +116,13 @@
   })();
   let unit = 1200 / wpm; // duration of one morse unit in ms
   let audioContext = null;
+  let gainNode = null;  // Add gain node for volume control
+  
+  // load preferred volume from localStorage or default to 75
+  let volume = (function() {
+    const stored = parseInt(localStorage.getItem('morseVolume'), 10);
+    return (stored && !isNaN(stored)) ? stored : 75;
+  })();
 
   const startButton = document.getElementById("start-button");
   const progressDiv = document.getElementById("progress");
@@ -125,6 +132,8 @@
   const menu = document.getElementById("menu");
   const speedSlider = document.getElementById("speed-slider");
   const speedLabel = document.getElementById("speed-label");
+  const volumeSlider = document.getElementById("volume-slider");
+  const volumeLabel = document.getElementById("volume-label");
   const replayButton = document.getElementById("replay-button");
   const hintButton = document.getElementById("hint-button");
   const hintDiv = document.getElementById("hint");
@@ -173,6 +182,10 @@
   // initialize speed slider display
   speedSlider.value = wpm;
   speedLabel.textContent = wpm + " WPM";
+  
+  // initialize volume slider display
+  volumeSlider.value = volume;
+  volumeLabel.textContent = volume + "%";
 
   startButton.addEventListener("click", startTest);
   menuToggle.addEventListener("click", () => {
@@ -187,6 +200,15 @@
     speedLabel.textContent = wpm + " WPM";
     // persist preference
     localStorage.setItem("morseWpm", wpm);
+  });
+
+  volumeSlider.addEventListener('input', (e) => {
+    volume = parseInt(e.target.value, 10);
+    volumeLabel.textContent = volume + '%';
+    if (gainNode) {
+      gainNode.gain.value = volume / 100;
+    }
+    localStorage.setItem('morseVolume', volume);
   });
   function replayCurrent() {
     if (!audioContext) return;
@@ -499,6 +521,9 @@
     document.addEventListener("keydown", handleKeydown);
     // Initialize audio
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    gainNode = audioContext.createGain();
+    gainNode.gain.value = volume / 100;
+    gainNode.connect(audioContext.destination);
     // Show initial progress
     updateProgress();
     // Ask first question
@@ -790,7 +815,7 @@
       const osc = audioContext.createOscillator();
       osc.frequency.value = 600;
       osc.type = "sine";
-      osc.connect(audioContext.destination);
+      osc.connect(gainNode);  // Connect to gain node instead of destination
       osc.start();
       setTimeout(() => {
         osc.stop();
@@ -810,7 +835,7 @@
       const osc = audioContext.createOscillator();
       osc.frequency.value = 300;
       osc.type = "sine";
-      osc.connect(audioContext.destination);
+      osc.connect(gainNode);  // Connect to gain node instead of destination
       osc.start();
       setTimeout(() => {
         osc.stop();
