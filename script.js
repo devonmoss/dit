@@ -289,11 +289,10 @@
   );
   // buffer for current letter's symbols
   let codeBuffer = "";
+  // buffer for decoded letters making current word
+  let wordBuffer = "";
   // decoded text output
   const decodedDiv = document.getElementById("decoded-output");
-  // timers for decode gaps
-  let decodeLetterTimer = null;
-  let decodeWordTimer = null;
   let sendWpm = (function () {
     const stored = parseInt(localStorage.getItem("morseSendWpm"), 10);
     return stored && !isNaN(stored) ? stored : 20;
@@ -339,9 +338,13 @@
     keyerOutput.textContent = "";
     decodedDiv.textContent = "";
     codeBuffer = "";
-    clearTimeout(decodeLetterTimer);
-    clearTimeout(decodeWordTimer);
+    wordBuffer = "";
   });
+  // called when a word has been fully sent (after word gap)
+  function handleWordComplete(word) {
+    console.log('Word complete:', word);
+    // clear word buffer for next word
+  }
   // Paddle key handlers: handle initial press and queue taps
   function sendKeydown(e) {
     if (!sendingMode) return;
@@ -362,24 +365,52 @@
       keyState[e.key] = false;
     }
   }
-  // Main send loop: handles queued taps, squeeze auto-keying, and decoding
+  // Main send loop: handles queued taps, squeeze auto-keying, and decoding at gaps
   async function sendLoop() {
     let lastSymbol = null;
+    let lastTime = Date.now();
     while (sendingMode) {
-      let symbol = null;
-      // process any queued taps first
+      const now = Date.now();
+      const gap = now - lastTime;
+      // word gap detection: >=7 units
+      if (gap >= sendUnit * 7 && (codeBuffer || wordBuffer)) {
+        // decode pending letter
+        if (codeBuffer) {
+          const letter = invMorseMap[codeBuffer] || '?';
+          decodedDiv.textContent += letter;
+          wordBuffer += letter;
+          codeBuffer = '';
+        }
+        // word complete: evaluate and clear displays
+        if (typeof handleWordComplete === 'function') {
+          handleWordComplete(wordBuffer);
+        }
+        keyerOutput.textContent = '';
+        decodedDiv.textContent = '';
+        wordBuffer = '';
+        lastTime = now;
+        await wait(10);
+        continue;
+      }
+      // letter gap detection: >=3 units
+      if (gap >= sendUnit * 3 && codeBuffer) {
+        const letter = invMorseMap[codeBuffer] || '?';
+        decodedDiv.textContent += letter;
+        wordBuffer += letter;
+        codeBuffer = '';
+        lastTime = now;
+      }
+      // determine next symbol: queued taps first
+      let symbol;
       if (sendQueue.length > 0) {
         symbol = sendQueue.shift();
       } else {
         const left = keyState.ArrowLeft;
         const right = keyState.ArrowRight;
-        // if no paddle is pressed, small pause
         if (!left && !right) {
           await wait(10);
           continue;
-        }
-        // determine symbol: squeeze or single paddle
-        if (left && right) {
+        } else if (left && right) {
           symbol = lastSymbol === '.' ? '-' : '.';
         } else if (left) {
           symbol = '.';
@@ -387,33 +418,14 @@
           symbol = '-';
         }
       }
-      lastSymbol = symbol;
       // play and display symbol
       await playSendSymbol(symbol);
       keyerOutput.textContent += symbol;
       codeBuffer += symbol;
-      // clear and schedule decode timers
-      clearTimeout(decodeLetterTimer);
-      clearTimeout(decodeWordTimer);
-      decodeLetterTimer = setTimeout(() => {
-        if (codeBuffer) {
-          const letter = invMorseMap[codeBuffer] || "?";
-          decodedDiv.textContent += letter;
-          codeBuffer = "";
-        }
-        decodeLetterTimer = null;
-      }, sendUnit * 3);
-      decodeWordTimer = setTimeout(() => {
-        if (codeBuffer) {
-          const letter = invMorseMap[codeBuffer] || "?";
-          decodedDiv.textContent += letter;
-          codeBuffer = "";
-        }
-        decodedDiv.textContent += " ";
-        decodeWordTimer = null;
-      }, sendUnit * 7);
+      lastSymbol = symbol;
       // inter-element gap
       await wait(sendUnit);
+      lastTime = Date.now();
     }
   }
   function playSendSymbol(symbol) {
