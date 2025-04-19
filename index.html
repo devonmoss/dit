@@ -1,36 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Morse Code Trainer</title>
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
-  <button id="menu-toggle">☰</button>
-  <div id="menu">
-    <label for="speed-slider">Speed: <span id="speed-label"></span></label>
-    <input type="range" id="speed-slider" min="5" max="40" step="1">
-    <div id="levels-list-container">
-      <ul id="levels-list"></ul>
+  <!-- Authentication UI -->
+  <div id="auth-container">
+    <div id="auth-logged-out">
+      <input id="email-input" type="email" placeholder="Email" />
+      <input id="password-input" type="password" placeholder="Password" />
+      <button id="signup-button">Sign Up</button>
+      <button id="login-button">Log In</button>
+      <div id="auth-error" style="color: red; margin-top: 0.5em;"></div>
+    </div>
+    <div id="auth-logged-in" style="display:none;">
+      <span id="user-email"></span>
+      <button id="logout-button">Log Out</button>
     </div>
   </div>
-  <div id="container">
-    <button id="start-button">Start</button>
-    <div id="current-level"></div>
-    <div id="mastery-container"></div>
-    <div id="progress"></div>
-    <div id="status"></div>
-    <div id="strikes"></div>
-    <div id="controls">
-      <button id="replay-button">Replay</button>
-      <button id="hint-button">Hint</button>
+  <!-- App content: hidden until user logs in -->
+  <div id="app" style="display:none;">
+    <button id="menu-toggle">☰</button>
+    <div id="menu">
+      <label for="speed-slider">Speed: <span id="speed-label"></span></label>
+      <input type="range" id="speed-slider" min="5" max="40" step="1">
+      <div id="levels-list-container">
+        <ul id="levels-list"></ul>
+      </div>
     </div>
-    <div id="hint"></div>
-    <div id="results"></div>
-  </div>
-  <div id="action-hints"></div>
+    <div id="container">
+      <button id="start-button">Start</button>
+      <div id="current-level"></div>
+      <div id="mastery-container"></div>
+      <div id="progress"></div>
+      <div id="status"></div>
+      <div id="strikes"></div>
+      <div id="controls">
+        <button id="replay-button">Replay</button>
+        <button id="hint-button">Hint</button>
+      </div>
+      <div id="hint"></div>
+      <div id="results"></div>
+    </div>
+    <div id="action-hints"></div>
+  </div> <!-- /#app -->
+  <!-- Supabase configuration: replace placeholders with your project values -->
+  <script>
+    const SUPABASE_URL = 'https://kverifrebkciexkbkauq.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt2ZXJpZnJlYmtjaWV4a2JrYXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUwNzI2MDcsImV4cCI6MjA2MDY0ODYwN30.JHD_87VLGaURSuQeToyVhbDpss7FQZMMI3kB3rsUYmU';
+  </script>
+  <!-- Supabase JS client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Levels definitions -->
   <script src="levels.js"></script>
+  <!-- Authentication logic -->
+  <script src="auth.js"></script>
+  <!-- Main application script -->
   <script src="script.js"></script>
 </body>
+
 </html>
