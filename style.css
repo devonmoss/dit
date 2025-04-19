@@ -476,6 +476,20 @@ body {
   white-space: pre-wrap;
   word-wrap: break-word;
 }
+# Sending decoding output
+.decoded-output {
+  width: 80%;
+  min-height: 40px;
+  background-color: #1f1f1f;
+  border: 1px solid #333;
+  color: #00e676;
+  margin: 10px 0;
+  padding: 10px;
+  font-family: monospace;
+  font-size: 20px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
 #send-clear-button {
   background-color: #1f1f1f;
   border: none;
