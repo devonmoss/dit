@@ -80,6 +80,16 @@
     if (error) showError(error.message);
     else showError("");
   });
+  // GitHub OAuth log in
+  const githubButton = document.getElementById('github-button');
+  githubButton.addEventListener('click', async () => {
+    authError.textContent = '';
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: 'github',
+      options: { redirectTo: window.location.origin }
+    });
+    if (error) showError(error.message);
+  });
 
   // Log out
   logoutButton.addEventListener("click", async () => {
