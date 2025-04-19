@@ -33,6 +33,12 @@
       <input type="range" id="speed-slider" min="5" max="40" step="1">
       <label for="volume-slider">Volume: <span id="volume-label"></span></label>
       <input type="range" id="volume-slider" min="0" max="100" step="1">
+      <div id="mode-toggle">
+        <input type="radio" name="mode" id="mode-copy" value="copy" checked>
+        <label for="mode-copy">Copy</label>
+        <input type="radio" name="mode" id="mode-send" value="send">
+        <label for="mode-send">Send</label>
+      </div>
         <div id="levels-list-container">
           <ul id="levels-list"></ul>
         </div>
@@ -59,6 +65,13 @@
     <div id="sending-trainer" style="display:none;">
       <button id="back-from-sending">← Back</button>
       <h2>Sending Trainer</h2>
+      <div id="send-current-meta">
+        <div id="send-current-level" class="send-current-level"></div>
+        <div id="send-current-char" class="send-current-char"></div>
+      </div>
+      <div id="send-mastery-container"></div>
+      <div id="send-progress"></div>
+      <div id="send-status"></div>
       <div id="sending-instructions">← <span class="dot">·</span> <span class="dash">–</span> → </div>
       <label for="send-speed-slider">Speed: <span id="send-speed-label"></span> WPM</label>
       <input type="range" id="send-speed-slider" min="5" max="40" step="1">
