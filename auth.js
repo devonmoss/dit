@@ -5,9 +5,12 @@
     SUPABASE_URL,
     SUPABASE_ANON_KEY,
   );
+  // Expose client globally for other modules
+  window.supabaseClient = supabaseClient;
 
   // Element references for auth UI
-  const authLoggedOut = document.getElementById("auth-logged-out");
+  const authToggle = document.getElementById("auth-toggle");
+  const authForm = document.getElementById("auth-form");
   const authLoggedIn = document.getElementById("auth-logged-in");
   const userEmailSpan = document.getElementById("user-email");
   const logoutButton = document.getElementById("logout-button");
@@ -21,13 +24,17 @@
   // Display or hide UI based on auth state
   function updateUI(session) {
     if (session && session.user) {
-      authLoggedOut.style.display = "none";
-      authLoggedIn.style.display = "block";
+      // hide login form and toggle link
+      authToggle.style.display = 'none';
+      authForm.style.display = 'none';
+      authLoggedIn.style.display = 'block';
       userEmailSpan.textContent = session.user.email;
     } else {
-      authLoggedOut.style.display = "block";
-      authLoggedIn.style.display = "none";
-      userEmailSpan.textContent = "";
+      // show toggle link, hide logged-in panel and form
+      authToggle.style.display = 'inline';
+      authLoggedIn.style.display = 'none';
+      authForm.style.display = 'none';
+      userEmailSpan.textContent = '';
     }
   }
 
@@ -42,6 +49,10 @@
     updateUI(session);
   });
 
+  // Toggle auth form visibility
+  authToggle.addEventListener('click', () => {
+    authForm.style.display = authForm.style.display === 'block' ? 'none' : 'block';
+  });
   // Display errors
   function showError(msg) {
     authError.textContent = msg;

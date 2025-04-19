@@ -166,6 +166,60 @@
       .join(' ');
     hintDiv.textContent = visual;
   });
+  // Progress dashboard elements
+  const viewProgressBtn = document.getElementById('view-progress-button');
+  const progressDashboard = document.getElementById('progress-dashboard');
+  const containerDiv = document.getElementById('container');
+  // View user progress
+  viewProgressBtn.addEventListener('click', async () => {
+    // check login session
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
+    if (!session || !session.user) {
+      alert('Please log in to view your progress.');
+      return;
+    }
+    // fetch progress records
+    const { data, error } = await window.supabaseClient
+      .from('progress')
+      .select('level_id, time_sec, replays, mistakes, created_at')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Error loading progress:', error);
+      alert('Failed to load progress data.');
+      return;
+    }
+    // build dashboard HTML
+    let html = '<button id="back-to-trainer">Back to Trainer</button>';
+    html += '<h2>My Progress</h2>';
+    html += '<table><thead><tr><th>Date</th><th>Level</th><th>Time</th><th>Replays</th><th>Mistakes</th></tr></thead><tbody>';
+    data.forEach(row => {
+      const date = new Date(row.created_at).toLocaleString();
+      const totalSec = row.time_sec;
+      const mm = Math.floor(totalSec / 60).toString().padStart(2, '0');
+      const ss = (totalSec % 60).toFixed(2).padStart(5, '0');
+      const time = `${mm}:${ss}`;
+      const mistakesList = Object.entries(row.mistakes || {})
+        .map(([c, count]) => `${c.toUpperCase()}:${count}`).join(', ');
+      html += `<tr><td>${date}</td><td>${row.level_id}</td><td>${time}</td><td>${row.replays}</td><td>${mistakesList}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    progressDashboard.innerHTML = html;
+    // close menu if open
+    menu.classList.remove('open');
+    menuToggle.classList.remove('open');
+    menuToggle.textContent = '☰';
+    // show dashboard
+    containerDiv.style.display = 'none';
+    actionHints.style.display = 'none';
+    progressDashboard.style.display = 'flex';
+    // back button
+    document.getElementById('back-to-trainer').addEventListener('click', () => {
+      progressDashboard.style.display = 'none';
+      containerDiv.style.display = 'flex';
+      actionHints.style.display = 'block';
+    });
+  });
 
   function startTest() {
     testActive = true;
@@ -384,7 +438,7 @@
     hintDiv.textContent = '';
     waitingForInput = false;
     document.removeEventListener('keydown', handleKeydown);
-    // mark current level completed and persist
+    // mark current level completed and persist locally
     if (completed) {
       if (!completedLevels.includes(selectedId)) {
         completedLevels.push(selectedId);
@@ -393,6 +447,30 @@
         if (completedEl) completedEl.classList.add('completed');
       }
     }
+    // persist test results to Supabase if user is logged in
+    (async () => {
+      try {
+        const {
+          data: { session }
+        } = await window.supabaseClient.auth.getSession();
+        if (session && session.user) {
+          const result = await window.supabaseClient
+            .from('progress')
+            .insert([
+              {
+                user_id: session.user.id,
+                level_id: selectedId,
+                time_sec: elapsedSec,
+                replays: replayCount,
+                mistakes: mistakesMap
+              }
+            ]);
+          if (result.error) console.error('Supabase insert error:', result.error);
+        }
+      } catch (e) {
+        console.error('Error persisting results:', e);
+      }
+    })();
     // show summary action hints: replay current or next lesson
     actionHints.textContent = 'Tab: Repeat Lesson, Enter: Next Lesson';
     document.addEventListener('keydown', handleSummaryKeydown);
