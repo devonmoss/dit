@@ -180,11 +180,6 @@
       .querySelectorAll(".level-item")
       .forEach((el) => el.classList.toggle("selected", el.dataset.id === id));
     updateCurrentLevelDisplay();
-    // start new send test when in send mode
-    if (currentMode === "send") {
-      if (guidedSendActive) finishSendTest();
-      startSendTest();
-    }
   }
   // initialize speed slider display
   speedSlider.value = wpm;
@@ -318,7 +313,6 @@
     if (mode === "copy" && guidedSendActive) finishSendTest();
     currentMode = mode;
     renderMode();
-    if (currentMode === "send") startSendTest();
   }
   function renderMode() {
     if (currentMode === "copy") {
@@ -333,12 +327,24 @@
       sendingDiv.style.display = "flex";
       progressDashboard.style.display = "none";
       startButton.style.display = "none";
+      // reset send UI to initial state
+      sendStartButton.style.display = "inline-block";
+      sendResultsDiv.style.display = "none";
     }
   }
   // initialize mode view
   renderMode();
 
   const backFromSendingBtn = document.getElementById("back-from-sending");
+  const sendStartButton = document.getElementById("send-start-button");
+  const sendResultsDiv = document.getElementById("send-results");
+  sendResultsDiv.style.display = "none";
+  const sendCurrentMetaDiv = document.getElementById("send-current-meta");
+  const sendingInstructions = document.getElementById("sending-instructions");
+  // Start button for send mode
+  sendStartButton.addEventListener("click", () => {
+    startSendTest();
+  });
   // const sendingDiv = document.getElementById("sending-trainer");
   // const backFromSendingBtn = document.getElementById("back-from-sending");
   const sendSpeedSlider = document.getElementById("send-speed-slider");
@@ -492,6 +498,12 @@
   // Start guided send test
   function startSendTest() {
     guidedSendActive = true;
+    // initialize test metrics
+    sendStartButton.style.display = 'none';
+    sendResultsDiv.innerHTML = '';
+    sendTestStartTime = Date.now();
+    sendResponseTimes = [];
+    sendMistakesMap = {};
     const lvl = window.trainingLevels.find((l) => l.id === selectedId) || {
       chars: defaultChars,
     };
@@ -521,6 +533,44 @@
     handleWordComplete = originalHandleWordComplete;
     sendStatusDiv.textContent = "Complete!";
     sendStatusDiv.classList.add("success");
+    // hide send UI elements for summary
+    sendCurrentMetaDiv.style.display = "none";
+    sendMasteryContainer.style.display = "none";
+    sendProgressDiv.style.display = "none";
+    sendStatusDiv.style.display = "none";
+    sendStartButton.style.display = "none";
+    sendingInstructions.style.display = "none";
+    // hide send speed controls
+    const sendSpeedLabelEl = document.querySelector('label[for="send-speed-slider"]');
+    if (sendSpeedLabelEl) sendSpeedLabelEl.style.display = "none";
+    sendSpeedSlider.style.display = "none";
+    // hide keyer output and controls
+    keyerOutput.style.display = "none";
+    decodedDiv.style.display = "none";
+    sendClearBtn.style.display = "none";
+    // build summary
+    const sendEndTime = Date.now();
+    const elapsed = (sendEndTime - sendTestStartTime) / 1000;
+    const minutes = Math.floor(elapsed / 60);
+    const secondsInt = Math.floor(elapsed % 60);
+    const pad = (n) => n.toString().padStart(2, "0");
+    const displayTime = `${pad(minutes)}:${pad(secondsInt)}`;
+    let html = "<p>Lesson Complete!</p>";
+    html += `<p>Time: ${displayTime}</p>`;
+    const struggles = Object.entries(sendMistakesMap).filter(([, cnt]) => cnt > 0);
+    if (struggles.length > 0) {
+      html += "<p>Characters you struggled with:</p><ul>";
+      struggles.forEach(([c, cnt]) => {
+        html += `<li>${c.toUpperCase()}: ${cnt} mistake${cnt > 1 ? "s" : ""}</li>`;
+      });
+      html += "</ul>";
+    }
+    sendResultsDiv.innerHTML = html;
+    sendResultsDiv.style.display = "block";
+    // show summary action hints
+    actionHints.style.display = "block";
+    actionHints.textContent = "Tab: Repeat Lesson, Enter: Next Lesson";
+    document.addEventListener("keydown", handleSummarySendKeydown);
   }
   // Custom handler for guided send completion of each letter
   function guidedSendHandleWordComplete(word) {
@@ -554,6 +604,44 @@
         sendStatusDiv.textContent = "";
         sendStatusDiv.classList.remove("error");
       }, feedbackDelay);
+    }
+  }
+  // Summary key handler for send mode: Tab to repeat, Enter to next lesson
+  function handleSummarySendKeydown(e) {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      document.removeEventListener("keydown", handleSummarySendKeydown);
+      // clear summary display
+      sendResultsDiv.style.display = "none";
+      actionHints.style.display = "none";
+      // restore send UI elements
+      sendCurrentMetaDiv.style.display = "";
+      sendMasteryContainer.style.display = "";
+      sendProgressDiv.style.display = "";
+      sendStatusDiv.style.display = "";
+      sendingInstructions.style.display = "";
+      document.querySelector('label[for="send-speed-slider"]').style.display = "";
+      sendSpeedSlider.style.display = "";
+      keyerOutput.style.display = "";
+      decodedDiv.style.display = "";
+      sendClearBtn.style.display = "";
+      // restart lesson
+      startSendTest();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      document.removeEventListener("keydown", handleSummarySendKeydown);
+      // advance level
+      if (window.trainingLevels && Array.isArray(window.trainingLevels)) {
+        const idx = window.trainingLevels.findIndex((l) => l.id === selectedId);
+        if (idx >= 0 && idx < window.trainingLevels.length - 1) {
+          const next = window.trainingLevels[idx + 1];
+          selectLevel(next.id);
+        }
+      }
+      // clear summary and start next lesson
+      sendResultsDiv.style.display = "none";
+      actionHints.style.display = "none";
+      startSendTest();
     }
   }
   // Paddle key handlers: handle initial press and queue taps
