@@ -29,15 +29,27 @@
   <div id="app">
     <button id="menu-toggle">☰</button>
     <div id="menu">
-      <label for="speed-slider">Speed: <span id="speed-label"></span></label>
-      <input type="range" id="speed-slider" min="5" max="40" step="1">
-      <label for="volume-slider">Volume: <span id="volume-label"></span></label>
-      <input type="range" id="volume-slider" min="0" max="100" step="1">
+      <div id="menu-tabs">
+        <button id="main-tab" class="tab-button active">Main</button>
+        <button id="options-tab" class="tab-button">Options</button>
+      </div>
+      <div id="main-panel" class="menu-panel active">
         <div id="levels-list-container">
           <ul id="levels-list"></ul>
         </div>
-      <button id="view-progress-button">My Progress</button>
-      <button id="sending-button">WIP: Sending Trainer</button>
+        <button id="view-progress-button">My Progress</button>
+        <button id="sending-button">WIP: Sending Trainer</button>
+      </div>
+      <div id="options-panel" class="menu-panel">
+        <label for="speed-slider">Speed: <span id="speed-label"></span></label>
+        <input type="range" id="speed-slider" min="5" max="40" step="1">
+        <label for="volume-slider">Volume: <span id="volume-label"></span></label>
+        <input type="range" id="volume-slider" min="0" max="100" step="1">
+        <label for="noise-slider">Noise: <span id="noise-label">10%</span></label>
+        <input type="range" id="noise-slider" min="0" max="100" step="1" value="10">
+        <label for="distortion-slider">Distortion: <span id="distortion-label">10</span></label>
+        <input type="range" id="distortion-slider" min="0" max="50" step="1" value="10">
+      </div>
     </div>
     <div id="container">
       <button id="start-button">Start</button>

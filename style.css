@@ -151,15 +151,17 @@ body {
   transition: left 0.3s ease;
   box-shadow: 2px 0 5px rgba(0,0,0,0.5);
   z-index: 100;
+  display: flex;
+  flex-direction: column;
 }
 #menu.open {
   left: 0;
 }
 #levels-list-container {
-  display: none;
+  display: block;
   margin-top: 20px;
   overflow-y: auto;
-  max-height: calc(100vh - 160px);
+  flex: 1;
 }
 #menu.open #levels-list-container {
   display: block;
@@ -188,7 +190,7 @@ body {
 /* Hide slider and label when menu is closed */
 #menu label,
 #menu input[type="range"] {
-  display: none;
+  display: block;
 }
 #menu.open label,
 #menu.open input[type="range"] {
@@ -196,7 +198,9 @@ body {
 }
 /* Slider styling */
 #speed-slider,
-#volume-slider {
+#volume-slider,
+#noise-slider,
+#distortion-slider {
   -webkit-appearance: none;
   width: 100%;
   height: 4px;
@@ -205,7 +209,9 @@ body {
   margin: 30px 0 20px;
 }
 #speed-slider::-webkit-slider-runnable-track,
-#volume-slider::-webkit-slider-runnable-track {
+#volume-slider::-webkit-slider-runnable-track,
+#noise-slider::-webkit-slider-runnable-track,
+#distortion-slider::-webkit-slider-runnable-track {
   height: 4px;
   background: #555;
   border-radius: 2px;
@@ -224,7 +230,7 @@ body {
 }
 #view-progress-button:hover {
   background-color: #2a2a2a;
-#}
+}
 /* Sending Trainer button styling, mirroring My Progress */
 #sending-button {
   width: 100%;
@@ -342,7 +348,9 @@ body {
   background-color: #e03131;
 }
 #speed-slider::-webkit-slider-thumb,
-#volume-slider::-webkit-slider-thumb {
+#volume-slider::-webkit-slider-thumb,
+#noise-slider::-webkit-slider-thumb,
+#distortion-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 16px;
   height: 16px;
@@ -352,13 +360,17 @@ body {
   cursor: pointer;
 }
 #speed-slider::-moz-range-track,
-#volume-slider::-moz-range-track {
+#volume-slider::-moz-range-track,
+#noise-slider::-moz-range-track,
+#distortion-slider::-moz-range-track {
   height: 4px;
   background: #555;
   border-radius: 2px;
 }
 #speed-slider::-moz-range-thumb,
-#volume-slider::-moz-range-thumb {
+#volume-slider::-moz-range-thumb,
+#noise-slider::-moz-range-thumb,
+#distortion-slider::-moz-range-thumb {
   width: 16px;
   height: 16px;
   background: #e0e0e0;
@@ -395,7 +407,6 @@ body {
   cursor: pointer;
   font-size: 20px;
   z-index: 101;
-  transition: left 0.3s ease;
 }
 #menu-toggle.open {
   left: 202px; /* hang out on right edge of 220px panel */
@@ -480,28 +491,34 @@ body {
   text-align: center;
   padding-top: 40px;
 }
-# Sending Trainer instructions
+
+/* Sending Trainer instructions */
 #sending-instructions {
   color: #888;
   font-size: 14px;
   margin-bottom: 8px;
 }
+
 .dot {
   color: #00e676;
   font-weight: bold;
 }
+
 .dash {
   color: #ff1744;
   font-weight: bold;
 }
+
 #sending-trainer h2 {
   font-size: 24px;
   margin: 10px 0 20px;
 }
+
 #send-speed-slider {
   width: 200px;
   margin: 10px 0;
 }
+
 .keyer-output {
   width: 80%;
   min-height: 100px;
@@ -515,7 +532,8 @@ body {
   white-space: pre-wrap;
   word-wrap: break-word;
 }
-# Sending decoding output
+
+/* Sending decoding output */
 .decoded-output {
   width: 80%;
   min-height: 40px;
@@ -529,6 +547,7 @@ body {
   white-space: pre-wrap;
   word-wrap: break-word;
 }
+
 #send-clear-button {
   background-color: #1f1f1f;
   border: none;
@@ -554,4 +573,35 @@ body {
 }
 #back-from-sending:hover {
   background-color: #00c150;
+}
+#menu-tabs {
+  display: flex;
+  margin: 40px 0 20px 0;  /* Increased top margin to make room for menu toggle */
+  border-bottom: 1px solid #333;
+}
+.tab-button {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #777;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+.tab-button:hover {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+}
+.tab-button.active {
+  color: #e0e0e0;
+  border-bottom: 2px solid #00e676;
+}
+.menu-panel {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+}
+.menu-panel.active {
+  display: flex;
 }

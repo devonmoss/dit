@@ -117,11 +117,27 @@
   let unit = 1200 / wpm; // duration of one morse unit in ms
   let audioContext = null;
   let gainNode = null;  // Add gain node for volume control
+  let distortionNode = null;
+  let noiseNode = null;
+  let noiseGainNode = null;
+	
   
   // load preferred volume from localStorage or default to 75
   let volume = (function() {
     const stored = parseInt(localStorage.getItem('morseVolume'), 10);
     return (stored && !isNaN(stored)) ? stored : 75;
+  })();
+
+  // load preferred noise level from localStorage or default to 10
+  let noiseLevel = (function() {
+    const stored = parseInt(localStorage.getItem('morseNoise'), 10);
+    return (stored && !isNaN(stored)) ? stored : 10;
+  })();
+
+  // load preferred distortion amount from localStorage or default to 10
+  let distortionAmount = (function() {
+    const stored = parseInt(localStorage.getItem('morseDistortion'), 10);
+    return (stored && !isNaN(stored)) ? stored : 10;
   })();
 
   const startButton = document.getElementById("start-button");
@@ -130,10 +146,18 @@
   const resultsDiv = document.getElementById("results");
   const menuToggle = document.getElementById("menu-toggle");
   const menu = document.getElementById("menu");
+  const mainTab = document.getElementById("main-tab");
+  const optionsTab = document.getElementById("options-tab");
+  const mainPanel = document.getElementById("main-panel");
+  const optionsPanel = document.getElementById("options-panel");
   const speedSlider = document.getElementById("speed-slider");
   const speedLabel = document.getElementById("speed-label");
   const volumeSlider = document.getElementById("volume-slider");
   const volumeLabel = document.getElementById("volume-label");
+  const noiseSlider = document.getElementById("noise-slider");
+  const noiseLabel = document.getElementById("noise-label");
+  const distortionSlider = document.getElementById("distortion-slider");
+  const distortionLabel = document.getElementById("distortion-label");
   const replayButton = document.getElementById("replay-button");
   const hintButton = document.getElementById("hint-button");
   const hintDiv = document.getElementById("hint");
@@ -186,6 +210,93 @@
   // initialize volume slider display
   volumeSlider.value = volume;
   volumeLabel.textContent = volume + "%";
+
+  // initialize noise slider display
+  noiseSlider.value = noiseLevel;
+  noiseLabel.textContent = noiseLevel + "%";
+
+  // initialize distortion slider display
+  distortionSlider.value = distortionAmount;
+  distortionLabel.textContent = distortionAmount;
+
+  // Add noise slider handler
+  noiseSlider.addEventListener('input', (e) => {
+    const noiseLevel = parseInt(e.target.value, 10);
+    noiseLabel.textContent = noiseLevel + '%';
+    if (noiseGainNode) {
+      noiseGainNode.gain.value = noiseLevel / 1000; // Convert percentage to small decimal
+    }
+    localStorage.setItem('morseNoise', noiseLevel);
+  });
+
+  // Add distortion slider handler
+  distortionSlider.addEventListener('input', (e) => {
+    const distortionAmount = parseInt(e.target.value, 10);
+    distortionLabel.textContent = distortionAmount;
+    if (distortionNode) {
+      updateDistortionCurve(distortionAmount);
+    }
+    localStorage.setItem('morseDistortion', distortionAmount);
+  });
+
+  // Function to update distortion curve
+  function updateDistortionCurve(amount) {
+    if (!distortionNode) return;
+    const samples = new Float32Array(44100);
+    for (let i = 0; i < 44100; i++) {
+      const x = (i * 2) / 44100 - 1;
+      samples[i] = (Math.PI + amount) * x / (Math.PI + amount * Math.abs(x));
+    }
+    distortionNode.curve = samples;
+  }
+
+  function createNoiseGenerator() {
+    const bufferSize = audioContext.sampleRate * 2; // 2 seconds of noise
+    const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    
+    // Generate white noise
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = Math.random() * 2 - 1;
+    }
+
+    // Create noise source node
+    noiseNode = audioContext.createBufferSource();
+    noiseNode.buffer = noiseBuffer;
+    noiseNode.loop = true;
+    
+    // Create gain node for noise level control
+    noiseGainNode = audioContext.createGain();
+    noiseGainNode.gain.value = noiseLevel / 1000; // Convert percentage to small decimal
+    noiseSlider.value = noiseLevel;
+    noiseLabel.textContent = noiseLevel + '%';
+    
+    // Create distortion for radio effect
+    distortionNode = audioContext.createWaveShaper();
+    distortionSlider.value = distortionAmount;
+    distortionLabel.textContent = distortionAmount;
+    updateDistortionCurve(distortionAmount);
+  }
+
+  function setupAudioNodes() {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    gainNode = audioContext.createGain();
+    gainNode.gain.value = volume / 100;
+    
+    createNoiseGenerator();
+    
+    // Connect noise chain
+    noiseNode.connect(noiseGainNode);
+    noiseGainNode.connect(gainNode);
+    
+    // Connect gain to destination
+    gainNode.connect(audioContext.destination);
+    
+    // Start noise
+    noiseNode.start();
+  }
 
   startButton.addEventListener("click", startTest);
   menuToggle.addEventListener("click", () => {
@@ -451,23 +562,128 @@
     }
   }
   function playSendSymbol(symbol) {
-    if (!audioContext)
+    if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
+			setupAudioNodes();
+		}
     return new Promise((resolve) => {
       const duration = symbol === "." ? sendUnit : sendUnit * 3;
       const osc = audioContext.createOscillator();
       osc.frequency.value = 600;
       osc.type = "sine";
-      osc.connect(audioContext.destination);
+      // Connect through distortion before gain
+      osc.connect(distortionNode);
+      distortionNode.connect(gainNode);
       osc.start();
       setTimeout(() => {
         osc.stop();
+        // Disconnect from distortion
+        osc.disconnect();
+        distortionNode.disconnect();
         resolve();
       }, duration);
     });
   }
 
+  function playMorse(char) {
+    const symbols = morseMap[char];
+    return new Promise(async (resolve) => {
+      for (let i = 0; i < symbols.length; i++) {
+        await playSymbol(symbols[i]);
+        await wait(unit);
+      }
+      await wait(unit * 2);
+      resolve();
+    });
+  }
+
+  function playSymbol(symbol) {
+    return new Promise((resolve) => {
+      const duration = symbol === "." ? unit : unit * 3;
+      const osc = audioContext.createOscillator();
+      osc.frequency.value = 600;
+      osc.type = "sine";
+      // Connect through distortion before gain
+      osc.connect(distortionNode);
+      distortionNode.connect(gainNode);
+      osc.start();
+      setTimeout(() => {
+        osc.stop();
+        // Disconnect from distortion
+        osc.disconnect();
+        distortionNode.disconnect();
+        resolve();
+      }, duration);
+    });
+  }
+
+  function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+  // play a gentle tone for incorrect answers
+  function playErrorSound() {
+    return new Promise((resolve) => {
+      if (!audioContext) return resolve();
+      const duration = 150; // error beep duration in ms
+      const osc = audioContext.createOscillator();
+      osc.frequency.value = 300;
+      osc.type = "sine";
+      // Connect through distortion before gain
+      osc.connect(distortionNode);
+      distortionNode.connect(gainNode);
+      osc.start();
+      setTimeout(() => {
+        osc.stop();
+        // Disconnect from distortion
+        osc.disconnect();
+        distortionNode.disconnect();
+        resolve();
+      }, duration);
+    });
+  }
+
+  // Add function to clean up audio nodes
+  function cleanupAudioNodes() {
+    if (noiseNode) {
+      noiseNode.stop();
+      noiseNode.disconnect();
+      noiseNode = null;
+    }
+    if (noiseGainNode) {
+      noiseGainNode.disconnect();
+      noiseGainNode = null;
+    }
+    if (distortionNode) {
+      distortionNode.disconnect();
+    }
+    if (gainNode) {
+      gainNode.disconnect();
+    }
+  }
+
+  // Add tab switching functionality
+  mainTab.addEventListener("click", () => {
+    mainTab.classList.add("active");
+    optionsTab.classList.remove("active");
+    mainPanel.classList.add("active");
+    optionsPanel.classList.remove("active");
+  });
+
+  optionsTab.addEventListener("click", () => {
+    optionsTab.classList.add("active");
+    mainTab.classList.remove("active");
+    optionsPanel.classList.add("active");
+    mainPanel.classList.remove("active");
+  });
+
   function startTest() {
+    // Clean up any existing audio nodes before starting
+    cleanupAudioNodes();
+    
+    // Initialize audio
+    setupAudioNodes();
+    
+    // Reset test state
     testActive = true;
     // Initialize level and mastery state
     const lvl = (window.trainingLevels || []).find(
@@ -519,11 +735,6 @@
     document.getElementById("controls").style.display = "block";
     actionHints.textContent = "Tab: Replay, Esc: End Test";
     document.addEventListener("keydown", handleKeydown);
-    // Initialize audio
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    gainNode = audioContext.createGain();
-    gainNode.gain.value = volume / 100;
-    gainNode.connect(audioContext.destination);
     // Show initial progress
     updateProgress();
     // Ask first question
@@ -545,6 +756,7 @@
     }
     return pool[pool.length - 1].char;
   }
+
   // update progress display: Mastered X/Y
   function updateProgress() {
     const mastered = chars.filter((c) => charPoints[c] >= targetPoints).length;
@@ -554,6 +766,7 @@
       finishTest();
     }
   }
+
   async function nextQuestion() {
     currentChar = pickNextChar();
     currentMistakes = 0;
@@ -663,8 +876,11 @@
       }
     }
   }
+
   function finishTest(completed = true) {
     testActive = false;
+    // Clean up audio nodes
+    cleanupAudioNodes();
     // hide strike indicators
     strikesDiv.style.display = "none";
     const endTime = Date.now();
@@ -795,53 +1011,6 @@
       actionHints.textContent = "Tab: Repeat Lesson, Enter: Next Lesson";
       document.addEventListener("keydown", handleSummaryKeydown);
     })();
-  }
-
-  function playMorse(char) {
-    const symbols = morseMap[char];
-    return new Promise(async (resolve) => {
-      for (let i = 0; i < symbols.length; i++) {
-        await playSymbol(symbols[i]);
-        await wait(unit);
-      }
-      await wait(unit * 2);
-      resolve();
-    });
-  }
-
-  function playSymbol(symbol) {
-    return new Promise((resolve) => {
-      const duration = symbol === "." ? unit : unit * 3;
-      const osc = audioContext.createOscillator();
-      osc.frequency.value = 600;
-      osc.type = "sine";
-      osc.connect(gainNode);  // Connect to gain node instead of destination
-      osc.start();
-      setTimeout(() => {
-        osc.stop();
-        resolve();
-      }, duration);
-    });
-  }
-
-  function wait(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-  // play a gentle tone for incorrect answers
-  function playErrorSound() {
-    return new Promise((resolve) => {
-      if (!audioContext) return resolve();
-      const duration = 150; // error beep duration in ms
-      const osc = audioContext.createOscillator();
-      osc.frequency.value = 300;
-      osc.type = "sine";
-      osc.connect(gainNode);  // Connect to gain node instead of destination
-      osc.start();
-      setTimeout(() => {
-        osc.stop();
-        resolve();
-      }, duration);
-    });
   }
 })();
 
