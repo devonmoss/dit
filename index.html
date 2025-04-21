@@ -27,24 +27,46 @@
   </div>
   <!-- App content: always visible; login is optional -->
   <div id="app">
-    <button id="menu-toggle">☰</button>
-    <div id="menu">
-      <label for="speed-slider">Speed: <span id="speed-label"></span></label>
-      <input type="range" id="speed-slider" min="5" max="40" step="1">
-      <label for="volume-slider">Volume: <span id="volume-label"></span></label>
-      <input type="range" id="volume-slider" min="0" max="100" step="1">
-      <div id="mode-toggle">
-        <input type="radio" name="mode" id="mode-copy" value="copy" checked>
-        <label for="mode-copy">Copy</label>
-        <input type="radio" name="mode" id="mode-send" value="send">
-        <label for="mode-send">Send</label>
+    <!-- Top horizontal navigation menu -->
+    <nav id="top-menu">
+      <div class="menu-section left">
+        <label for="mode-copy" class="menu-item">
+          <input type="radio" name="mode" id="mode-copy" value="copy" checked>
+          copy
+        </label>
+        <label for="mode-send" class="menu-item">
+          <input type="radio" name="mode" id="mode-send" value="send">
+          send
+        </label>
       </div>
-        <div id="levels-list-container">
-          <ul id="levels-list"></ul>
+      <div class="menu-section middle">
+        <button class="menu-item" data-test-type="time" disabled>time</button>
+        <button class="menu-item" data-test-type="words" disabled>words</button>
+        <button class="menu-item active" data-test-type="training">training</button>
+        <button class="menu-item" data-test-type="custom" disabled>custom</button>
+      </div>
+      <div class="menu-section right">
+        <div id="level-selector" class="menu-item">
+          <span id="current-level-display"></span>
+          <ul id="levels-list" class="level-dropdown hidden"></ul>
         </div>
-      <button id="view-progress-button">My Progress</button>
-      <button id="sending-button">WIP: Sending Trainer</button>
-    </div>
+        <!-- Settings gear icon -->
+        <button id="settings-toggle" class="menu-item">&#9881;</button>
+        <ul id="settings-dropdown" class="settings-dropdown hidden">
+          <li>
+            <label for="speed-slider">Speed: <span id="speed-label"></span> WPM</label>
+            <input type="range" id="speed-slider" min="5" max="40" step="1">
+          </li>
+          <li>
+            <label for="volume-slider">Volume: <span id="volume-label"></span>%</label>
+            <input type="range" id="volume-slider" min="0" max="100" step="1">
+          </li>
+          <li>
+            <button id="view-progress-button" class="settings-item">My Progress</button>
+          </li>
+        </ul>
+      </div>
+    </nav>
     <div id="container">
       <button id="start-button">Start</button>
       <div id="current-level"></div>
