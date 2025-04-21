@@ -643,7 +643,7 @@
     } else if (e.key === "Enter") {
       e.preventDefault();
       document.removeEventListener("keydown", handleSummarySendKeydown);
-      // advance level
+      // advance to next level if available
       if (window.trainingLevels && Array.isArray(window.trainingLevels)) {
         const idx = window.trainingLevels.findIndex((l) => l.id === selectedId);
         if (idx >= 0 && idx < window.trainingLevels.length - 1) {
@@ -651,9 +651,22 @@
           selectLevel(next.id);
         }
       }
-      // clear summary and start next lesson
+      // clear summary display
       sendResultsDiv.style.display = "none";
       actionHints.style.display = "none";
+      // restore send UI elements
+      sendCurrentMetaDiv.style.display = "";
+      sendMasteryContainer.style.display = "";
+      sendProgressDiv.style.display = "";
+      sendStatusDiv.style.display = "";
+      sendingInstructions.style.display = "";
+      const sendSpeedLabelEl = document.querySelector('label[for="send-speed-slider"]');
+      if (sendSpeedLabelEl) sendSpeedLabelEl.style.display = "";
+      sendSpeedSlider.style.display = "";
+      keyerOutput.style.display = "";
+      decodedDiv.style.display = "";
+      sendClearBtn.style.display = "";
+      // start next lesson
       startSendTest();
     }
   }
