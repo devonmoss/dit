@@ -130,8 +130,9 @@
   const progressDiv = document.getElementById("progress");
   const statusDiv = document.getElementById("status");
   const resultsDiv = document.getElementById("results");
-  const menuToggle = document.getElementById("menu-toggle");
-  const menu = document.getElementById("menu");
+  // removed sidebar menu elements (replaced by top horizontal menu)
+  // const menuToggle = document.getElementById("menu-toggle");
+  // const menu = document.getElementById("menu");
   const speedSlider = document.getElementById("speed-slider");
   const speedLabel = document.getElementById("speed-label");
   const volumeSlider = document.getElementById("volume-slider");
@@ -169,49 +170,62 @@
   }
   // current level display
   const currentLevelDiv = document.getElementById("current-level");
+  // Nav bar current level display
+  const navCurrentLevelDisplay = document.getElementById("current-level-display");
   function updateCurrentLevelDisplay() {
     const lvl = window.trainingLevels.find((l) => l.id === selectedId);
     currentLevelDiv.textContent = lvl ? lvl.name : "";
+    if (navCurrentLevelDisplay) navCurrentLevelDisplay.textContent = lvl ? lvl.name : "";
   }
   updateCurrentLevelDisplay();
+  // Toggle level dropdown when clicking on nav level selector
+  const levelSelector = document.getElementById("level-selector");
+  if (levelSelector && levelsList) {
+    levelSelector.addEventListener("click", () => {
+      levelsList.classList.toggle("hidden");
+    });
+  }
   function selectLevel(id) {
     selectedId = id;
     document
       .querySelectorAll(".level-item")
       .forEach((el) => el.classList.toggle("selected", el.dataset.id === id));
     updateCurrentLevelDisplay();
+    // hide level dropdown after selection
+    const levelsDropdown = document.getElementById("levels-list");
+    if (levelsDropdown) levelsDropdown.classList.add("hidden");
   }
-  // initialize speed slider display
-  speedSlider.value = wpm;
-  speedLabel.textContent = wpm + " WPM";
-
-  // initialize volume slider display
-  volumeSlider.value = volume;
-  volumeLabel.textContent = volume + "%";
+  // initialize speed and volume sliders if present
+  if (speedSlider && speedLabel) {
+    speedSlider.value = wpm;
+    speedLabel.textContent = wpm + " WPM";
+  }
+  if (volumeSlider && volumeLabel) {
+    volumeSlider.value = volume;
+    volumeLabel.textContent = volume + "%";
+  }
 
   startButton.addEventListener("click", startTest);
-  menuToggle.addEventListener("click", () => {
-    const isOpen = menu.classList.toggle("open");
-    menuToggle.classList.toggle("open", isOpen);
-    // use arrow icon when open
-    menuToggle.textContent = isOpen ? "<" : "☰";
-  });
-  speedSlider.addEventListener("input", (e) => {
+  if (speedSlider && speedLabel) {
+    speedSlider.addEventListener("input", (e) => {
     wpm = parseInt(e.target.value, 10);
     unit = 1200 / wpm;
     speedLabel.textContent = wpm + " WPM";
     // persist preference
     localStorage.setItem("morseWpm", wpm);
-  });
+    });
+  }
 
-  volumeSlider.addEventListener("input", (e) => {
+  if (volumeSlider && volumeLabel) {
+    volumeSlider.addEventListener("input", (e) => {
     volume = parseInt(e.target.value, 10);
     volumeLabel.textContent = volume + "%";
     if (gainNode) {
       gainNode.gain.value = volume / 100;
     }
     localStorage.setItem("morseVolume", volume);
-  });
+    });
+  }
   function replayCurrent() {
     if (!audioContext) return;
     // count user-triggered replay
@@ -279,23 +293,36 @@
     });
     html += "</tbody></table>";
     progressDashboard.innerHTML = html;
-    // close menu if open
-    menu.classList.remove("open");
-    menuToggle.classList.remove("open");
-    menuToggle.textContent = "☰";
     // show dashboard
     containerDiv.style.display = "none";
     actionHints.style.display = "none";
     progressDashboard.style.display = "flex";
     // back button
     document.getElementById("back-to-trainer").addEventListener("click", () => {
+      // hide progress view and return to training mode
       progressDashboard.style.display = "none";
-      containerDiv.style.display = "flex";
-      actionHints.style.display = "block";
+      setMode("copy");
     });
   });
+  // Settings dropdown toggle (gear icon)
+  const settingsToggle = document.getElementById("settings-toggle");
+  const settingsDropdown = document.getElementById("settings-dropdown");
+  if (settingsToggle && settingsDropdown) {
+    settingsToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      settingsDropdown.classList.toggle("hidden");
+    });
+    // Hide dropdown on outside click
+    document.addEventListener("click", () => {
+      settingsDropdown.classList.add("hidden");
+    });
+    // Prevent click inside dropdown from closing
+    settingsDropdown.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+  }
   // Sending Trainer UI elements
-  const sendingBtn = document.getElementById("sending-button");
+  // sending-button removed; use mode toggle for send mode
   const sendingDiv = document.getElementById("sending-trainer");
   // Mode toggle setup (Copy vs Send)
   const modeCopyRadio = document.getElementById("mode-copy");
@@ -379,24 +406,6 @@
     sendUnit = 1200 / sendWpm;
     sendSpeedLabel.textContent = sendWpm;
     localStorage.setItem("morseSendWpm", sendWpm);
-  });
-  sendingBtn.addEventListener("click", () => {
-    // Open sending trainer view
-    sendingMode = true;
-    containerDiv.style.display = "none";
-    progressDashboard.style.display = "none";
-    actionHints.style.display = "none";
-    menu.classList.remove("open");
-    menuToggle.classList.remove("open");
-    menuToggle.textContent = "☰";
-    sendingDiv.style.display = "flex";
-    // capture paddle key events
-    keyState.ArrowLeft = false;
-    keyState.ArrowRight = false;
-    document.addEventListener("keydown", sendKeydown);
-    document.addEventListener("keyup", sendKeyup);
-    // start send loop
-    sendLoop();
   });
   backFromSendingBtn.addEventListener("click", () => {
     // Close sending trainer view
@@ -1124,4 +1133,21 @@
       }, duration);
     });
   }
+  // Test type menu handling
+  const testTypeButtons = document.querySelectorAll("[data-test-type]");
+  let selectedTestType = "training";
+  testTypeButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      selectedTestType = btn.dataset.testType;
+      testTypeButtons.forEach((b) => {
+        b.classList.toggle("active", b.dataset.testType === selectedTestType);
+      });
+      const levelSelectorEl = document.getElementById("level-selector");
+      if (levelSelectorEl) {
+        levelSelectorEl.style.display =
+          selectedTestType === "training" ? "flex" : "none";
+      }
+    });
+  });
 })();

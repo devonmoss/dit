@@ -95,7 +95,8 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  /* adjust for top menu height */
+  height: calc(100vh - 50px);
   text-align: center;
 }
 #sending-trainer {
@@ -103,7 +104,8 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  /* adjust for top menu height */
+  height: calc(100vh - 50px);
   text-align: center;
 }
 #send-current-level {
@@ -282,7 +284,7 @@ body {
 }
 #view-progress-button:hover {
   background-color: #2a2a2a;
-#}
+}
 /* Sending Trainer button styling, mirroring My Progress */
 #sending-button {
   width: 100%;
@@ -315,6 +317,149 @@ body {
   width: 100%;
   border-collapse: collapse;
   margin-top: 10px;
+}
+/* Top horizontal navigation menu */
+#top-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background-color: #1f1f1f;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  color: #e0e0e0;
+  z-index: 1000;
+}
+
+.menu-section {
+  display: flex;
+  align-items: center;
+}
+
+.menu-section.middle {
+  flex: 1;
+  justify-content: center;
+}
+
+.menu-item {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 8px 12px;
+  margin: 0 4px;
+  cursor: pointer;
+  font-size: 14px;
+  text-transform: capitalize;
+}
+
+.menu-item input[type="radio"] {
+  margin-right: 4px;
+}
+
+.menu-item.active {
+  color: #ffd700;
+}
+
+#level-selector {
+  position: relative;
+}
+
+.level-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: #1f1f1f;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+  list-style: none;
+  padding: 8px 0;
+  margin: 4px 0 0 0;
+  max-height: 200px;
+  overflow-y: auto;
+  min-width: 120px;
+}
+
+.level-dropdown.hidden {
+  display: none;
+}
+
+.level-dropdown li {
+  padding: 8px 16px;
+  font-size: 14px;
+  color: #e0e0e0;
+  cursor: pointer;
+}
+
+.level-dropdown li.completed {
+  color: #777;
+}
+
+.level-dropdown li.selected {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.level-dropdown li:hover {
+  background-color: #3a3a3a;
+}
+/* Settings dropdown (speed, volume, progress) */
+#settings-toggle {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 8px 12px;
+  margin: 0 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+.settings-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: #1f1f1f;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+  list-style: none;
+  padding: 8px 0;
+  margin: 4px 0 0 0;
+  max-height: 300px;
+  overflow-y: auto;
+  min-width: 200px;
+  z-index: 1001;
+}
+.settings-dropdown.hidden {
+  display: none;
+}
+.settings-dropdown li {
+  padding: 8px 16px;
+}
+.settings-dropdown li label {
+  display: block;
+  color: #e0e0e0;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.settings-dropdown li input[type="range"] {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.settings-dropdown li button {
+  width: 100%;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.settings-dropdown li button:hover {
+  background-color: #2a2a2a;
+}
+
+#app {
+  padding-top: 48px;
 }
 #progress-dashboard th,
 #progress-dashboard td {
@@ -538,7 +683,86 @@ body {
   text-align: center;
   padding-top: 40px;
 }
-# Sending Trainer instructions
+/* Hide old sidebar menu and toggle (replaced by top horizontal menu) */
+#menu, #menu-toggle, #levels-list-container {
+  display: none !important;
+}
+/* Top horizontal menu styles */
+nav#top-menu {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  background-color: #1f1f1f;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  height: 50px;
+  z-index: 100;
+}
+nav#top-menu .menu-section {
+  display: flex;
+  align-items: center;
+}
+nav#top-menu .menu-section.middle {
+  justify-content: center;
+  flex: 1;
+}
+nav#top-menu .menu-section.left .menu-item {
+  margin-right: 15px;
+}
+nav#top-menu .menu-section.middle .menu-item {
+  margin: 0 10px;
+}
+nav#top-menu .menu-section.right {
+  position: relative;
+}
+nav#top-menu .menu-item {
+  font-size: 14px;
+  color: #777;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+}
+nav#top-menu .menu-item:hover,
+nav#top-menu .menu-item.active {
+  color: #e0e0e0;
+}
+#level-selector {
+  position: relative;
+}
+#levels-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: #1f1f1f;
+  list-style: none;
+  margin: 5px 0 0 0;
+  padding: 0;
+  border: 1px solid #333;
+  z-index: 101;
+}
+#levels-list li {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #777;
+}
+#levels-list li:hover {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+}
+#levels-list li.selected {
+  font-weight: bold;
+  color: #e0e0e0;
+}
+/* Utility class to hide dropdown */
+.hidden { display: none; }
+/* Hide old current-level under container */
+#current-level { display: none; }
+/* Sending Trainer instructions */
 #sending-instructions {
   color: #888;
   font-size: 14px;
@@ -573,7 +797,7 @@ body {
   white-space: pre-wrap;
   word-wrap: break-word;
 }
-# Sending decoding output
+/* Sending decoding output */
 .decoded-output {
   width: 80%;
   min-height: 40px;
