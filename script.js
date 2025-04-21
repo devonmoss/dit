@@ -198,11 +198,11 @@
   // initialize speed and volume sliders if present
   if (speedSlider && speedLabel) {
     speedSlider.value = wpm;
-    speedLabel.textContent = wpm + " WPM";
+    speedLabel.textContent = wpm;
   }
   if (volumeSlider && volumeLabel) {
     volumeSlider.value = volume;
-    volumeLabel.textContent = volume + "%";
+    volumeLabel.textContent = volume;
   }
 
   startButton.addEventListener("click", startTest);
@@ -210,7 +210,7 @@
     speedSlider.addEventListener("input", (e) => {
     wpm = parseInt(e.target.value, 10);
     unit = 1200 / wpm;
-    speedLabel.textContent = wpm + " WPM";
+    speedLabel.textContent = wpm;
     // persist preference
     localStorage.setItem("morseWpm", wpm);
     });
@@ -219,7 +219,7 @@
   if (volumeSlider && volumeLabel) {
     volumeSlider.addEventListener("input", (e) => {
     volume = parseInt(e.target.value, 10);
-    volumeLabel.textContent = volume + "%";
+    volumeLabel.textContent = volume;
     if (gainNode) {
       gainNode.gain.value = volume / 100;
     }
