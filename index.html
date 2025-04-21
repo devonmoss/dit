@@ -63,6 +63,10 @@
             <input type="range" id="volume-slider" min="0" max="100" step="1">
           </li>
           <li>
+            <label for="send-speed-slider">Send Speed: <span id="send-speed-label"></span> WPM</label>
+            <input type="range" id="send-speed-slider" min="5" max="40" step="1">
+          </li>
+          <li>
             <button id="view-progress-button" class="settings-item">My Progress</button>
           </li>
         </ul>
@@ -98,8 +102,6 @@
       <button id="send-start-button">Start</button>
       <div id="send-results"></div>
       <div id="sending-instructions">← <span class="dot">·</span> <span class="dash">–</span> → </div>
-      <label for="send-speed-slider">Speed: <span id="send-speed-label"></span> WPM</label>
-      <input type="range" id="send-speed-slider" min="5" max="40" step="1">
       <div id="keyer-output" class="keyer-output"></div>
       <div id="decoded-output" class="decoded-output"></div>
       <button id="send-clear-button">Clear</button>
