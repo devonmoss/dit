@@ -273,8 +273,7 @@
       return;
     }
     // build dashboard HTML
-    let html = '<button id="back-to-trainer">Back to Trainer</button>';
-    html += "<h2>My Progress</h2>";
+    let html = "<h2>My Progress</h2>";
     html +=
       "<table><thead><tr><th>Date</th><th>Level</th><th>Time</th><th>Replays</th><th>Mistakes</th><th>Avg Times</th></tr></thead><tbody>";
     data.forEach((row) => {
@@ -300,12 +299,6 @@
     containerDiv.style.display = "none";
     actionHints.style.display = "none";
     progressDashboard.style.display = "flex";
-    // back button
-    document.getElementById("back-to-trainer").addEventListener("click", () => {
-      // hide progress view and return to training mode
-      progressDashboard.style.display = "none";
-      setMode("copy");
-    });
   });
   // Settings dropdown toggle (gear icon)
   const settingsToggle = document.getElementById("settings-toggle");
