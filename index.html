@@ -29,7 +29,8 @@
   <div id="app">
     <!-- Top horizontal navigation menu -->
     <nav id="top-menu">
-      <div class="menu-section left">
+      <div class="menu-wrapper">
+        <div class="menu-section left">
         <label for="mode-copy" class="menu-item">
           <input type="radio" name="mode" id="mode-copy" value="copy" checked>
           copy
@@ -45,7 +46,7 @@
         <button class="menu-item active" data-test-type="training">training</button>
         <button class="menu-item" data-test-type="custom" disabled>custom</button>
       </div>
-      <div class="menu-section right">
+        <div class="menu-section right">
         <div id="level-selector" class="menu-item">
           <span id="current-level-display"></span>
           <ul id="levels-list" class="level-dropdown hidden"></ul>
@@ -65,7 +66,8 @@
             <button id="view-progress-button" class="settings-item">My Progress</button>
           </li>
         </ul>
-      </div>
+        </div>
+      </div> <!-- /.menu-wrapper -->
     </nav>
     <div id="container">
       <button id="start-button">Start</button>
