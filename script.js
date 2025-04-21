@@ -580,8 +580,12 @@
     if (!word) return;
     const letter = word[0];
     if (letter === sendCurrentChar) {
+      // correct send
+      sendStatusDiv.classList.remove("error");
+      sendStatusDiv.textContent = "Correct!";
+      sendStatusDiv.classList.add("success");
       if (sendCurrentMistakes === 0) {
-        // first-try success (could track)
+        // could track first-try success
       }
       sendCharPoints[sendCurrentChar] = Math.min(
         sendCharPoints[sendCurrentChar] + 1,
@@ -589,17 +593,17 @@
       );
       updateSendMasteryDisplay();
       updateSendProgress();
-      sendStatusDiv.textContent = "✓";
-      sendStatusDiv.classList.add("success");
       setTimeout(() => {
         sendStatusDiv.textContent = "";
         sendStatusDiv.classList.remove("success");
         nextSendQuestion();
       }, feedbackDelay);
     } else {
-      sendCurrentMistakes++;
-      sendStatusDiv.textContent = "✕";
+      // incorrect send
+      sendStatusDiv.classList.remove("success");
+      sendStatusDiv.textContent = "Incorrect! Try again.";
       sendStatusDiv.classList.add("error");
+      sendCurrentMistakes++;
       setTimeout(() => {
         sendStatusDiv.textContent = "";
         sendStatusDiv.classList.remove("error");
