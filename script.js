@@ -383,7 +383,6 @@
   // initialize mode view
   renderMode();
 
-  const backFromSendingBtn = document.getElementById("back-from-sending");
   const sendStartButton = document.getElementById("send-start-button");
   const sendResultsDiv = document.getElementById("send-results");
   sendResultsDiv.style.display = "none";
@@ -427,15 +426,6 @@
     sendUnit = 1200 / sendWpm;
     sendSpeedLabel.textContent = sendWpm;
     localStorage.setItem("morseSendWpm", sendWpm);
-  });
-  backFromSendingBtn.addEventListener("click", () => {
-    // Close sending trainer view
-    sendingMode = false;
-    sendingDiv.style.display = "none";
-    containerDiv.style.display = "flex";
-    actionHints.style.display = "block";
-    document.removeEventListener("keydown", sendKeydown);
-    document.removeEventListener("keyup", sendKeyup);
   });
   sendClearBtn.addEventListener("click", () => {
     keyerOutput.textContent = "";
