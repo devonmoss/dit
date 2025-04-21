@@ -176,6 +176,9 @@
     const lvl = window.trainingLevels.find((l) => l.id === selectedId);
     currentLevelDiv.textContent = lvl ? lvl.name : "";
     if (navCurrentLevelDisplay) navCurrentLevelDisplay.textContent = lvl ? lvl.name : "";
+    // highlight current level name in menu
+    const levelSelectorEl = document.getElementById("level-selector");
+    if (levelSelectorEl) levelSelectorEl.classList.add('active');
   }
   updateCurrentLevelDisplay();
   // Toggle level dropdown when clicking on nav level selector
@@ -327,6 +330,20 @@
   // Mode toggle setup (Copy vs Send)
   const modeCopyRadio = document.getElementById("mode-copy");
   const modeSendRadio = document.getElementById("mode-send");
+  // Update label styling for copy/send toggles
+  function updateModeToggleUI() {
+    const copyLabel = document.querySelector('label[for="mode-copy"]');
+    const sendLabel = document.querySelector('label[for="mode-send"]');
+    if (copyLabel && sendLabel) {
+      if (modeCopyRadio.checked) {
+        copyLabel.classList.add('active');
+        sendLabel.classList.remove('active');
+      } else {
+        sendLabel.classList.add('active');
+        copyLabel.classList.remove('active');
+      }
+    }
+  }
   let currentMode = "copy";
   modeCopyRadio.addEventListener("change", () => {
     if (modeCopyRadio.checked) setMode("copy");
@@ -340,6 +357,8 @@
     if (mode === "copy" && guidedSendActive) finishSendTest();
     currentMode = mode;
     renderMode();
+    // update copy/send label styling
+    updateModeToggleUI();
   }
   function renderMode() {
     if (currentMode === "copy") {
@@ -358,6 +377,8 @@
       sendStartButton.style.display = "inline-block";
       sendResultsDiv.style.display = "none";
     }
+    // ensure copy/send labels show correct style
+    updateModeToggleUI();
   }
   // initialize mode view
   renderMode();
