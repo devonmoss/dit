@@ -375,11 +375,11 @@ body {
 }
 
 .menu-item input[type="radio"] {
-  margin-right: 4px;
+  display: none;
 }
 
 .menu-item.active {
-  color: #ffd700;
+  color: #00e676;
 }
 
 #level-selector {
@@ -534,7 +534,7 @@ body {
   margin-left: 60px;
 }
 #progress-dashboard button#back-to-trainer:hover {
-  background-color: #00c150;
+  background-color: #00e676;
 }
 /* Auth UI panel */
 #auth-wrapper {
@@ -579,7 +579,7 @@ body {
   margin-right: 4px;
 }
 #auth-form button:hover {
-  background-color: #00c150;
+  background-color: #00e676;
 }
 #auth-logged-in {
   margin-top: 8px;
@@ -816,5 +816,5 @@ body {
   font-size: 14px;
 }
 #back-from-sending:hover {
-  background-color: #00c150;
+  background-color: #00e676;
 }
