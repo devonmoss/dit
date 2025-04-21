@@ -322,7 +322,8 @@ body {
 /* Full-width container to center the menu wrapper */
 #top-menu {
   position: fixed;
-  top: 0;
+  /* Position menu below auth panel */
+  top: 60px;
   left: 0;
   right: 0;
   height: auto;
