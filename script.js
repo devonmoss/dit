@@ -643,11 +643,12 @@
     } else if (e.key === "Enter") {
       e.preventDefault();
       document.removeEventListener("keydown", handleSummarySendKeydown);
-      // advance to next level if available
+      // advance to next level (include all types)
       if (window.trainingLevels && Array.isArray(window.trainingLevels)) {
-        const idx = window.trainingLevels.findIndex((l) => l.id === selectedId);
-        if (idx >= 0 && idx < window.trainingLevels.length - 1) {
-          const next = window.trainingLevels[idx + 1];
+        const all = window.trainingLevels;
+        const idx = all.findIndex((l) => l.id === selectedId);
+        if (idx >= 0 && idx < all.length - 1) {
+          const next = all[idx + 1];
           selectLevel(next.id);
         }
       }
