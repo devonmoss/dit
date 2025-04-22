@@ -178,10 +178,14 @@
   await channel.subscribe();
   await channel.track({ user: username });
 
-  // Get references for countdown UI
+  // Get references for countdown and race UI
   const countdownEl = document.getElementById('countdown');
   const timerEl = document.getElementById('countdown-timer');
   let countdownInterval = null;
+  // Race UI elements (hidden until race starts)
+  const raceContainer = document.getElementById('race-container');
+  const progressInfo  = document.getElementById('progress-info');
+  const feedbackEl    = document.getElementById('feedback');
 
   // Retrieve user ID from session
   let userId = null;
