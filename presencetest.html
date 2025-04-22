@@ -29,12 +29,21 @@
         presenceId = Math.random().toString(36).substring(2, 10);
         localStorage.setItem('presencetest-id', presenceId);
       }
-      // Determine username (email if logged in, else guest)
+      // Determine username: use display name if available, otherwise remain as guest ID
       let username = presenceId;
       try {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (session && session.user && session.user.email) {
-          username = session.user.email;
+        const {
+          data: { session },
+        } = await supabaseClient.auth.getSession();
+        if (session && session.user) {
+          const meta = session.user.user_metadata || {};
+          if (meta.full_name) {
+            username = meta.full_name;
+          } else if (meta.name) {
+            username = meta.name;
+          }
+          console.log(session.user);
+          // if no display name;
         }
       } catch (e) {
         // ignore
