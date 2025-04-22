@@ -69,6 +69,8 @@
     });
   }
 
+  // Preload sequence container (will be set from DB)
+  let sequence = [];
   // Determine raceId from URL (query param 'id')
   const url = new URL(window.location.href);
   let raceId = url.searchParams.get('id');
@@ -191,7 +193,6 @@
   }
 
   // Load sequence and initial start_time
-  let sequence = [];
   let hasStarted = false;
   async function loadRace() {
     const { data: race, error } = await supabaseClient
