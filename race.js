@@ -19,9 +19,19 @@
   if (isNaN(wpm) || wpm <= 0) wpm = 20;
   const unit = 1200 / wpm;
   // Audio setup
+  // Audio setup: create context and gain node
   const audioContext = new (window.AudioContext || window.webkitAudioContext)();
   const gainNode = audioContext.createGain();
   gainNode.connect(audioContext.destination);
+  // Unlock AudioContext on first user interaction (required by browser autoplay policies)
+  const resumeAudio = () => {
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().catch((e) => console.warn('AudioContext resume failed:', e));
+    }
+  };
+  ['click', 'keydown', 'touchstart'].forEach((evt) =>
+    document.addEventListener(evt, resumeAudio, { once: true })
+  );
   let volume = parseInt(localStorage.getItem('morseVolume'), 10);
   if (isNaN(volume) || volume < 0) volume = 75;
   gainNode.gain.value = volume / 100;
