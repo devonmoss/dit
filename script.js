@@ -924,8 +924,8 @@
       statusDiv.classList.remove("success");
       statusDiv.classList.add("error");
       waitingForInput = false;
-      // incorrect: lose one point
-      charPoints[currentChar] = Math.max(0, charPoints[currentChar] - 1);
+      // incorrect: lose 25% of points
+      charPoints[currentChar] = Math.max(0, charPoints[currentChar] * 0.75);
       updateMasteryDisplay();
       // checkpoint strike logic
       if (strikeLimit !== null) {
