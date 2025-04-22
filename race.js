@@ -138,16 +138,23 @@
   // Track correct answers per user
   const correctCounts = {};
   function renderPresence(state) {
-    listEl.innerHTML = '';
-    Object.values(state).forEach((arr) => {
-      arr.forEach((p) => {
-        const name = p.user;
-        const count = correctCounts[name] || 0;
-        const li = document.createElement('li');
-        li.textContent = `${name} (${count}/${sequence.length})`;
-        listEl.appendChild(li);
-      });
+  listEl.innerHTML = '';
+  Object.values(state).forEach((arr) => {
+    arr.forEach((p) => {
+      const name = p.user;
+      const count = correctCounts[name] || 0;
+      const li = document.createElement('li');
+      // Display name and progress bar
+      const text = document.createElement('span');
+      text.textContent = `${name} `;
+      const prog = document.createElement('progress');
+      prog.value = count;
+      prog.max = sequence.length;
+      li.appendChild(text);
+      li.appendChild(prog);
+      listEl.appendChild(li);
     });
+  });
   }
   // presence sync event
   channel.on('presence', { event: 'sync' }, () => {
@@ -163,7 +170,7 @@
       handleStart(new Date(race.start_time).getTime());
     }
   });
-  // listen for answers to update per-player progress
+  // Listen for answers INSERTs to update per-player progress via the same channel
   channel.on('postgres_changes', {
     event: 'INSERT', schema: 'public', table: 'answers', filter: `race_id=eq.${raceId}`
   }, ({ new: ans }) => {
@@ -233,7 +240,9 @@
    */
   function handleStart(targetTime) {
     hasStarted = true;
-    document.getElementById('lobby').style.display = 'none';
+    // Hide start button but keep presence list visible
+    const startBtn = document.getElementById('start-button');
+    if (startBtn) startBtn.style.display = 'none';
     countdownEl.style.display = 'block';
     const tick = () => {
       const diff = (targetTime - Date.now()) / 1000;
