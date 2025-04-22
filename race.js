@@ -133,12 +133,16 @@
     config: { presence: { key: presenceId } }
   });
   const listEl = document.getElementById('participant-list');
+  // Track correct answers per user
+  const correctCounts = {};
   function renderPresence(state) {
     listEl.innerHTML = '';
     Object.values(state).forEach((arr) => {
       arr.forEach((p) => {
+        const name = p.user;
+        const count = correctCounts[name] || 0;
         const li = document.createElement('li');
-        li.textContent = p.user;
+        li.textContent = `${name} (${count}/${sequence.length})`;
         listEl.appendChild(li);
       });
     });
@@ -156,6 +160,17 @@
       console.log('[race] triggering handleStart for:', race.start_time);
       handleStart(new Date(race.start_time).getTime());
     }
+  });
+  // listen for answers to update per-player progress
+  channel.on('postgres_changes', {
+    event: 'INSERT', schema: 'public', table: 'answers', filter: `race_id=eq.${raceId}`
+  }, ({ new: ans }) => {
+    if (ans.correct) {
+      correctCounts[ans.username] = (correctCounts[ans.username] || 0) + 1;
+    }
+    renderPresence(channel.presenceState());
+    // update this user's progress display
+    if (ans.username === username) updateProgress();
   });
   // subscribe and register presence
   await channel.subscribe();
@@ -221,6 +236,8 @@
       if (diff <= 0) {
         clearInterval(countdownInterval);
         countdownEl.style.display = 'none';
+        // show race UI
+        if (raceContainer) raceContainer.style.display = 'block';
         startRace();
       }
     };
