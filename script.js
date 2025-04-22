@@ -5,8 +5,8 @@
   // number of points required to master each character
   const targetPoints = 3;
   // thresholds (in seconds)
-  const fastThreshold = 0.5;
-  const maxThreshold = 4.0;
+  const fastThreshold = 0.8;
+  const maxThreshold = 7.0;
   // weight for already mastered chars in question pool
   const completedWeight = 0.2;
   // delay after feedback (correct or incorrect) before next action (ms)
