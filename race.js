@@ -233,6 +233,31 @@
       }
     }, 1000);
   })();
+  // Poll answer counts periodically to update progress bars (fallback for realtime)
+  setInterval(async () => {
+    // Fetch all answers for this race and count correct per user
+    const { data: answers, error: pollError } = await supabaseClient
+      .from('answers')
+      .select('username, correct')
+      .eq('race_id', raceId);
+    if (pollError) {
+      console.error('Error polling answers for progress:', pollError);
+      return;
+    }
+    // Reset local correctCounts and recount
+    for (const user in correctCounts) {
+      if (Object.prototype.hasOwnProperty.call(correctCounts, user)) {
+        delete correctCounts[user];
+      }
+    }
+    answers.forEach(ans => {
+      if (ans.correct) {
+        correctCounts[ans.username] = (correctCounts[ans.username] || 0) + 1;
+      }
+    });
+    // Re-render presence list with updated progress
+    renderPresence(channel.presenceState());
+  }, 1000);
 
 
   /**
