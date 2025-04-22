@@ -171,8 +171,6 @@
       correctCounts[ans.username] = (correctCounts[ans.username] || 0) + 1;
     }
     renderPresence(channel.presenceState());
-    // update this user's progress display
-    if (ans.username === username) updateProgress();
   });
   // subscribe and register presence
   await channel.subscribe();
@@ -209,6 +207,8 @@
       return;
     }
     sequence = race.sequence || [];
+    // render presence now that we know total questions
+    renderPresence(channel.presenceState());
     if (race.start_time) {
       handleStart(new Date(race.start_time).getTime());
     }
@@ -255,33 +255,53 @@
    */
   async function startRace() {
     let currentIndex = 0;
+    // Update local progress display
+    function updateProgress() {
+      progressInfo.textContent = `Question ${currentIndex + 1} of ${sequence.length}`;
+    }
     async function playNext() {
       if (currentIndex >= sequence.length) {
+        feedbackEl.textContent = 'Race completed!';
         console.log('Race finished');
         return;
       }
+      // Clear previous feedback and update progress
+      feedbackEl.textContent = '';
+      updateProgress();
       const char = sequence[currentIndex];
       await playMorse(char);
       const questionStart = Date.now();
       const onKeyDown = async (e) => {
-        const answer = e.key.toLowerCase();
-        const correct = answer === char;
+        // Replay on Tab
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          await playMorse(char);
+          return;
+        }
+        const key = e.key.toLowerCase();
+        // Accept only alphanumeric keys
+        if (!/^[a-z0-9]$/.test(key)) return;
+        document.removeEventListener('keydown', onKeyDown);
+        const correct = key === char;
         const time_ms = Date.now() - questionStart;
         const { error } = await supabaseClient.from('answers').insert([{
           race_id: raceId,
           user_id: userId,
           username,
           char,
-          answer,
+          answer: key,
           correct,
           time_ms
         }]);
         if (error) console.error('Error recording answer:', error);
-        document.removeEventListener('keydown', onKeyDown);
-        currentIndex++;
-        if (!correct) {
+        if (correct) {
+          feedbackEl.textContent = '✓';
+          currentIndex++;
+        } else {
+          feedbackEl.textContent = '✗';
           await playErrorSound();
         }
+        // Continue with next or retry
         playNext();
       };
       document.addEventListener('keydown', onKeyDown);
