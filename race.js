@@ -135,26 +135,57 @@
     config: { presence: { key: presenceId } }
   });
   const listEl = document.getElementById('participant-list');
-  // Track correct answers per user
+  // Track correct answers, errors, and finish info per user
   const correctCounts = {};
+  const errorCounts = {};
+  const finishTimes = {};
+  const finishPlaces = {};
+  let finishOrder = [];
+  let raceStartTimestamp = null;
+
+  // Helper: format ordinal suffix (e.g., 1st, 2nd)
+  function getOrdinal(n) {
+    const j = n % 10, k = n % 100;
+    if (j === 1 && k !== 11) return n + 'st';
+    if (j === 2 && k !== 12) return n + 'nd';
+    if (j === 3 && k !== 13) return n + 'rd';
+    return n + 'th';
+  }
+  // Helper: format duration (ms) as mm:ss.ss
+  function formatDuration(ms) {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = ((ms % 60000) / 1000).toFixed(2);
+    return `${minutes}:${seconds.padStart(5, '0')}`;
+  }
+
   function renderPresence(state) {
-  listEl.innerHTML = '';
-  Object.values(state).forEach((arr) => {
-    arr.forEach((p) => {
-      const name = p.user;
-      const count = correctCounts[name] || 0;
-      const li = document.createElement('li');
-      // Display name and progress bar
-      const text = document.createElement('span');
-      text.textContent = `${name} `;
-      const prog = document.createElement('progress');
-      prog.value = count;
-      prog.max = sequence.length;
-      li.appendChild(text);
-      li.appendChild(prog);
-      listEl.appendChild(li);
+    listEl.innerHTML = '';
+    Object.values(state).forEach(arr => {
+      arr.forEach(p => {
+        const name = p.user;
+        const count = correctCounts[name] || 0;
+        const errors = errorCounts[name] || 0;
+        const li = document.createElement('li');
+        const nameSpan = document.createElement('span');
+        if (finishTimes[name] != null) {
+          const place = finishPlaces[name];
+          const ordinal = getOrdinal(place);
+          const durationMs = finishTimes[name] - raceStartTimestamp;
+          const mmss = formatDuration(durationMs);
+          nameSpan.textContent = `${name} (${ordinal}, ${mmss}, errors: ${errors}) `;
+        } else {
+          nameSpan.textContent = `${name} `;
+        }
+        li.appendChild(nameSpan);
+        if (finishTimes[name] == null) {
+          const prog = document.createElement('progress');
+          prog.value = count;
+          prog.max = sequence.length;
+          li.appendChild(prog);
+        }
+        listEl.appendChild(li);
+      });
     });
-  });
   }
   // presence sync event
   channel.on('presence', { event: 'sync' }, () => {
@@ -174,8 +205,18 @@
   channel.on('postgres_changes', {
     event: 'INSERT', schema: 'public', table: 'answers', filter: `race_id=eq.${raceId}`
   }, ({ new: ans }) => {
+    const user = ans.username;
     if (ans.correct) {
-      correctCounts[ans.username] = (correctCounts[ans.username] || 0) + 1;
+      correctCounts[user] = (correctCounts[user] || 0) + 1;
+      // record finish info when user completes all questions
+      if (correctCounts[user] === sequence.length && finishTimes[user] == null) {
+        const finishTs = ans.created_at ? new Date(ans.created_at).getTime() : Date.now();
+        finishTimes[user] = finishTs;
+        finishOrder.push(user);
+        finishPlaces[user] = finishOrder.length;
+      }
+    } else {
+      errorCounts[user] = (errorCounts[user] || 0) + 1;
     }
     renderPresence(channel.presenceState());
   });
@@ -235,27 +276,38 @@
   })();
   // Poll answer counts periodically to update progress bars (fallback for realtime)
   setInterval(async () => {
-    // Fetch all answers for this race and count correct per user
+    // Fetch all answers for this race and rebuild stats
     const { data: answers, error: pollError } = await supabaseClient
       .from('answers')
-      .select('username, correct')
-      .eq('race_id', raceId);
+      .select('username, correct, created_at')
+      .eq('race_id', raceId)
+      .order('created_at', { ascending: true });
     if (pollError) {
       console.error('Error polling answers for progress:', pollError);
       return;
     }
-    // Reset local correctCounts and recount
-    for (const user in correctCounts) {
-      if (Object.prototype.hasOwnProperty.call(correctCounts, user)) {
-        delete correctCounts[user];
-      }
-    }
+    // Reset all tracking
+    Object.keys(correctCounts).forEach(u => delete correctCounts[u]);
+    Object.keys(errorCounts).forEach(u => delete errorCounts[u]);
+    finishOrder = [];
+    Object.keys(finishTimes).forEach(u => delete finishTimes[u]);
+    Object.keys(finishPlaces).forEach(u => delete finishPlaces[u]);
+    // Recount answers, record finish times and errors
     answers.forEach(ans => {
+      const user = ans.username;
       if (ans.correct) {
-        correctCounts[ans.username] = (correctCounts[ans.username] || 0) + 1;
+        correctCounts[user] = (correctCounts[user] || 0) + 1;
+        if (correctCounts[user] === sequence.length && finishTimes[user] == null) {
+          const finishTs = ans.created_at ? new Date(ans.created_at).getTime() : Date.now();
+          finishTimes[user] = finishTs;
+          finishOrder.push(user);
+          finishPlaces[user] = finishOrder.length;
+        }
+      } else {
+        errorCounts[user] = (errorCounts[user] || 0) + 1;
       }
     });
-    // Re-render presence list with updated progress
+    // Re-render presence list with updated stats
     renderPresence(channel.presenceState());
   }, 1000);
 
@@ -265,6 +317,7 @@
    */
   function handleStart(targetTime) {
     hasStarted = true;
+    raceStartTimestamp = targetTime;
     // Hide start button but keep presence list visible
     const startBtn = document.getElementById('start-button');
     if (startBtn) startBtn.style.display = 'none';
