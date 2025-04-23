@@ -123,6 +123,12 @@
   let pollStartTimeInterval = null;
   let pollAnswersTimeout = null;
   let pollAnswersInterval = null;
+  // Feature flag to enable fallback polling at runtime (default off)
+  // Set window.enableFallbackPolling = true before loading this script to enable
+  const enableFallbackPolling = window.enableFallbackPolling === true;
+  // Separate flags for start and answer fallback, consumed upon schedule
+  let startPollingFallback = enableFallbackPolling;
+  let answerPollingFallback = enableFallbackPolling;
 
   // Helper: format ordinal suffix (e.g., 1st, 2nd)
   function getOrdinal(n) {
@@ -260,62 +266,29 @@
   }
   // After initial load, schedule fallback polling if websocket updates do not arrive
   await loadRace();
-  // Fallback for start_time: begin after delay if no websocket event
-  pollStartTimeTimeout = setTimeout(() => {
-    if (!startRealtimeActive) {
-      console.log('[race] No websocket start_time event received, falling back to polling start_time');
-      pollStartTimeInterval = setInterval(async () => {
-        if (hasStarted) {
-          clearInterval(pollStartTimeInterval);
-          return;
-        }
-        const { data: race, error } = await supabaseClient
-          .from('races').select('start_time').eq('id', raceId).single();
-        if (!error && race?.start_time) {
-          console.log('[race] Detected start_time via polling');
-          clearInterval(pollStartTimeInterval);
-          handleStart(new Date(race.start_time).getTime());
-        }
-      }, 1000);
-    }
-  }, 2000);
-  // Fallback for answers: begin after delay if no websocket events
-  pollAnswersTimeout = setTimeout(() => {
-    if (!answerRealtimeActive) {
-      console.log('[race] No websocket answers events received, falling back to polling answers for progress');
-      pollAnswersInterval = setInterval(async () => {
-        const { data: answers, error: pollError } = await supabaseClient
-          .from('answers')
-          .select('username, correct, created_at')
-          .eq('race_id', raceId)
-          .order('created_at', { ascending: true });
-        if (pollError) {
-          console.error('Error polling answers for progress:', pollError);
-          return;
-        }
-        Object.keys(correctCounts).forEach(u => delete correctCounts[u]);
-        Object.keys(errorCounts).forEach(u => delete errorCounts[u]);
-        finishOrder = [];
-        Object.keys(finishTimes).forEach(u => delete finishTimes[u]);
-        Object.keys(finishPlaces).forEach(u => delete finishPlaces[u]);
-        answers.forEach(ans => {
-          const user = ans.username;
-          if (ans.correct) {
-            correctCounts[user] = (correctCounts[user] || 0) + 1;
-            if (correctCounts[user] === sequence.length && finishTimes[user] == null) {
-              const finishTs = ans.created_at ? new Date(ans.created_at).getTime() : Date.now();
-              finishTimes[user] = finishTs;
-              finishOrder.push(user);
-              finishPlaces[user] = finishOrder.length;
-            }
-          } else {
-            errorCounts[user] = (errorCounts[user] || 0) + 1;
+  if (startPollingFallback && !hasStarted) {
+    // consume fallback flag so it only runs once
+    startPollingFallback = false;
+    // Fallback for start_time: begin after delay if no websocket event
+    pollStartTimeTimeout = setTimeout(() => {
+      if (!startRealtimeActive && !hasStarted) {
+        console.log('[race] No websocket start_time event received, falling back to polling start_time');
+        pollStartTimeInterval = setInterval(async () => {
+          if (hasStarted) {
+            clearInterval(pollStartTimeInterval);
+            return;
           }
-        });
-        renderPresence(channel.presenceState());
-      }, 1000);
-    }
-  }, 2000);
+          const { data: race, error } = await supabaseClient
+            .from('races').select('start_time').eq('id', raceId).single();
+          if (!error && race?.start_time) {
+            console.log('[race] Detected start_time via polling');
+            clearInterval(pollStartTimeInterval);
+            handleStart(new Date(race.start_time).getTime());
+          }
+        }, 1000);
+      }
+    }, 2000);
+  }
 
 
   /**
@@ -332,6 +305,45 @@
     if (pollStartTimeInterval) {
       clearInterval(pollStartTimeInterval);
       pollStartTimeInterval = null;
+    }
+    // Fallback for answers: schedule polling after delay if no websocket answer events
+    if (!answerRealtimeActive) {
+      pollAnswersTimeout = setTimeout(() => {
+        if (!answerRealtimeActive) {
+          console.log('[race] No websocket answers events received, falling back to polling answers for progress');
+          pollAnswersInterval = setInterval(async () => {
+            const { data: answers, error: pollError } = await supabaseClient
+              .from('answers')
+              .select('username, correct, created_at')
+              .eq('race_id', raceId)
+              .order('created_at', { ascending: true });
+            if (pollError) {
+              console.error('Error polling answers for progress:', pollError);
+              return;
+            }
+            Object.keys(correctCounts).forEach(u => delete correctCounts[u]);
+            Object.keys(errorCounts).forEach(u => delete errorCounts[u]);
+            finishOrder = [];
+            Object.keys(finishTimes).forEach(u => delete finishTimes[u]);
+            Object.keys(finishPlaces).forEach(u => delete finishPlaces[u]);
+            answers.forEach(ans => {
+              const user = ans.username;
+              if (ans.correct) {
+                correctCounts[user] = (correctCounts[user] || 0) + 1;
+                if (correctCounts[user] === sequence.length && finishTimes[user] == null) {
+                  const finishTs = ans.created_at ? new Date(ans.created_at).getTime() : Date.now();
+                  finishTimes[user] = finishTs;
+                  finishOrder.push(user);
+                  finishPlaces[user] = finishOrder.length;
+                }
+              } else {
+                errorCounts[user] = (errorCounts[user] || 0) + 1;
+              }
+            });
+            renderPresence(channel.presenceState());
+          }, 1000);
+        }
+      }, 2000);
     }
     // Hide start button but keep presence list visible
     const startBtn = document.getElementById('start-button');
