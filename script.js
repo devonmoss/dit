@@ -320,6 +320,30 @@
   // Sending Trainer UI elements
   // sending-button removed; use mode toggle for send mode
   const sendingDiv = document.getElementById("sending-trainer");
+  // Race UI elements
+  const lobbyDiv = document.getElementById("lobby");
+  const countdownDiv = document.getElementById("countdown");
+  const raceViewDiv = document.getElementById("race-container");
+  // Button for creating a new race
+  const raceCreateBtn = document.getElementById("race-create-button");
+  // Handle 'Create Race' button click: generate new race and redirect
+  if (raceCreateBtn) {
+    raceCreateBtn.addEventListener("click", async () => {
+      const mode = currentMode;
+      const level = window.trainingLevels.find((l) => l.id === selectedId);
+      const seq = level && Array.isArray(level.chars) ? [...level.chars] : [...defaultChars];
+      const newId = Math.random().toString(36).substring(2, 10);
+      const { error } = await window.supabaseClient
+        .from('races')
+        .insert([{ id: newId, mode, sequence: seq }]);
+      if (error) {
+        console.error('Error creating race:', error);
+        alert('Could not create race. See console for details.');
+      } else {
+        window.location.search = '?id=' + newId;
+      }
+    });
+  }
   // Mode toggle setup (Copy vs Send)
   const modeCopyRadio = document.getElementById("mode-copy");
   const modeSendRadio = document.getElementById("mode-send");
@@ -1153,19 +1177,65 @@
   }
   // Test type menu handling
   const testTypeButtons = document.querySelectorAll("[data-test-type]");
-  let selectedTestType = "training";
+  // Get race ID from URL if present
+  const raceId = new URL(window.location.href).searchParams.get('id');
+  // Determine initial test type: race if URL has id=, else training
+  let selectedTestType = window.location.search.includes("id=") ? "race" : "training";
+  // Function to switch main UI views based on selectedTestType
+  function switchView(testType) {
+    // Hide all primary sections
+    containerDiv.style.display = "none";
+    actionHints.style.display = "none";
+    sendingDiv.style.display = "none";
+    progressDashboard.style.display = "none";
+    lobbyDiv.style.display = "none";
+    countdownDiv.style.display = "none";
+    raceViewDiv.style.display = "none";
+    // Hide buttons
+    startButton.style.display = "none";
+    raceCreateBtn.style.display = "none";
+    // Show relevant section
+    if (testType === "training") {
+      containerDiv.style.display = "flex";
+      actionHints.style.display = "block";
+      startButton.style.display = "inline-block";
+    } else if (testType === "send") {
+      sendingDiv.style.display = "flex";
+    } else if (testType === "race") {
+      if (raceId) {
+        // In a joined/created race, show lobby and hide training container
+        lobbyDiv.style.display = "block";
+      } else {
+        // Before race creation, show create UI in container
+        containerDiv.style.display = "flex";
+        raceCreateBtn.style.display = "inline-block";
+      }
+    }
+  }
   testTypeButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       if (btn.disabled) return;
       selectedTestType = btn.dataset.testType;
+      // Highlight active test type in navbar
       testTypeButtons.forEach((b) => {
         b.classList.toggle("active", b.dataset.testType === selectedTestType);
       });
+      // Show level selector for training and race modes
       const levelSelectorEl = document.getElementById("level-selector");
       if (levelSelectorEl) {
         levelSelectorEl.style.display =
-          selectedTestType === "training" ? "flex" : "none";
+          (selectedTestType === "training" || selectedTestType === "race")
+            ? "flex"
+            : "none";
       }
+      // Switch the main UI view
+      switchView(selectedTestType);
     });
   });
+  // Initial nav highlight and view
+  testTypeButtons.forEach((b) =>
+    b.classList.toggle("active", b.dataset.testType === selectedTestType)
+  );
+  // Show initial view based on URL or default
+  switchView(selectedTestType);
 })();
