@@ -116,6 +116,13 @@
   const finishPlaces = {};
   let finishOrder = [];
   let raceStartTimestamp = null;
+  // Flags and timers for fallback polling
+  let startRealtimeActive = false;
+  let answerRealtimeActive = false;
+  let pollStartTimeTimeout = null;
+  let pollStartTimeInterval = null;
+  let pollAnswersTimeout = null;
+  let pollAnswersInterval = null;
 
   // Helper: format ordinal suffix (e.g., 1st, 2nd)
   function getOrdinal(n) {
@@ -169,6 +176,14 @@
   channel.on('postgres_changes', {
     event: 'UPDATE', schema: 'public', table: 'races', filter: `id=eq.${raceId}`
   }, ({ new: race }) => {
+    // Mark that we received start_time update via websocket and stop fallback polling
+    startRealtimeActive = true;
+    clearTimeout(pollStartTimeTimeout);
+    if (pollStartTimeInterval) {
+      console.log('[race] Websocket update for start_time received, stopping polling fallback');
+      clearInterval(pollStartTimeInterval);
+      pollStartTimeInterval = null;
+    }
     console.log('[race] postgres_changes payload:', race);
     if (race.start_time && !hasStarted) {
       console.log('[race] triggering handleStart for:', race.start_time);
@@ -179,6 +194,14 @@
   channel.on('postgres_changes', {
     event: 'INSERT', schema: 'public', table: 'answers', filter: `race_id=eq.${raceId}`
   }, ({ new: ans }) => {
+    // Mark that we received answers update via websocket and stop fallback polling
+    answerRealtimeActive = true;
+    clearTimeout(pollAnswersTimeout);
+    if (pollAnswersInterval) {
+      console.log('[race] Websocket update for answers received, stopping polling fallback');
+      clearInterval(pollAnswersInterval);
+      pollAnswersInterval = null;
+    }
     const user = ans.username;
     if (ans.correct) {
       correctCounts[user] = (correctCounts[user] || 0) + 1;
@@ -235,55 +258,64 @@
       handleStart(new Date(race.start_time).getTime());
     }
   }
+  // After initial load, schedule fallback polling if websocket updates do not arrive
   await loadRace();
-  // Fallback polling if realtime update misses: check for start_time every second
-  (function pollStartTime() {
-    const poll = setInterval(async () => {
-      if (hasStarted) return clearInterval(poll);
-      const { data: race, error } = await supabaseClient
-        .from('races').select('start_time').eq('id', raceId).single();
-      if (!error && race?.start_time) {
-        clearInterval(poll);
-        handleStart(new Date(race.start_time).getTime());
-      }
-    }, 1000);
-  })();
-  // Poll answer counts periodically to update progress bars (fallback for realtime)
-  setInterval(async () => {
-    // Fetch all answers for this race and rebuild stats
-    const { data: answers, error: pollError } = await supabaseClient
-      .from('answers')
-      .select('username, correct, created_at')
-      .eq('race_id', raceId)
-      .order('created_at', { ascending: true });
-    if (pollError) {
-      console.error('Error polling answers for progress:', pollError);
-      return;
-    }
-    // Reset all tracking
-    Object.keys(correctCounts).forEach(u => delete correctCounts[u]);
-    Object.keys(errorCounts).forEach(u => delete errorCounts[u]);
-    finishOrder = [];
-    Object.keys(finishTimes).forEach(u => delete finishTimes[u]);
-    Object.keys(finishPlaces).forEach(u => delete finishPlaces[u]);
-    // Recount answers, record finish times and errors
-    answers.forEach(ans => {
-      const user = ans.username;
-      if (ans.correct) {
-        correctCounts[user] = (correctCounts[user] || 0) + 1;
-        if (correctCounts[user] === sequence.length && finishTimes[user] == null) {
-          const finishTs = ans.created_at ? new Date(ans.created_at).getTime() : Date.now();
-          finishTimes[user] = finishTs;
-          finishOrder.push(user);
-          finishPlaces[user] = finishOrder.length;
+  // Fallback for start_time: begin after delay if no websocket event
+  pollStartTimeTimeout = setTimeout(() => {
+    if (!startRealtimeActive) {
+      console.log('[race] No websocket start_time event received, falling back to polling start_time');
+      pollStartTimeInterval = setInterval(async () => {
+        if (hasStarted) {
+          clearInterval(pollStartTimeInterval);
+          return;
         }
-      } else {
-        errorCounts[user] = (errorCounts[user] || 0) + 1;
-      }
-    });
-    // Re-render presence list with updated stats
-    renderPresence(channel.presenceState());
-  }, 1000);
+        const { data: race, error } = await supabaseClient
+          .from('races').select('start_time').eq('id', raceId).single();
+        if (!error && race?.start_time) {
+          console.log('[race] Detected start_time via polling');
+          clearInterval(pollStartTimeInterval);
+          handleStart(new Date(race.start_time).getTime());
+        }
+      }, 1000);
+    }
+  }, 2000);
+  // Fallback for answers: begin after delay if no websocket events
+  pollAnswersTimeout = setTimeout(() => {
+    if (!answerRealtimeActive) {
+      console.log('[race] No websocket answers events received, falling back to polling answers for progress');
+      pollAnswersInterval = setInterval(async () => {
+        const { data: answers, error: pollError } = await supabaseClient
+          .from('answers')
+          .select('username, correct, created_at')
+          .eq('race_id', raceId)
+          .order('created_at', { ascending: true });
+        if (pollError) {
+          console.error('Error polling answers for progress:', pollError);
+          return;
+        }
+        Object.keys(correctCounts).forEach(u => delete correctCounts[u]);
+        Object.keys(errorCounts).forEach(u => delete errorCounts[u]);
+        finishOrder = [];
+        Object.keys(finishTimes).forEach(u => delete finishTimes[u]);
+        Object.keys(finishPlaces).forEach(u => delete finishPlaces[u]);
+        answers.forEach(ans => {
+          const user = ans.username;
+          if (ans.correct) {
+            correctCounts[user] = (correctCounts[user] || 0) + 1;
+            if (correctCounts[user] === sequence.length && finishTimes[user] == null) {
+              const finishTs = ans.created_at ? new Date(ans.created_at).getTime() : Date.now();
+              finishTimes[user] = finishTs;
+              finishOrder.push(user);
+              finishPlaces[user] = finishOrder.length;
+            }
+          } else {
+            errorCounts[user] = (errorCounts[user] || 0) + 1;
+          }
+        });
+        renderPresence(channel.presenceState());
+      }, 1000);
+    }
+  }, 2000);
 
 
   /**
@@ -292,6 +324,15 @@
   function handleStart(targetTime) {
     hasStarted = true;
     raceStartTimestamp = targetTime;
+    // Clear fallback polling for start_time if scheduled or running
+    if (pollStartTimeTimeout) {
+      clearTimeout(pollStartTimeTimeout);
+      pollStartTimeTimeout = null;
+    }
+    if (pollStartTimeInterval) {
+      clearInterval(pollStartTimeInterval);
+      pollStartTimeInterval = null;
+    }
     // Hide start button but keep presence list visible
     const startBtn = document.getElementById('start-button');
     if (startBtn) startBtn.style.display = 'none';
