@@ -324,6 +324,26 @@
   const lobbyDiv = document.getElementById("lobby");
   const countdownDiv = document.getElementById("countdown");
   const raceViewDiv = document.getElementById("race-container");
+  // Button for creating a new race
+  const raceCreateBtn = document.getElementById("race-create-button");
+  // Handle 'Create Race' button click: generate new race and redirect
+  if (raceCreateBtn) {
+    raceCreateBtn.addEventListener("click", async () => {
+      const mode = currentMode;
+      const level = window.trainingLevels.find((l) => l.id === selectedId);
+      const seq = level && Array.isArray(level.chars) ? [...level.chars] : [...defaultChars];
+      const newId = Math.random().toString(36).substring(2, 10);
+      const { error } = await window.supabaseClient
+        .from('races')
+        .insert([{ id: newId, mode, sequence: seq }]);
+      if (error) {
+        console.error('Error creating race:', error);
+        alert('Could not create race. See console for details.');
+      } else {
+        window.location.search = '?id=' + newId;
+      }
+    });
+  }
   // Mode toggle setup (Copy vs Send)
   const modeCopyRadio = document.getElementById("mode-copy");
   const modeSendRadio = document.getElementById("mode-send");
@@ -1157,6 +1177,8 @@
   }
   // Test type menu handling
   const testTypeButtons = document.querySelectorAll("[data-test-type]");
+  // Get race ID from URL if present
+  const raceId = new URL(window.location.href).searchParams.get('id');
   // Determine initial test type: race if URL has id=, else training
   let selectedTestType = window.location.search.includes("id=") ? "race" : "training";
   // Function to switch main UI views based on selectedTestType
@@ -1171,6 +1193,7 @@
     raceViewDiv.style.display = "none";
     // Hide buttons
     startButton.style.display = "none";
+    raceCreateBtn.style.display = "none";
     // Show relevant section
     if (testType === "training") {
       containerDiv.style.display = "flex";
@@ -1179,7 +1202,14 @@
     } else if (testType === "send") {
       sendingDiv.style.display = "flex";
     } else if (testType === "race") {
-      lobbyDiv.style.display = "block";
+      if (raceId) {
+        // In a joined/created race, show lobby
+        lobbyDiv.style.display = "block";
+      } else {
+        // Before race creation, show create UI in test container
+        containerDiv.style.display = "flex";
+        raceCreateBtn.style.display = "inline-block";
+      }
     }
   }
   testTypeButtons.forEach((btn) => {
