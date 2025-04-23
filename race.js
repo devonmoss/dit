@@ -370,13 +370,16 @@
     playNext();
   }
 
-  // Handle start-button click: set start_time = now+15s
-  document.getElementById('start-button').addEventListener('click', async () => {
-    const startTime = new Date(Date.now() + 15000).toISOString();
-    const { error } = await supabaseClient
-      .from('races')
-      .update({ start_time: startTime })
-      .eq('id', raceId);
-    if (error) console.error('Error setting race start_time:', error);
-  });
+  // Handle race-start-button click: set start_time = now + 15s
+  const raceStartBtn = document.getElementById('race-start-button');
+  if (raceStartBtn) {
+    raceStartBtn.addEventListener('click', async () => {
+      const startTime = new Date(Date.now() + 15000).toISOString();
+      const { error } = await supabaseClient
+        .from('races')
+        .update({ start_time: startTime })
+        .eq('id', raceId);
+      if (error) console.error('Error setting race start_time:', error);
+    });
+  }
 })();

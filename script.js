@@ -324,8 +324,6 @@
   const lobbyDiv = document.getElementById("lobby");
   const countdownDiv = document.getElementById("countdown");
   const raceViewDiv = document.getElementById("race-container");
-  // Button for creating a new race
-  const raceCreateBtn = document.getElementById("race-create-button");
   // Mode toggle setup (Copy vs Send)
   const modeCopyRadio = document.getElementById("mode-copy");
   const modeSendRadio = document.getElementById("mode-send");
@@ -1173,7 +1171,6 @@
     raceViewDiv.style.display = "none";
     // Hide buttons
     startButton.style.display = "none";
-    raceCreateBtn.style.display = "none";
     // Show relevant section
     if (testType === "training") {
       containerDiv.style.display = "flex";
@@ -1183,7 +1180,6 @@
       sendingDiv.style.display = "flex";
     } else if (testType === "race") {
       lobbyDiv.style.display = "block";
-      raceCreateBtn.style.display = "inline-block";
     }
   }
   testTypeButtons.forEach((btn) => {
@@ -1202,17 +1198,6 @@
             ? "flex"
             : "none";
       }
-      // Toggle Start vs Create Race button visibility
-      const startBtn = document.getElementById("start-button");
-      const raceCreateBtn = document.getElementById("race-create-button");
-      if (startBtn) {
-        startBtn.style.display =
-          selectedTestType === "training" ? "inline-block" : "none";
-      }
-      if (raceCreateBtn) {
-        raceCreateBtn.style.display =
-          selectedTestType === "race" ? "inline-block" : "none";
-      }
       // Switch the main UI view
       switchView(selectedTestType);
     });
@@ -1223,28 +1208,4 @@
   );
   // Show initial view based on URL or default
   switchView(selectedTestType);
-  // Create Race button handler
-  if (raceCreateBtn) {
-    raceCreateBtn.addEventListener("click", async () => {
-      // Determine mode and sequence based on selected level
-      const mode = currentMode;
-      const level = window.trainingLevels.find((l) => l.id === selectedId);
-      const seq = level && Array.isArray(level.chars)
-        ? [...level.chars]
-        : [...defaultChars];
-      // Generate a short random race ID
-      const newId = Math.random().toString(36).substring(2, 10);
-      // Insert new race record
-      const { error } = await window.supabaseClient
-        .from('races')
-        .insert([{ id: newId, mode, sequence: seq }]);
-      if (error) {
-        console.error('Error creating race:', error);
-        alert('Could not create race. See console for details.');
-      } else {
-        // Redirect to this page with race ID
-        window.location.search = '?id=' + newId;
-      }
-    });
-  }
 })();
