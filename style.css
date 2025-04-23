@@ -6,6 +6,25 @@
   width: 100%;
   max-width: 600px;
 }
+# Progress bar styling: dark track and green fill matching other UI accents
+progress {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100px;
+  height: 12px;
+}
+progress::-webkit-progress-bar {
+  background-color: #333;
+  border-radius: 4px;
+}
+progress::-webkit-progress-value {
+  background-color: #00e676;
+  border-radius: 4px;
+}
+progress::-moz-progress-bar {
+  background-color: #00e676;
+  border-radius: 4px;
+}
 #send-start-button {
   font-size: 24px;
   padding: 20px 40px;
@@ -137,6 +156,20 @@ body {
   color: #e0e0e0;
 }
 #start-button:hover {
+  background-color: #2a2a2a;
+}
+/* Match Create Race and Start Race buttons to training Start button */
+#race-create-button,
+#race-start-button {
+  font-size: 24px;
+  padding: 20px 40px;
+  cursor: pointer;
+  background-color: #1f1f1f;
+  border: none;
+  color: #e0e0e0;
+}
+#race-create-button:hover,
+#race-start-button:hover {
   background-color: #2a2a2a;
 }
 /* current level display */
