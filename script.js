@@ -1203,10 +1203,10 @@
       sendingDiv.style.display = "flex";
     } else if (testType === "race") {
       if (raceId) {
-        // In a joined/created race, show lobby
+        // In a joined/created race, show lobby and hide training container
         lobbyDiv.style.display = "block";
       } else {
-        // Before race creation, show create UI in test container
+        // Before race creation, show create UI in container
         containerDiv.style.display = "flex";
         raceCreateBtn.style.display = "inline-block";
       }

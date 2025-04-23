@@ -108,6 +108,18 @@ body {
   height: calc(100vh - 50px);
   text-align: center;
 }
+/* Race room styling: lobby, countdown, race-container */
+#lobby,
+#countdown,
+#race-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  /* adjust for top menu height to match nav */
+  height: calc(100vh - 50px);
+  text-align: center;
+}
 #send-current-level {
   font-size: 16px;
   color: #888;
