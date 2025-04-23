@@ -320,6 +320,12 @@
   // Sending Trainer UI elements
   // sending-button removed; use mode toggle for send mode
   const sendingDiv = document.getElementById("sending-trainer");
+  // Race UI elements
+  const lobbyDiv = document.getElementById("lobby");
+  const countdownDiv = document.getElementById("countdown");
+  const raceViewDiv = document.getElementById("race-container");
+  // Button for creating a new race
+  const raceCreateBtn = document.getElementById("race-create-button");
   // Mode toggle setup (Copy vs Send)
   const modeCopyRadio = document.getElementById("mode-copy");
   const modeSendRadio = document.getElementById("mode-send");
@@ -1153,7 +1159,33 @@
   }
   // Test type menu handling
   const testTypeButtons = document.querySelectorAll("[data-test-type]");
-  let selectedTestType = "training";
+  // Determine initial test type: race if URL has id=, else training
+  let selectedTestType = window.location.search.includes("id=") ? "race" : "training";
+  // Function to switch main UI views based on selectedTestType
+  function switchView(testType) {
+    // Hide all primary sections
+    containerDiv.style.display = "none";
+    actionHints.style.display = "none";
+    sendingDiv.style.display = "none";
+    progressDashboard.style.display = "none";
+    lobbyDiv.style.display = "none";
+    countdownDiv.style.display = "none";
+    raceViewDiv.style.display = "none";
+    // Hide buttons
+    startButton.style.display = "none";
+    raceCreateBtn.style.display = "none";
+    // Show relevant section
+    if (testType === "training") {
+      containerDiv.style.display = "flex";
+      actionHints.style.display = "block";
+      startButton.style.display = "inline-block";
+    } else if (testType === "send") {
+      sendingDiv.style.display = "flex";
+    } else if (testType === "race") {
+      lobbyDiv.style.display = "block";
+      raceCreateBtn.style.display = "inline-block";
+    }
+  }
   testTypeButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       if (btn.disabled) return;
@@ -1181,10 +1213,17 @@
         raceCreateBtn.style.display =
           selectedTestType === "race" ? "inline-block" : "none";
       }
+      // Switch the main UI view
+      switchView(selectedTestType);
     });
   });
+  // Initial nav highlight and view
+  testTypeButtons.forEach((b) =>
+    b.classList.toggle("active", b.dataset.testType === selectedTestType)
+  );
+  // Show initial view based on URL or default
+  switchView(selectedTestType);
   // Create Race button handler
-  const raceCreateBtn = document.getElementById("race-create-button");
   if (raceCreateBtn) {
     raceCreateBtn.addEventListener("click", async () => {
       // Determine mode and sequence based on selected level
