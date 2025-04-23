@@ -1,7 +1,7 @@
 // race.js: basic race room with presence and start-time countdown
 (async () => {
-  // Initialize Supabase client
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Initialize Supabase client (shared instance)
+  const supabaseClient = window.supabaseClient;
 
   // --- Morse playback utilities (self-contained) ---
   const morseMap = {
@@ -81,34 +81,8 @@
       raceId = parts[2];
     }
   }
-  // If no raceId in URL, show race creation UI
+  // If no raceId provided, skip race logic (UI will present create control)
   if (!raceId) {
-    const lobbyDiv = document.getElementById('lobby');
-    // Setup UI: select mode and create button
-    lobbyDiv.innerHTML = `
-      <h2>Create a New Race</h2>
-      <label><input type="radio" name="mode" value="copy" checked> Copy Mode</label>
-      <label><input type="radio" name="mode" value="send"> Send Mode</label>
-      <button id="create-button">Create Race</button>
-    `;
-    document.getElementById('create-button').addEventListener('click', async () => {
-      // Determine selected mode
-      const mode = document.querySelector('input[name="mode"]:checked').value;
-      // Generate a short random race ID
-      const newId = Math.random().toString(36).substring(2, 10);
-      // Generate a sequence of characters (e.g., 20 random alphanumerics)
-      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
-      const seq = Array.from({ length: 20 }, () => chars[Math.floor(Math.random() * chars.length)]);
-      // Insert new race record
-      const { error } = await supabaseClient.from('races').insert([{ id: newId, mode, sequence: seq }]);
-      if (error) {
-        console.error('Error creating race:', error);
-        alert('Could not create race. See console for details.');
-      } else {
-        // Redirect to this page with race ID
-        window.location.search = '?id=' + newId;
-      }
-    });
     return;
   }
 

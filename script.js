@@ -1158,14 +1158,54 @@
     btn.addEventListener("click", () => {
       if (btn.disabled) return;
       selectedTestType = btn.dataset.testType;
+      // Highlight active test type in navbar
       testTypeButtons.forEach((b) => {
         b.classList.toggle("active", b.dataset.testType === selectedTestType);
       });
+      // Show level selector for training and race modes
       const levelSelectorEl = document.getElementById("level-selector");
       if (levelSelectorEl) {
         levelSelectorEl.style.display =
-          selectedTestType === "training" ? "flex" : "none";
+          (selectedTestType === "training" || selectedTestType === "race")
+            ? "flex"
+            : "none";
+      }
+      // Toggle Start vs Create Race button visibility
+      const startBtn = document.getElementById("start-button");
+      const raceCreateBtn = document.getElementById("race-create-button");
+      if (startBtn) {
+        startBtn.style.display =
+          selectedTestType === "training" ? "inline-block" : "none";
+      }
+      if (raceCreateBtn) {
+        raceCreateBtn.style.display =
+          selectedTestType === "race" ? "inline-block" : "none";
       }
     });
   });
+  // Create Race button handler
+  const raceCreateBtn = document.getElementById("race-create-button");
+  if (raceCreateBtn) {
+    raceCreateBtn.addEventListener("click", async () => {
+      // Determine mode and sequence based on selected level
+      const mode = currentMode;
+      const level = window.trainingLevels.find((l) => l.id === selectedId);
+      const seq = level && Array.isArray(level.chars)
+        ? [...level.chars]
+        : [...defaultChars];
+      // Generate a short random race ID
+      const newId = Math.random().toString(36).substring(2, 10);
+      // Insert new race record
+      const { error } = await window.supabaseClient
+        .from('races')
+        .insert([{ id: newId, mode, sequence: seq }]);
+      if (error) {
+        console.error('Error creating race:', error);
+        alert('Could not create race. See console for details.');
+      } else {
+        // Redirect to this page with race ID
+        window.location.search = '?id=' + newId;
+      }
+    });
+  }
 })();
