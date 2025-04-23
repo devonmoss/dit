@@ -306,8 +306,10 @@
       clearInterval(pollStartTimeInterval);
       pollStartTimeInterval = null;
     }
-    // Fallback for answers: schedule polling after delay if no websocket answer events
-    if (!answerRealtimeActive) {
+    // Fallback for answers: schedule polling after countdown start if enabled and no websocket events
+    if (answerPollingFallback && !answerRealtimeActive) {
+      // consume fallback flag so it only runs once
+      answerPollingFallback = false;
       pollAnswersTimeout = setTimeout(() => {
         if (!answerRealtimeActive) {
           console.log('[race] No websocket answers events received, falling back to polling answers for progress');
