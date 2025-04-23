@@ -45,13 +45,14 @@
         <button class="menu-item" data-test-type="words" disabled>words</button>
         <button class="menu-item active" data-test-type="training">training</button>
         <button class="menu-item" data-test-type="custom" disabled>custom</button>
-        <a class="menu-item" href="race.html">race</a>
+        <button class="menu-item" data-test-type="race">race</button>
       </div>
         <div class="menu-section right">
         <div id="level-selector" class="menu-item">
           <span id="current-level-display"></span>
           <ul id="levels-list" class="level-dropdown hidden"></ul>
         </div>
+        <button id="create-race" class="menu-item" style="display:none">Create Race</button>
         <!-- Settings gear icon -->
         <button id="settings-toggle" class="menu-item">&#9881;</button>
         <ul id="settings-dropdown" class="settings-dropdown hidden">
@@ -105,6 +106,19 @@
       <div id="keyer-output" class="keyer-output"></div>
       <div id="decoded-output" class="decoded-output"></div>
       <button id="send-clear-button">Clear</button>
+    </div> <!-- /#sending-trainer -->
+    <!-- Race Room views -->
+    <div id="lobby" style="display:none;">
+      <p>Participants connected:</p>
+      <ul id="participant-list"></ul>
+      <button id="race-start-button">Start Race</button>
+    </div>
+    <div id="countdown" style="display:none;">
+      <h2>Race starts in <span id="countdown-timer"></span> seconds</h2>
+    </div>
+    <div id="race-container" style="display:none;">
+      <div id="progress-info"></div>
+      <div id="feedback" aria-live="polite"></div>
     </div>
   </div> <!-- /#app -->
   <!-- Supabase configuration: replace placeholders with your project values -->
@@ -120,6 +134,8 @@
   <script src="auth.js"></script>
   <!-- Main application script -->
   <script src="script.js"></script>
+  <!-- Race mode script -->
+  <script src="race.js"></script>
 </body>
 
 </html>
