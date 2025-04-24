@@ -348,7 +348,7 @@
         console.error('Error creating race:', error);
         alert('Could not create race. See console for details.');
       } else {
-        window.location.search = '?id=' + newId;
+        window.location.href = '/race?id=' + newId;
       }
     });
   }
@@ -1186,9 +1186,10 @@
   // Test type menu handling
   const testTypeButtons = document.querySelectorAll("[data-test-type]");
   // Get race ID from URL if present
+  const urlPath = window.location.pathname;
   const raceId = new URL(window.location.href).searchParams.get('id');
   // Determine initial test type: race if URL has id=, else training
-  let selectedTestType = window.location.search.includes("id=") ? "race" : "training";
+  let selectedTestType = urlPath === '/race' || window.location.search.includes("id=") ? "race" : "training";
   // Function to switch main UI views based on selectedTestType
   function switchView(testType) {
     // Hide all primary sections
@@ -1199,6 +1200,8 @@
     lobbyDiv.style.display = "none";
     countdownDiv.style.display = "none";
     raceViewDiv.style.display = "none";
+    document.getElementById("race-info").style.display = "none";
+    document.getElementById("race-sharing").style.display = "none";
     // Hide buttons
     startButton.style.display = "none";
     raceCreateBtn.style.display = "none";
@@ -1211,12 +1214,28 @@
       sendingDiv.style.display = "flex";
     } else if (testType === "race") {
       if (raceId) {
-        // In a joined/created race, show lobby and hide training container
-        lobbyDiv.style.display = "block";
+        // In a joined/created race, show sharing UI if just created, otherwise lobby
+        if (document.referrer.includes('/race') && !document.referrer.includes('id=')) {
+          // Just created the race - show sharing UI
+          document.getElementById("race-sharing").style.display = "block";
+          document.getElementById("race-share-url").value = window.location.href;
+        } else {
+          // Regular joined race - show lobby
+          lobbyDiv.style.display = "block";
+        }
       } else {
-        // Before race creation, show create UI in container
+        // Before race creation, show race info and create button
         containerDiv.style.display = "flex";
+        document.getElementById("race-info").style.display = "block";
         raceCreateBtn.style.display = "inline-block";
+        
+        // Update race info with current level details
+        const level = window.trainingLevels.find((l) => l.id === selectedId);
+        if (level) {
+          document.getElementById("race-level-name").textContent = level.name;
+          document.getElementById("race-chars-list").textContent = 
+            level.chars.map(c => c.toUpperCase()).join(", ");
+        }
       }
     }
   }
@@ -1224,6 +1243,14 @@
     btn.addEventListener("click", () => {
       if (btn.disabled) return;
       selectedTestType = btn.dataset.testType;
+      
+      // Update URL for race mode without page reload
+      if (selectedTestType === "race" && window.location.pathname !== "/race") {
+        history.pushState({}, "", "/race");
+      } else if (selectedTestType !== "race" && window.location.pathname === "/race") {
+        history.pushState({}, "", "/");
+      }
+      
       // Highlight active test type in navbar
       testTypeButtons.forEach((b) => {
         b.classList.toggle("active", b.dataset.testType === selectedTestType);
@@ -1240,6 +1267,49 @@
       switchView(selectedTestType);
     });
   });
+  
+  // Handle browser back/forward navigation
+  window.addEventListener('popstate', () => {
+    const isRacePath = window.location.pathname === "/race";
+    const hasRaceId = window.location.search.includes("id=");
+    
+    if (isRacePath || hasRaceId) {
+      selectedTestType = "race";
+    } else {
+      selectedTestType = "training";
+    }
+    
+    // Update navbar buttons
+    testTypeButtons.forEach((b) => {
+      b.classList.toggle("active", b.dataset.testType === selectedTestType);
+    });
+    
+    // Update view
+    switchView(selectedTestType);
+  });
+  
+  // Handle copy race link button
+  const copyRaceLinkBtn = document.getElementById("copy-race-link");
+  if (copyRaceLinkBtn) {
+    copyRaceLinkBtn.addEventListener("click", () => {
+      const shareUrlInput = document.getElementById("race-share-url");
+      shareUrlInput.select();
+      navigator.clipboard.writeText(shareUrlInput.value)
+        .then(() => {
+          // Provide feedback that copy succeeded
+          const originalText = copyRaceLinkBtn.textContent;
+          copyRaceLinkBtn.textContent = "Copied!";
+          setTimeout(() => {
+            copyRaceLinkBtn.textContent = originalText;
+          }, 2000);
+        })
+        .catch(err => {
+          console.error("Could not copy text: ", err);
+          alert("Failed to copy link. Please copy it manually.");
+        });
+    });
+  }
+  
   // Initial nav highlight and view
   testTypeButtons.forEach((b) =>
     b.classList.toggle("active", b.dataset.testType === selectedTestType)
