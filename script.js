@@ -1,4 +1,14 @@
 (function () {
+  // Initialize Supabase client
+  let supabaseClient;
+  try {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.supabaseClient = supabaseClient;
+    console.log("Supabase client initialized");
+  } catch (err) {
+    console.error("Failed to initialize Supabase client:", err);
+  }
+
   // legacy total questions (placeholder to avoid undefined)
   let totalChars = 50;
   let currentIndex = 0;
@@ -329,26 +339,56 @@
   // Handle 'Create Race' button click: generate new race and redirect
   if (raceCreateBtn) {
     raceCreateBtn.addEventListener("click", async () => {
-      const mode = currentMode;
-      const level = window.trainingLevels.find((l) => l.id === selectedId);
-      const levelChars = level && Array.isArray(level.chars) ? [...level.chars] : [...defaultChars];
-      
-      // Generate a random sequence of 20 characters from the level's character set
-      const seq = [];
-      for (let i = 0; i < 20; i++) {
-        const randomIndex = Math.floor(Math.random() * levelChars.length);
-        seq.push(levelChars[randomIndex]);
-      }
-      
-      const newId = Math.random().toString(36).substring(2, 10);
-      const { error } = await window.supabaseClient
-        .from('races')
-        .insert([{ id: newId, mode, sequence: seq }]);
-      if (error) {
-        console.error('Error creating race:', error);
-        alert('Could not create race. See console for details.');
-      } else {
-        window.location.href = '/race?id=' + newId;
+      try {
+        // Check if Supabase client exists
+        if (!window.supabaseClient) {
+          throw new Error("Supabase client not initialized. Please refresh the page and try again.");
+        }
+
+        const mode = currentMode;
+        const level = window.trainingLevels.find((l) => l.id === selectedId);
+        const levelChars = level && Array.isArray(level.chars) ? [...level.chars] : [...defaultChars];
+        
+        // Generate a random sequence of 20 characters from the level's character set
+        const seq = [];
+        for (let i = 0; i < 20; i++) {
+          const randomIndex = Math.floor(Math.random() * levelChars.length);
+          seq.push(levelChars[randomIndex]);
+        }
+        
+        const newId = Math.random().toString(36).substring(2, 10);
+        console.log("Creating race with ID:", newId, "and sequence:", seq);
+        
+        // IMPORTANT: Set the flag BEFORE making the database call or redirect
+        console.log("Setting justCreatedRace flag in sessionStorage");
+        sessionStorage.setItem('justCreatedRace', 'true');
+        
+        const { data, error } = await window.supabaseClient
+          .from('races')
+          .insert([{ id: newId, mode, sequence: seq }]);
+        
+        if (error) {
+          console.error('Error creating race:', error);
+          
+          // For development: If we're getting network errors, create a mock race locally
+          if (error.message && error.message.includes("NetworkError")) {
+            console.log("Network error detected. Creating mock race for development.");
+            // Redirect to the race URL without actually creating in database
+            window.location.href = '/race?id=' + newId;
+            return;
+          }
+          
+          // If there was a real error, remove the flag
+          sessionStorage.removeItem('justCreatedRace');
+          alert('Could not create race. See console for details.');
+        } else {
+          window.location.href = '/race?id=' + newId;
+        }
+      } catch (err) {
+        console.error("Error in race creation:", err);
+        // If there was an exception, remove the flag
+        sessionStorage.removeItem('justCreatedRace');
+        alert("An error occurred while creating the race: " + err.message);
       }
     });
   }
@@ -1190,8 +1230,11 @@
   const raceId = new URLSearchParams(window.location.search).get('id');
   // Determine initial test type: race if URL path is /race or has id=, else training
   let selectedTestType = urlPath === '/race' || raceId ? "race" : "training";
+  
   // Function to switch main UI views based on selectedTestType
   function switchView(testType) {
+    console.log("Switching view to:", testType, "raceId:", raceId);
+    
     // Hide all primary sections
     containerDiv.style.display = "none";
     actionHints.style.display = "none";
@@ -1201,10 +1244,15 @@
     countdownDiv.style.display = "none";
     raceViewDiv.style.display = "none";
     document.getElementById("race-info").style.display = "none";
-    document.getElementById("race-sharing").style.display = "none";
+    
+    // Make sure race sharing section is hidden initially
+    const raceShareSection = document.getElementById("race-sharing-section");
+    if (raceShareSection) raceShareSection.style.display = "none";
+    
     // Hide buttons
     startButton.style.display = "none";
     raceCreateBtn.style.display = "none";
+    
     // Show relevant section
     if (testType === "training") {
       containerDiv.style.display = "flex";
@@ -1213,19 +1261,29 @@
     } else if (testType === "send") {
       sendingDiv.style.display = "flex";
     } else if (testType === "race") {
+      containerDiv.style.display = "flex"; // Always show the container
+      
       if (raceId) {
-        // In a joined/created race, show sharing UI if just created, otherwise lobby
-        if (document.referrer.includes('/race') && !document.referrer.includes('id=')) {
-          // Just created the race - show sharing UI
-          document.getElementById("race-sharing").style.display = "block";
-          document.getElementById("race-share-url").value = window.location.href;
-        } else {
-          // Regular joined race - show lobby
-          lobbyDiv.style.display = "block";
+        // Show the lobby for races with ID
+        lobbyDiv.style.display = "block";
+        
+        // Check session storage for newly created race
+        const justCreated = sessionStorage.getItem('justCreatedRace') === 'true';
+        console.log("Just created race:", justCreated);
+        
+        if (justCreated) {
+          // Clear the flag immediately
+          sessionStorage.removeItem('justCreatedRace');
+          
+          // Show the race sharing section within the lobby
+          if (raceShareSection) {
+            console.log("Showing race sharing section");
+            raceShareSection.style.display = "block";
+            document.getElementById("race-share-url").value = window.location.href;
+          }
         }
       } else {
         // Before race creation, show race info and create button
-        containerDiv.style.display = "flex";
         document.getElementById("race-info").style.display = "block";
         raceCreateBtn.style.display = "inline-block";
         
@@ -1288,38 +1346,16 @@
     switchView(selectedTestType);
   });
   
-  // Update race creation to use path-based URL
-  if (raceCreateBtn) {
-    raceCreateBtn.addEventListener("click", async () => {
-      const mode = currentMode;
-      const level = window.trainingLevels.find((l) => l.id === selectedId);
-      const levelChars = level && Array.isArray(level.chars) ? [...level.chars] : [...defaultChars];
-      
-      // Generate a random sequence of 20 characters from the level's character set
-      const seq = [];
-      for (let i = 0; i < 20; i++) {
-        const randomIndex = Math.floor(Math.random() * levelChars.length);
-        seq.push(levelChars[randomIndex]);
-      }
-      
-      const newId = Math.random().toString(36).substring(2, 10);
-      const { error } = await window.supabaseClient
-        .from('races')
-        .insert([{ id: newId, mode, sequence: seq }]);
-      if (error) {
-        console.error('Error creating race:', error);
-        alert('Could not create race. See console for details.');
-      } else {
-        window.location.href = '/race?id=' + newId;
-      }
-    });
-  }
-  
   // Handle copy race link button
   const copyRaceLinkBtn = document.getElementById("copy-race-link");
   if (copyRaceLinkBtn) {
     copyRaceLinkBtn.addEventListener("click", () => {
       const shareUrlInput = document.getElementById("race-share-url");
+      if (!shareUrlInput) {
+        console.error("Race share URL input not found");
+        return;
+      }
+      console.log("Copying URL:", shareUrlInput.value);
       shareUrlInput.select();
       navigator.clipboard.writeText(shareUrlInput.value)
         .then(() => {
@@ -1341,6 +1377,29 @@
   testTypeButtons.forEach((b) =>
     b.classList.toggle("active", b.dataset.testType === selectedTestType)
   );
+  
+  // Debug initial state
+  console.log("Initial test type:", selectedTestType);
+  console.log("Race ID:", raceId);
+  console.log("Just created flag:", sessionStorage.getItem('justCreatedRace'));
+  
   // Show initial view based on URL or default
   switchView(selectedTestType);
+  
+  // Add window load handler to re-check session storage
+  window.addEventListener('load', () => {
+    console.log("Window loaded");
+    const justCreated = sessionStorage.getItem('justCreatedRace') === 'true';
+    console.log("At window load, justCreated:", justCreated);
+    
+    if (justCreated && raceId) {
+      console.log("Detected new race at window load, ensuring race sharing is visible");
+      const raceShareSection = document.getElementById("race-sharing-section");
+      if (raceShareSection) {
+        raceShareSection.style.display = "block";
+        const shareUrlInput = document.getElementById("race-share-url");
+        if (shareUrlInput) shareUrlInput.value = window.location.href;
+      }
+    }
+  });
 })();
