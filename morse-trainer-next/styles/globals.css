@@ -1,0 +1,820 @@
+:root {
+  --font-family: monospace;
+  --background-color: #121212;
+  --text-color: #e0e0e0;
+  --primary-bg: #1f1f1f;
+  --secondary-bg: #2a2a2a;
+  --accent-color: #00e676;
+  --error-color: #ff1744;
+  --warning-color: #ff9100;
+  --border-color: #333;
+  --muted-text: #777;
+  --box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: var(--font-family);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: var(--font-family);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#app {
+  padding-top: 48px;
+}
+
+#container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  /* position below fixed navbar */
+  margin-top: 100px;
+  height: calc(100vh - 100px);
+  text-align: center;
+}
+
+#sending-trainer {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  /* position below fixed navbar */
+  margin-top: 100px;
+  height: calc(100vh - 100px);
+  text-align: center;
+}
+
+/* Race room styling: lobby, countdown, race-container */
+#lobby,
+#countdown,
+#race-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  /* position below fixed navbar */
+  margin-top: 100px;
+  height: calc(100vh - 100px);
+  text-align: center;
+}
+
+#send-mastery-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 10px auto 0;
+  width: 100%;
+  max-width: 600px;
+}
+
+/* Progress bar styling: dark track and green fill matching other UI accents */
+progress {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100px;
+  height: 12px;
+}
+
+progress::-webkit-progress-bar {
+  background-color: #333;
+  border-radius: 4px;
+}
+
+progress::-webkit-progress-value {
+  background-color: var(--accent-color);
+  border-radius: 4px;
+}
+
+progress::-moz-progress-bar {
+  background-color: var(--accent-color);
+  border-radius: 4px;
+}
+
+#send-start-button, 
+#start-button,
+#race-create-button,
+#race-start-button {
+  font-size: 24px;
+  padding: 20px 40px;
+  cursor: pointer;
+  background-color: var(--primary-bg);
+  border: none;
+  color: var(--text-color);
+  margin: 10px 0;
+}
+
+#send-start-button:hover,
+#start-button:hover,
+#race-create-button:hover,
+#race-start-button:hover {
+  background-color: var(--secondary-bg);
+}
+
+#send-current-char {
+  font-size: 64px;
+  font-weight: bold;
+  color: #ffffff;
+  margin: 10px 0;
+}
+
+#send-results {
+  margin-top: 20px;
+  color: var(--text-color);
+  text-align: center;
+}
+
+/* Feedback text area for sending trainer, matching copy mode */
+#send-status, #status {
+  font-size: 32px;
+  margin-top: 20px;
+  line-height: 32px;
+  min-height: 32px;
+  text-align: center;
+}
+
+#send-status.success, #status.success {
+  color: var(--accent-color);
+}
+
+#send-status.error, #status.error {
+  color: var(--error-color);
+}
+
+#mastery-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 10px auto 0;
+  width: 100%;
+  max-width: 600px;
+}
+
+.char-master {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  margin: 4px;
+}
+
+.char-master svg {
+  width: 48px;
+  height: 48px;
+  transform: rotate(-90deg);
+}
+
+.char-master circle.bg {
+  fill: none;
+  stroke: #333;
+  stroke-width: 4;
+}
+
+.char-master circle.fg {
+  fill: none;
+  stroke: var(--accent-color);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.char-master .char-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+  color: var(--text-color);
+  user-select: none;
+}
+
+#send-current-level, #current-level {
+  font-size: 16px;
+  color: #888;
+  margin-top: 10px;
+}
+
+#progress {
+  font-size: 20px;
+  margin-top: 20px;
+}
+
+/* Strike indicators for checkpoint levels */
+#strikes {
+  margin-top: 10px;
+  min-height: 24px;
+  display: none;
+  justify-content: center;
+  align-items: center;
+}
+
+.strike {
+  font-size: 24px;
+  color: #777;
+  margin: 0 4px;
+}
+
+.strike.used {
+  color: var(--error-color);
+}
+
+#results {
+  font-size: 24px;
+  margin-top: 20px;
+}
+
+#level-select {
+  font-size: 16px;
+  padding: 6px;
+  background-color: var(--primary-bg);
+  color: var(--text-color);
+  border: none;
+  border-radius: 4px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+#controls {
+  display: none;
+  margin-top: 20px;
+}
+
+#controls button {
+  margin: 0 5px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: var(--primary-bg);
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+#controls button:hover {
+  background-color: var(--secondary-bg);
+}
+
+#hint {
+  margin-top: 10px;
+  font-size: 24px;
+  color: var(--text-color);
+  min-height: 1.2em;
+}
+
+/* Top horizontal navigation menu */
+#top-menu {
+  position: fixed;
+  /* Position menu below auth panel */
+  top: 60px;
+  left: 0;
+  right: 0;
+  height: auto;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+  z-index: 1000;
+}
+
+.menu-wrapper {
+  display: flex;
+  align-items: center;
+  background-color: var(--primary-bg);
+  color: var(--muted-text);
+  border-radius: 4px;
+  padding: 0 16px;
+  /* limit menu width */
+  max-width: 750px;
+}
+
+.menu-section {
+  display: flex;
+  align-items: center;
+}
+
+.menu-section.middle {
+  /* Center test-type buttons; no flex grow */
+  flex: none;
+  justify-content: center;
+}
+
+#top-menu .menu-section:not(:first-child) {
+  border-left: 1px solid #444;
+  padding-left: 8px;
+  margin-left: 8px;
+}
+
+.menu-item {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 8px 12px;
+  margin: 0 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Only apply to radio inputs in menu items */
+.menu-item input[type="radio"] {
+  display: none;
+}
+
+/* Style for active menu items - applies to both radio buttons and links */
+.menu-item.active {
+  color: var(--accent-color);
+}
+
+.menu-item:hover {
+  color: var(--text-color);
+}
+
+/* Race mode specific styling - make it clear this is a clickable link */
+.menu-item[data-mode="race"],
+a.menu-item {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* For proper positioning of race link after custom */
+.menu-section .menu-item[data-mode="custom"] + .menu-item[data-mode="race"],
+.menu-section .custom-mode-item + .race-mode-item {
+  margin-left: 4px;
+}
+
+#level-selector {
+  position: relative;
+}
+
+.level-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: var(--primary-bg);
+  box-shadow: var(--box-shadow);
+  list-style: none;
+  padding: 8px 0;
+  margin: 4px 0 0 0;
+  max-height: 200px;
+  overflow-y: auto;
+  min-width: 120px;
+}
+
+.level-dropdown.hidden {
+  display: none;
+}
+
+.level-dropdown li {
+  padding: 8px 16px;
+  font-size: 14px;
+  color: var(--muted-text);
+  cursor: pointer;
+}
+
+.level-dropdown li.completed {
+  color: var(--text-color);
+}
+
+.level-dropdown li.selected {
+  background-color: var(--secondary-bg);
+  color: var(--accent-color);
+}
+
+.level-dropdown li:hover {
+  background-color: #3a3a3a;
+}
+
+/* Settings dropdown (speed, volume, progress) */
+#settings-toggle {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 8px 12px;
+  margin: 0 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.settings-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: var(--primary-bg);
+  box-shadow: var(--box-shadow);
+  list-style: none;
+  padding: 8px 0;
+  margin: 4px 0 0 0;
+  max-height: 300px;
+  overflow-y: auto;
+  min-width: 200px;
+  z-index: 1001;
+}
+
+.settings-dropdown.hidden {
+  display: none;
+}
+
+.settings-dropdown li {
+  padding: 8px 16px;
+}
+
+.settings-dropdown li label {
+  display: block;
+  color: var(--text-color);
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.settings-dropdown li input[type="range"] {
+  width: 100%;
+  margin-bottom: 8px;
+  /* match main sliders */
+  -webkit-appearance: none;
+  height: 4px;
+  background: #555;
+  border-radius: 2px;
+}
+
+.settings-dropdown li input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #555;
+  border-radius: 2px;
+}
+
+.settings-dropdown li input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--text-color);
+  border-radius: 50%;
+  margin-top: -6px;
+  cursor: pointer;
+}
+
+.settings-dropdown li input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: #555;
+  border-radius: 2px;
+}
+
+.settings-dropdown li input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--text-color);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.settings-dropdown li button {
+  width: 100%;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.settings-dropdown li button:hover {
+  background-color: var(--secondary-bg);
+}
+
+/* Auth UI panel */
+#auth-wrapper {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 200;
+  background-color: var(--primary-bg);
+  border: 1px solid var(--border-color);
+  padding: 8px;
+  border-radius: 4px;
+  font-family: var(--font-family);
+  font-size: 14px;
+  color: var(--text-color);
+}
+
+#auth-wrapper a#auth-toggle {
+  cursor: pointer;
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+#auth-wrapper a#auth-toggle:hover {
+  text-decoration: underline;
+}
+
+#auth-form {
+  margin-top: 8px;
+}
+
+#auth-form input {
+  display: block;
+  background-color: var(--secondary-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  padding: 4px;
+  margin-bottom: 6px;
+  width: 200px;
+}
+
+#auth-form button {
+  background-color: var(--accent-color);
+  color: #121212;
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+  margin-right: 4px;
+}
+
+#auth-form button:hover {
+  background-color: var(--accent-color);
+}
+
+#auth-logged-in {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+#auth-logged-in button {
+  background-color: var(--error-color);
+  color: #121212;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+#auth-logged-in button:hover {
+  background-color: #e03131;
+}
+
+/* Action hints at bottom */
+#action-hints {
+  position: fixed;
+  bottom: 8px;
+  width: 100%;
+  text-align: center;
+  font-size: 14px;
+  color: #888;
+  user-select: none;
+}
+
+/* Response times visualization in test summary */
+#char-times {
+  margin-top: 20px;
+  text-align: left;
+}
+
+#char-times h3 {
+  margin-bottom: 8px;
+  font-size: 20px;
+  color: var(--text-color);
+}
+
+.char-time {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  font-family: var(--font-family);
+}
+
+.char-time .char-label {
+  width: 24px;
+  color: var(--text-color);
+}
+
+.char-time .bar {
+  flex-grow: 1;
+  height: 10px;
+  background-color: #555;
+  margin: 0 8px;
+  border-radius: 4px;
+  position: relative;
+}
+
+.char-time .bar.fast {
+  background-color: var(--accent-color);
+}
+
+.char-time .bar.medium {
+  background-color: var(--warning-color);
+}
+
+.char-time .bar.slow {
+  background-color: var(--error-color);
+}
+
+.char-time .time-label {
+  width: 50px;
+  font-size: 12px;
+  color: var(--text-color);
+}
+
+/* Table styling for average response times summary */
+#char-times table.times-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#char-times table.times-table th,
+#char-times table.times-table td {
+  border: 1px solid var(--border-color);
+  padding: 6px 8px;
+  text-align: center;
+  font-family: var(--font-family);
+  color: var(--text-color);
+}
+
+#char-times table.times-table th {
+  background-color: var(--primary-bg);
+}
+
+/* Sending Trainer styles */
+#sending-trainer {
+  display: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  text-align: center;
+  padding-top: 40px;
+}
+
+/* Sending Trainer instructions */
+#sending-instructions {
+  color: #888;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.dot {
+  color: var(--accent-color);
+  font-weight: bold;
+}
+
+.dash {
+  color: var(--error-color);
+  font-weight: bold;
+}
+
+#sending-trainer h2 {
+  font-size: 24px;
+  margin: 10px 0 20px;
+}
+
+#send-speed-slider {
+  width: 200px;
+  margin: 10px 0;
+}
+
+.keyer-output {
+  width: 80%;
+  min-height: 100px;
+  background-color: var(--primary-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  margin: 20px 0;
+  padding: 10px;
+  font-family: var(--font-family);
+  font-size: 20px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Sending decoding output */
+.decoded-output {
+  width: 80%;
+  min-height: 40px;
+  background-color: var(--primary-bg);
+  border: 1px solid var(--border-color);
+  color: var(--accent-color);
+  margin: 10px 0;
+  padding: 10px;
+  font-family: var(--font-family);
+  font-size: 20px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+#send-clear-button {
+  background-color: var(--primary-bg);
+  border: none;
+  color: var(--text-color);
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+#send-clear-button:hover {
+  background-color: var(--secondary-bg);
+}
+
+/* Race status feedback */
+.status-feedback {
+  margin: 20px 0;
+  padding: 10px;
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+  transition: all 0.3s ease;
+  border-radius: 5px;
+}
+
+.status-feedback.success {
+  background-color: rgba(76, 175, 80, 0.3);
+  color: #2e7d32;
+}
+
+.status-feedback.error {
+  background-color: rgba(244, 67, 54, 0.3);
+  color: #c62828;
+}
+
+/* Race participant list styling */
+#participant-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+}
+
+#participant-list li {
+  padding: 5px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Utility classes */
+.text-center {
+  text-align: center;
+}
+
+.mt-1 {
+  margin-top: 0.25rem;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
+.mt-3 {
+  margin-top: 1rem;
+}
+
+.mt-4 {
+  margin-top: 1.5rem;
+}
+
+.mb-1 {
+  margin-bottom: 0.25rem;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
+.mb-3 {
+  margin-bottom: 1rem;
+}
+
+.mb-4 {
+  margin-bottom: 1.5rem;
+}
+
+/* For React and Next.js compatibility */
+.hidden {
+  display: none !important;
+}
+
+/* Make sure buttons have proper cursor */
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+} 

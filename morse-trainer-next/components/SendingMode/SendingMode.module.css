@@ -1,0 +1,116 @@
+.sendingTrainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.startContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 3rem 0;
+  gap: 2rem;
+}
+
+.startButton {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 1rem 3rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.startButton:hover {
+  background-color: #3a5d97;
+}
+
+.sendCurrentMeta {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.sendCurrentLevel {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.sendCurrentChar {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.sendingInstructions {
+  margin: 2rem 0;
+  font-size: 1.25rem;
+  text-align: center;
+  color: #666;
+}
+
+.dot {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.dash {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.keyerOutput, .decodedOutput {
+  background-color: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  margin: 1rem 0;
+  min-height: 3rem;
+  width: 100%;
+  font-family: monospace;
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+.keyerOutput {
+  letter-spacing: 0.5rem;
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.button {
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: var(--border-radius);
+  padding: 0.5rem 1.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button:hover {
+  background-color: #e0e0e0;
+}
+
+.actionHints {
+  color: #666;
+  margin-top: 2rem;
+  font-size: 0.9rem;
+}
+
+.results {
+  font-size: 1.2rem;
+  margin: 1rem 0;
+  text-align: center;
+  color: var(--success-color);
+} 
