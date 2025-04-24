@@ -155,6 +155,12 @@
   </script>
   <!-- Supabase JS client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Initialize Supabase client globally -->
+  <script>
+    // Create a single instance of the Supabase client to be used throughout the app
+    window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log("Global Supabase client initialized");
+  </script>
   <!-- Levels definitions -->
   <script src="levels.js"></script>
   <!-- Authentication logic -->

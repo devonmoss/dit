@@ -1,13 +1,6 @@
 (function () {
-  // Initialize Supabase client
-  let supabaseClient;
-  try {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    window.supabaseClient = supabaseClient;
-    console.log("Supabase client initialized");
-  } catch (err) {
-    console.error("Failed to initialize Supabase client:", err);
-  }
+  // Use the global Supabase client instead of creating a new one
+  // No need to initialize Supabase client again - it's already available as window.supabaseClient
 
   // legacy total questions (placeholder to avoid undefined)
   let totalChars = 50;
