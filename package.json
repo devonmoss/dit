@@ -1,0 +1,13 @@
+{
+  "name": "morse-trainer",
+  "version": "1.0.0",
+  "description": "Morse code training application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
