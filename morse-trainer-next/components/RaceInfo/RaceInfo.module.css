@@ -1,0 +1,82 @@
+.raceInfoContainer {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem;
+  background-color: var(--primary-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.raceInfoContainer h2 {
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: var(--accent-color);
+}
+
+.raceDetails {
+  margin-bottom: 2rem;
+}
+
+.raceDetails p {
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.detailsList {
+  list-style-type: none;
+  padding: 0;
+  margin: 1.5rem 0;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.detailsList li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.detailsList li:last-child {
+  border-bottom: none;
+}
+
+.charsList {
+  font-family: monospace;
+  background-color: var(--background-color);
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  white-space: normal;
+  word-break: break-all;
+}
+
+.levelName {
+  color: var(--accent-color);
+  font-weight: bold;
+}
+
+.instruction {
+  font-style: italic;
+  color: var(--muted-text);
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.createButton {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  background-color: var(--accent-color);
+  color: #121212;
+  border: none;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.createButton:hover {
+  background-color: #00c853;
+}

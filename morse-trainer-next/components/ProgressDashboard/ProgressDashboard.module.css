@@ -1,0 +1,141 @@
+.container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  z-index: 1000;
+  padding: 2rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-color);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.closeButton:hover {
+  background-color: var(--primary-bg);
+}
+
+.tableContainer {
+  flex: 1;
+  overflow-x: auto;
+}
+
+.progressTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-family: var(--font-family);
+}
+
+.progressTable th,
+.progressTable td {
+  border: 1px solid var(--border-color);
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+
+.progressTable th {
+  background-color: var(--primary-bg);
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+}
+
+.progressTable tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.progressTable tr:hover {
+  background-color: var(--primary-bg);
+}
+
+.detailCell {
+  font-size: 0.85rem;
+  max-width: 25vw;
+  overflow-wrap: break-word;
+}
+
+.loading, 
+.error, 
+.noData, 
+.loginPrompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 50vh;
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+.error {
+  color: var(--error-color);
+}
+
+.loginButton {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  background-color: var(--accent-color);
+  color: var(--background-color);
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.loginButton:hover {
+  background-color: #00c853;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+  
+  .header h2 {
+    font-size: 1.5rem;
+  }
+  
+  .progressTable th,
+  .progressTable td {
+    padding: 0.5rem;
+    font-size: 0.9rem;
+  }
+  
+  .detailCell {
+    font-size: 0.8rem;
+    max-width: 40vw;
+  }
+}

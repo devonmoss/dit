@@ -1,0 +1,100 @@
+.trainingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.startContainer {
+  display: flex;
+  justify-content: center;
+  margin: 3rem 0;
+}
+
+.startButton {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 1rem 3rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.startButton:hover {
+  background-color: #3a5d97;
+}
+
+.progressInfo {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+.status {
+  font-size: 1.5rem;
+  margin: 1.5rem 0;
+  min-height: 2.5rem;
+  text-align: center;
+}
+
+.status.success {
+  color: var(--success-color);
+}
+
+.status.error {
+  color: var(--error-color);
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.button {
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: var(--border-radius);
+  padding: 0.5rem 1.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button:hover {
+  background-color: #e0e0e0;
+}
+
+.hint {
+  font-size: 1.5rem;
+  margin: 1rem 0;
+  min-height: 2rem;
+  letter-spacing: 0.2rem;
+}
+
+.actionHints {
+  color: #666;
+  margin-top: 2rem;
+  font-size: 0.9rem;
+}
+
+.strikes {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.strike {
+  color: #ddd;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.strike.used {
+  color: var(--error-color);
+} 

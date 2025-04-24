@@ -1,0 +1,182 @@
+.resultsContainer {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  background-color: var(--primary-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.resultsContainer h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: var(--accent-color);
+  font-size: 1.8rem;
+}
+
+.summary {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1.5rem;
+  font-size: 1.2rem;
+}
+
+.time, .replays {
+  padding: 0.5rem 1rem;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.strugglesSection {
+  margin-bottom: 2rem;
+}
+
+.strugglesSection h3 {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
+}
+
+.strugglesList {
+  list-style-type: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.strugglesList li {
+  background-color: rgba(255, 23, 68, 0.1);
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 23, 68, 0.3);
+  font-size: 0.9rem;
+}
+
+.timesSection {
+  margin-bottom: 2rem;
+}
+
+.timesSection h3 {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  color: var(--text-color);
+}
+
+.timesTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.timesTable th,
+.timesTable td {
+  border: 1px solid var(--border-color);
+  padding: 0.5rem;
+  text-align: left;
+  font-family: var(--font-family);
+}
+
+.timesTable th {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.timeBarContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.noData {
+  color: var(--muted-text);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.bar {
+  height: 10px;
+  background-color: #555;
+  border-radius: 4px;
+  min-width: 2px;
+  transition: width 0.3s ease;
+}
+
+.bar.fast {
+  background-color: var(--accent-color);
+}
+
+.bar.medium {
+  background-color: var(--warning-color);
+}
+
+.bar.slow {
+  background-color: var(--error-color);
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.repeatButton, .nextButton {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.repeatButton {
+  background-color: var(--primary-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+.repeatButton:hover {
+  background-color: var(--secondary-bg);
+}
+
+.nextButton {
+  background-color: var(--accent-color);
+  color: #121212;
+}
+
+.nextButton:hover {
+  background-color: #00c853;
+}
+
+.nextButton:disabled {
+  background-color: #333;
+  color: #777;
+  cursor: not-allowed;
+}
+
+.actionHints {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: #888;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 600px) {
+  .summary {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .actions {
+    flex-direction: column;
+  }
+  
+  .timeBarContainer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .bar {
+    width: 100%;
+  }
+}
