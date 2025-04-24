@@ -331,7 +331,15 @@
     raceCreateBtn.addEventListener("click", async () => {
       const mode = currentMode;
       const level = window.trainingLevels.find((l) => l.id === selectedId);
-      const seq = level && Array.isArray(level.chars) ? [...level.chars] : [...defaultChars];
+      const levelChars = level && Array.isArray(level.chars) ? [...level.chars] : [...defaultChars];
+      
+      // Generate a random sequence of 20 characters from the level's character set
+      const seq = [];
+      for (let i = 0; i < 20; i++) {
+        const randomIndex = Math.floor(Math.random() * levelChars.length);
+        seq.push(levelChars[randomIndex]);
+      }
+      
       const newId = Math.random().toString(36).substring(2, 10);
       const { error } = await window.supabaseClient
         .from('races')

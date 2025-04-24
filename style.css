@@ -6,7 +6,7 @@
   width: 100%;
   max-width: 600px;
 }
-# Progress bar styling: dark track and green fill matching other UI accents
+/* Progress bar styling: dark track and green fill matching other UI accents */
 progress {
   -webkit-appearance: none;
   appearance: none;
@@ -547,7 +547,6 @@ body {
   border-radius: 50%;
   border: none;
   cursor: pointer;
-}
 }
 .settings-dropdown li button {
   width: 100%;
