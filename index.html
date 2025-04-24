@@ -75,7 +75,32 @@
       </div> <!-- /.menu-wrapper -->
     </nav>
     <div id="container">
-          <!-- Race Info View (pre-creation) -->
+      <!-- Race Room views -->
+      <div id="lobby" style="display:none;">
+        <div id="race-sharing-section" style="display:none;">
+          <h2>Race Created!</h2>
+          <p>Share this link with your friends so they can join your race:</p>
+          <div class="share-link-container">
+            <input type="text" id="race-share-url" readonly>
+            <button id="copy-race-link">Copy Link</button>
+          </div>
+          <p>Waiting for participants to join...</p>
+          <hr>
+        </div>
+        
+        <p>Participants connected:</p>
+        <ul id="participant-list"></ul>
+        <button id="race-start-button">Start Race</button>
+        <div id="countdown" style="display:none;">
+          <h2>Race starts in <span id="countdown-timer"></span> seconds</h2>
+        </div>
+        <div id="race-container" style="display:none;">
+          <div id="progress-info"></div>
+          <div id="feedback" aria-live="polite"></div>
+        </div>
+      </div>
+      
+      <!-- Race Info View (pre-creation) -->
       <div id="race-info" style="display:none;">
         <h2>Create a Morse Code Race</h2>
         <div class="race-details">
@@ -89,16 +114,6 @@
         </div>
       </div>
 
-      <!-- Race Sharing View (post-creation) -->
-      <div id="race-sharing" style="display:none;">
-        <h2>Race Created!</h2>
-        <p>Share this link with your friends so they can join your race:</p>
-        <div class="share-link-container">
-          <input type="text" id="race-share-url" readonly>
-          <button id="copy-race-link">Copy Link</button>
-        </div>
-        <p>Waiting for participants to join...</p>
-      </div>  
       <button id="start-button">Start</button>
       <button id="race-create-button" style="display:none;">Create Race</button>
       <div id="current-level"></div>
@@ -131,21 +146,6 @@
       <div id="decoded-output" class="decoded-output"></div>
       <button id="send-clear-button">Clear</button>
     </div> <!-- /#sending-trainer -->
-    <!-- Race Room views -->
-    <div id="lobby" style="display:none;">
-      <p>Participants connected:</p>
-      <ul id="participant-list"></ul>
-      <button id="race-start-button">Start Race</button>
-      <div id="countdown" style="display:none;">
-        <h2>Race starts in <span id="countdown-timer"></span> seconds</h2>
-      </div>
-      <div id="race-container" style="display:none;">
-        <div id="progress-info"></div>
-        <div id="feedback" aria-live="polite"></div>
-      </div>
-    </div>
-    
-
   </div> <!-- /#app -->
   <!-- Supabase configuration: replace placeholders with your project values -->
   <script>
