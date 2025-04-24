@@ -1,3 +1,5 @@
 .env
 .vscode/
 .mockups/
+
+node_modules/

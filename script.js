@@ -1187,9 +1187,9 @@
   const testTypeButtons = document.querySelectorAll("[data-test-type]");
   // Get race ID from URL if present
   const urlPath = window.location.pathname;
-  const raceId = new URL(window.location.href).searchParams.get('id');
-  // Determine initial test type: race if URL has id=, else training
-  let selectedTestType = urlPath === '/race' || window.location.search.includes("id=") ? "race" : "training";
+  const raceId = new URLSearchParams(window.location.search).get('id');
+  // Determine initial test type: race if URL path is /race or has id=, else training
+  let selectedTestType = urlPath === '/race' || raceId ? "race" : "training";
   // Function to switch main UI views based on selectedTestType
   function switchView(testType) {
     // Hide all primary sections
@@ -1287,6 +1287,33 @@
     // Update view
     switchView(selectedTestType);
   });
+  
+  // Update race creation to use path-based URL
+  if (raceCreateBtn) {
+    raceCreateBtn.addEventListener("click", async () => {
+      const mode = currentMode;
+      const level = window.trainingLevels.find((l) => l.id === selectedId);
+      const levelChars = level && Array.isArray(level.chars) ? [...level.chars] : [...defaultChars];
+      
+      // Generate a random sequence of 20 characters from the level's character set
+      const seq = [];
+      for (let i = 0; i < 20; i++) {
+        const randomIndex = Math.floor(Math.random() * levelChars.length);
+        seq.push(levelChars[randomIndex]);
+      }
+      
+      const newId = Math.random().toString(36).substring(2, 10);
+      const { error } = await window.supabaseClient
+        .from('races')
+        .insert([{ id: newId, mode, sequence: seq }]);
+      if (error) {
+        console.error('Error creating race:', error);
+        alert('Could not create race. See console for details.');
+      } else {
+        window.location.href = '/race?id=' + newId;
+      }
+    });
+  }
   
   // Handle copy race link button
   const copyRaceLinkBtn = document.getElementById("copy-race-link");
