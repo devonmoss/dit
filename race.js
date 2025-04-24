@@ -347,9 +347,14 @@
         }
       }, 2000);
     }
-    // Hide start button but keep presence list visible
+    // Hide start button and race start button
     const startBtn = document.getElementById('start-button');
     if (startBtn) startBtn.style.display = 'none';
+    
+    // Hide the race start button
+    const raceStartBtn = document.getElementById('race-start-button');
+    if (raceStartBtn) raceStartBtn.style.display = 'none';
+    
     countdownEl.style.display = 'block';
     const tick = () => {
       const diff = (targetTime - Date.now()) / 1000;
@@ -371,10 +376,37 @@
    */
   async function startRace() {
     let currentIndex = 0;
+    // Get the status feedback element
+    const raceStatusEl = document.getElementById('race-status');
+    
     // Update local progress display
     function updateProgress() {
       progressInfo.textContent = `Question ${currentIndex + 1} of ${sequence.length}`;
     }
+    
+    // Display feedback with status styling
+    function showFeedback(isCorrect, message) {
+      if (!raceStatusEl) return;
+      
+      // Clear any existing classes
+      raceStatusEl.classList.remove('success', 'error');
+      
+      // Add appropriate class and message
+      if (isCorrect) {
+        raceStatusEl.textContent = message || 'Correct!';
+        raceStatusEl.classList.add('success');
+      } else {
+        raceStatusEl.textContent = message || 'Incorrect! Try again.';
+        raceStatusEl.classList.add('error');
+      }
+      
+      // Auto-clear feedback after delay
+      setTimeout(() => {
+        raceStatusEl.textContent = '';
+        raceStatusEl.classList.remove('success', 'error');
+      }, 750); // Same delay as training mode
+    }
+    
     async function playNext() {
       if (currentIndex >= sequence.length) {
         feedbackEl.textContent = 'Race completed!';
@@ -383,6 +415,7 @@
       }
       // Clear previous feedback and update progress
       feedbackEl.textContent = '';
+      if (raceStatusEl) raceStatusEl.textContent = '';
       updateProgress();
       const char = sequence[currentIndex];
       await playMorse(char);
@@ -412,9 +445,11 @@
         if (error) console.error('Error recording answer:', error);
         if (correct) {
           feedbackEl.textContent = '✓';
+          showFeedback(true);
           currentIndex++;
         } else {
           feedbackEl.textContent = '✗';
+          showFeedback(false);
           await playErrorSound();
         }
         // Continue with next or retry

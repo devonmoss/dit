@@ -841,3 +841,23 @@ body {
 #send-clear-button:hover {
   background-color: #2a2a2a;
 }
+/* Race status feedback */
+.status-feedback {
+  margin: 20px 0;
+  padding: 10px;
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+  transition: all 0.3s ease;
+  border-radius: 5px;
+}
+
+.status-feedback.success {
+  background-color: rgba(76, 175, 80, 0.3);
+  color: #2e7d32;
+}
+
+.status-feedback.error {
+  background-color: rgba(244, 67, 54, 0.3);
+  color: #c62828;
+}
