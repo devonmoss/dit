@@ -1,12 +1,7 @@
 // auth.js: Supabase authentication logic for login gating
 (async () => {
-  // Initialize Supabase client
-  const supabaseClient = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
-  );
-  // Expose client globally for other modules
-  window.supabaseClient = supabaseClient;
+  // Use the global Supabase client
+  const supabaseClient = window.supabaseClient;
 
   // Element references for auth UI
   const authToggle = document.getElementById("auth-toggle");

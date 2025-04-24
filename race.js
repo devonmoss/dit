@@ -1,6 +1,6 @@
 // race.js: basic race room with presence and start-time countdown
 (async () => {
-  // Initialize Supabase client (shared instance)
+  // Use the global Supabase client instance
   const supabaseClient = window.supabaseClient;
 
   // --- Morse playback utilities (self-contained) ---
