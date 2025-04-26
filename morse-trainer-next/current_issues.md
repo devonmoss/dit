@@ -1,22 +1,21 @@
 when copy training:
-    - points are not determined based on speed
-    - no penalty for incorrect guess
+    - points should be awarded proportionally to the speed at which they are input. a response that happens within .8 seconds of the hearing it should get 1 point. anything longer than 7 seconds should receive 0 points. anything in between should receive the appropriate proportion.
+    - the penalty for an incorrect guess is loss of 30% of you mastery points for that char.
     - on test summary page:
-        - hitting enter doesn't move to next lesson (clicking button does)
-        - hitting tab doesn't restart test (clicking restart test does)
+        - hitting enter doesn't move to next lesson but should (clicking button does)
+        - hitting tab doesn't restart test but should (clicking restart test does)
 
 when sending training:
-- the UI is distracting
+    - points should be awarded proportionally to the speed at which they are input. a response that happens within .8 seconds of the hearing it should get 1 point. anything longer than 7 seconds should receive 0 points. anything in between should receive the appropriate proportion.
+    - the penalty for an incorrect guess is loss of 30% of you mastery points for that char.
     - just as was happening with copy training the level is not ending once all chars are mastered but instead requires one extra correct answer.
-    - points are not determined based on speed
-    - no penalty for incorrect guess
-    - it has lots of unwanted movement when showing success/failure
-    - needs styling improvements 
-        - sections that show morse and english char have big wide white backgrounds
-        - Send the character: T ==> Correct! You sent: T should just show the letter T significantly larger so it is the main visual focus.
-        - the letter to be sent should disappear when correctly identified so there is a distinct indication that a new letter has appeared. It is very confusing if the same character is shown twice in a row at the moment because there is no idication that we are on a different letter.
     - needs to keep track of how long it took to key in the char and store it in the db after the test is complete
-    - sending training level summary should match the copy training summary
+    - the UI is distracting:
+        - it has lots of unwanted movement when showing success/failure
+        - sections that show morse and english char have big wide white backgrounds
+        - Send the character: T ==> Correct! You sent: T should just show the letter T significantly larger so it is the main visual focus. The way that race mode has that spot for a char is really nice, make it look like that
+        - the letter to be sent should disappear when correctly identified so there is a distinct indication that a new letter has appeared. It is very confusing if the same character is shown twice in a row at the moment because there is no idication that we are on a different letter.
+        - sending training level summary should match the copy training summary
 
 placeholders for other modes:
     - time: Coming soon! Complete as many characters as possible in a set amount of time.

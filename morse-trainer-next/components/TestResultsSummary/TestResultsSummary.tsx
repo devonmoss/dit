@@ -42,6 +42,22 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const resultsSaved = useRef(false);
   
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        onRepeat();
+      } else if (e.key === 'Enter' && completed) {
+        e.preventDefault();
+        onNext();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onRepeat, onNext, completed]);
+  
   // Fetch historical average times for user if logged in
   useEffect(() => {
     const fetchHistory = async () => {
