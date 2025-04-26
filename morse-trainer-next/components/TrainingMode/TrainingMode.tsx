@@ -46,8 +46,9 @@ const TrainingMode: React.FC = () => {
   } | null>(null);
   
   // Get current level
-  const currentLevel: LevelWithStrikeLimit = state.chars.length > 0 ? { chars: state.chars } : { chars: [] };
-  const strikeLimit = currentLevel?.strikeLimit;
+  const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
+  const isCheckpoint = currentLevel?.type === 'checkpoint';
+  const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
   
   // Debug logging
   useEffect(() => {
@@ -197,10 +198,11 @@ const TrainingMode: React.FC = () => {
         updateCharPoints(target, newPoints);
         
         // Update strike count for checkpoint levels
-        if (strikeLimit !== undefined && strikeLimit !== null) {
-          setStrikeCount(prev => prev + 1);
+        if (isCheckpoint && strikeLimit) {
+          const newStrikeCount = strikeCount + 1;
+          setStrikeCount(newStrikeCount);
           
-          if (strikeCount + 1 >= strikeLimit) {
+          if (newStrikeCount >= strikeLimit) {
             finishTest(false);
             return;
           }
@@ -216,7 +218,7 @@ const TrainingMode: React.FC = () => {
       }
     },
     [waitingForInput, currentChar, questionStartTime, currentMistakes, state.charPoints, 
-     state.chars, strikeLimit, strikeCount, endTest, updateCharPoints, nextQuestion, audioContextInstance]
+     state.chars, strikeLimit, strikeCount, endTest, updateCharPoints, nextQuestion, audioContextInstance, isCheckpoint]
   );
   
   // Replay current character
@@ -478,13 +480,12 @@ const TrainingMode: React.FC = () => {
           
           <MasteryDisplay targetPoints={TARGET_POINTS} />
           
-          {strikeLimit !== null && strikeLimit !== undefined && (
+          {isCheckpoint && strikeLimit && (
             <div className={styles.strikes}>
-              {Array.from({ length: strikeLimit || 0 }).map((_, i) => (
+              {Array.from({ length: strikeLimit }).map((_, i) => (
                 <span 
                   key={i} 
                   className={`${styles.strike} ${i < strikeCount ? styles.used : ''}`}
-                  data-strike={i + 1}
                 >
                   ✕
                 </span>
