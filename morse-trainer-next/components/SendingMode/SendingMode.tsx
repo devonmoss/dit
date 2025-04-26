@@ -3,6 +3,7 @@ import styles from './SendingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
 import { createAudioContext, invMorseMap, morseMap, isBrowser } from '../../utils/morse';
 import MasteryDisplay from '../MasteryDisplay/MasteryDisplay';
+import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
 
 // Constants
 const TARGET_POINTS = 3;
@@ -52,6 +53,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Time tracking
   const charStartTimeRef = useRef<number>(0);
+  const testStartTimeRef = useRef<number>(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [mistakesMap, setMistakesMap] = useState<Record<string, number>>({});
+  const [showResults, setShowResults] = useState(false);
   
   // Pick next character to practice sending
   const pickNextChar = useCallback(() => {
@@ -88,6 +93,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setCodeBuffer('');
     setWordBuffer('');
     setResponseTimes([]);
+    setShowResults(false);
+    setMistakesMap({});
+    
+    // Initialize test time tracking
+    testStartTimeRef.current = Date.now();
     
     // Clear the send queue and key state
     sendQueueRef.current = [];
@@ -121,6 +131,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
     console.log('Reset key state and queue');
     
+    // Calculate total elapsed time
+    const endTime = Date.now();
+    const totalTime = (endTime - testStartTimeRef.current) / 1000;
+    setElapsedTime(totalTime);
+    
     // Save response times to database
     if (responseTimes.length > 0) {
       saveResponseTimes(responseTimes);
@@ -136,6 +151,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       : '0';
       
     setSendResults(`You've mastered ${masteredCount}/${totalCount} characters. Average response time: ${avgTime}s`);
+    
+    // Show the results component
+    setShowResults(true);
   }, [state.chars, endTest, responseTimes, saveResponseTimes]);
   
   // Make sure we're using the same timing as the original application
@@ -249,6 +267,15 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Incorrect
       setSendCurrentMistakes(prev => prev + 1);
       
+      // Update mistakes map for results
+      setMistakesMap(prev => {
+        const currentCount = prev[sendCurrentChar] || 0;
+        return {
+          ...prev,
+          [sendCurrentChar]: currentCount + 1
+        };
+      });
+      
       // Set feedback to incorrect
       setFeedbackState('incorrect');
       setIncorrectChar(word);
@@ -271,7 +298,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setKeyerOutput('');
     setCodeBuffer('');
     setWordBuffer('');
-  }, [guidedSendActive, sendCurrentChar, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, checkAllMastered]);
+  }, [guidedSendActive, sendCurrentChar, state.chars, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, checkAllMastered]);
   
   // Clear current output
   const handleClear = useCallback(() => {
@@ -508,9 +535,33 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     }
   }, [sendingActive, state.chars, state.charPoints]);
   
+  // Handle repeat and next level functions for TestResultsSummary
+  const handleRepeatLevel = useCallback(() => {
+    setShowResults(false);
+    startSendTest();
+  }, [startSendTest]);
+  
+  const handleNextLevel = useCallback(() => {
+    setShowResults(false);
+    // Here you would navigate to the next level
+    // For now, we'll just restart
+    startSendTest();
+  }, [startSendTest]);
+  
   return (
     <div className={styles.sendingTrainer}>
-      {sendingActive ? (
+      {showResults ? (
+        <TestResultsSummary
+          completed={true}
+          elapsedTime={elapsedTime}
+          replayCount={0} // Not applicable for sending mode
+          mistakesMap={mistakesMap}
+          responseTimes={responseTimes}
+          levelId={state.selectedLevelId}
+          onRepeat={handleRepeatLevel}
+          onNext={handleNextLevel}
+        />
+      ) : sendingActive ? (
         <>
           <div className={styles.sendCurrentMeta}>
             <div className={styles.sendCurrentLevel}>{sendProgress}</div>
