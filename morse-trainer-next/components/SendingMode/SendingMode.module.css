@@ -123,6 +123,25 @@
   font-weight: bold;
 }
 
+/* Strikes display for checkpoint levels */
+.strikes {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+  justify-content: center;
+}
+
+.strike {
+  color: #ddd;
+  font-size: 1.5rem;
+  font-weight: bold;
+  transition: color 0.3s ease;
+}
+
+.strike.used {
+  color: var(--error-color, #ff3b30);
+}
+
 /* Keyer display container */
 .keyerDisplay {
   width: 100%;

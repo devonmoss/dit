@@ -51,6 +51,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [feedbackState, setFeedbackState] = useState<'none' | 'correct' | 'incorrect'>('none');
   const [incorrectChar, setIncorrectChar] = useState<string>('');
+  const [strikeCount, setStrikeCount] = useState(0);
+  const [completed, setCompleted] = useState(true);
   
   // Time tracking
   const charStartTimeRef = useRef<number>(0);
@@ -58,6 +60,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [mistakesMap, setMistakesMap] = useState<Record<string, number>>({});
   const [showResults, setShowResults] = useState(false);
+  
+  // Get current level and check if it's a checkpoint level
+  const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
+  const isCheckpoint = currentLevel?.type === 'checkpoint';
+  const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
   
   // Pick next character to practice sending
   const pickNextChar = useCallback(() => {
@@ -96,6 +103,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setResponseTimes([]);
     setShowResults(false);
     setMistakesMap({});
+    setStrikeCount(0);
+    setCompleted(true);
     
     // Initialize test time tracking
     testStartTimeRef.current = Date.now();
@@ -122,10 +131,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   }, [pickNextChar]);
   
   // Finish send test
-  const finishSendTest = useCallback(() => {
-    console.log('Finishing send test');
+  const finishSendTest = useCallback((isCompleted = true) => {
+    console.log('Finishing send test, completed:', isCompleted);
     setSendingActive(false);
     setGuidedSendActive(false);
+    setCompleted(isCompleted);
     
     // Clear any remaining state
     sendQueueRef.current = [];
@@ -142,7 +152,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       saveResponseTimes(responseTimes);
     }
     
-    endTest(true);
+    // Only mark as completed if not failed
+    endTest(isCompleted);
     
     // Display results
     const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
@@ -249,7 +260,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // If this was the last character needed for mastery, finish the test
       if (willCompleteMastery && otherCharsMastered) {
         setTimeout(() => {
-          finishSendTest();
+          finishSendTest(true);
         }, 750);
         return;
       }
@@ -286,6 +297,20 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       const newPoints = Math.max(0, currentPoints * INCORRECT_PENALTY);
       updateCharPoints(sendCurrentChar, newPoints);
       
+      // For checkpoint levels, count strikes
+      if (isCheckpoint && strikeLimit) {
+        const newStrikeCount = strikeCount + 1;
+        setStrikeCount(newStrikeCount);
+        
+        // If we've reached the strike limit, fail the test
+        if (newStrikeCount >= strikeLimit) {
+          setTimeout(() => {
+            finishSendTest(false); // Failed
+          }, 1000);
+          return;
+        }
+      }
+      
       // Play error sound
       playErrorSound();
       
@@ -299,7 +324,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setKeyerOutput('');
     setCodeBuffer('');
     setWordBuffer('');
-  }, [guidedSendActive, sendCurrentChar, state.chars, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, checkAllMastered]);
+  }, [guidedSendActive, sendCurrentChar, state.chars, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, checkAllMastered, isCheckpoint, strikeLimit, strikeCount]);
   
   // Clear current output
   const handleClear = useCallback(() => {
@@ -571,7 +596,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     <div className={styles.sendingTrainer}>
       {showResults ? (
         <TestResultsSummary
-          completed={true}
+          completed={completed}
           elapsedTime={elapsedTime}
           replayCount={0} // Not applicable for sending mode
           mistakesMap={mistakesMap}
@@ -587,6 +612,19 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           </div>
           
           <MasteryDisplay targetPoints={TARGET_POINTS} />
+          
+          {isCheckpoint && strikeLimit && (
+            <div className={styles.strikes}>
+              {Array.from({ length: strikeLimit }).map((_, i) => (
+                <span 
+                  key={i} 
+                  className={`${styles.strike} ${i < strikeCount ? styles.used : ''}`}
+                >
+                  ✕
+                </span>
+              ))}
+            </div>
+          )}
           
           <div className={styles.currentCharDisplay}>
             {sendCurrentChar && (
