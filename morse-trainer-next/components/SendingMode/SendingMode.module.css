@@ -82,8 +82,32 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+.feedbackContainer {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1rem 0;
+  min-width: 300px;
+}
+
+.correctFeedback {
+  color: var(--success-color, #34c759);
+  font-weight: bold;
+  font-size: 1.5rem;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.incorrectFeedback {
+  color: var(--error-color, #ff3b30);
+  font-weight: bold;
+  font-size: 1.5rem;
+  text-decoration: line-through;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
 .sendingInstructions {
-  margin: 2rem 0;
+  margin: 1rem 0;
   font-size: 1.25rem;
   text-align: center;
   color: #666;
@@ -116,31 +140,14 @@
   font-family: monospace;
   font-size: 1.5rem;
   text-align: center;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .keyerOutput {
   letter-spacing: 0.5rem;
-}
-
-.controls {
-  display: flex;
-  gap: 1rem;
-  margin: 1rem 0;
-}
-
-.button {
-  background-color: var(--accent-color, #00a0e4);
-  color: white;
-  border: 1px solid #ddd;
-  border-radius: var(--border-radius);
-  padding: 0.5rem 1.5rem;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.button:hover {
-  background-color: var(--accent-color-hover, #0080b4);
 }
 
 .actionHints {

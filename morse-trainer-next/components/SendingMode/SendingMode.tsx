@@ -48,6 +48,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const [allMastered, setAllMastered] = useState(false);
   const [responseTimes, setResponseTimes] = useState<CharTiming[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [feedbackState, setFeedbackState] = useState<'none' | 'correct' | 'incorrect'>('none');
+  const [incorrectChar, setIncorrectChar] = useState<string>('');
   
   // Time tracking
   const charStartTimeRef = useRef<number>(0);
@@ -203,8 +205,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Check if the sent word matches the current character
     if (word.toLowerCase() === sendCurrentChar.toLowerCase()) {
-      // Clear any error message
+      // Set feedback to correct
+      setFeedbackState('correct');
       setErrorMessage('');
+      setIncorrectChar('');
       
       // Points based on response time
       const responsePoints = calculatePointsForTime(responseTime);
@@ -231,14 +235,20 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         return;
       }
       
+      // Reset feedback after a delay
+      setTimeout(() => {
+        setFeedbackState('none');
+      }, 750);
+      
       // Go to next character after a delay - match original feedbackDelay of 750ms
       setTimeout(nextSendQuestion, 750);
     } else {
       // Incorrect
       setSendCurrentMistakes(prev => prev + 1);
       
-      // Show error message
-      setErrorMessage(`You sent "${word}" instead of "${sendCurrentChar}"`);
+      // Set feedback to incorrect
+      setFeedbackState('incorrect');
+      setIncorrectChar(word);
       
       // Reduce points for mistakes - now 30% reduction
       const currentPoints = state.charPoints[sendCurrentChar] || 0;
@@ -248,9 +258,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Play error sound
       playErrorSound();
       
-      // Clear error message after delay
+      // Reset feedback after delay
       setTimeout(() => {
-        setErrorMessage('');
+        setFeedbackState('none');
       }, 2000);
     }
     
@@ -511,11 +521,14 @@ const SendingMode: React.FC<SendingModeProps> = () => {
             )}
           </div>
           
-          {errorMessage && (
-            <div className={styles.errorMessage}>
-              {errorMessage}
-            </div>
-          )}
+          <div className={styles.feedbackContainer}>
+            {feedbackState === 'correct' && (
+              <div className={styles.correctFeedback}>Correct!</div>
+            )}
+            {feedbackState === 'incorrect' && (
+              <div className={styles.incorrectFeedback}>{incorrectChar}</div>
+            )}
+          </div>
           
           <div className={styles.sendingInstructions}>
             Use ← key for <span className={styles.dot}>·</span> and → key for <span className={styles.dash}>–</span>
@@ -524,15 +537,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           <div className={styles.keyerDisplay}>
             <div className={styles.keyerOutput}>{keyerOutput}</div>
             <div className={styles.decodedOutput}>{decodedOutput}</div>
-          </div>
-          
-          <div className={styles.controls}>
-            <button 
-              className={styles.button}
-              onClick={handleClear}
-            >
-              Clear
-            </button>
           </div>
           
           <div className={styles.actionHints}>
