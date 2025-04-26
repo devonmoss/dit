@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import styles from './TestResultsSummary.module.css';
 import useAuth from '../../hooks/useAuth';
 import supabase from '../../utils/supabase';
+import { useAppState } from '../../contexts/AppStateContext';
 
 interface CharTimeData {
   char: string;
@@ -38,6 +39,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
   onNext
 }) => {
   const { user } = useAuth();
+  const { state } = useAppState();
   const [historyAvgTimes, setHistoryAvgTimes] = useState<Record<string, number>>({});
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const resultsSaved = useRef(false);
@@ -70,7 +72,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
           .from('training_results')
           .select('times')
           .eq('user_id', user.id)
-          .eq('mode', 'copy')
+          .eq('mode', state.mode) // Use the current mode (copy or send)
           .eq('level_id', levelId);
           
         if (error) throw error;
@@ -106,7 +108,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
     };
     
     fetchHistory();
-  }, [user, completed, levelId]);
+  }, [user, completed, levelId, state.mode]);
   
   // Save results to database if completed and user is logged in
   useEffect(() => {
@@ -133,7 +135,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
           .insert([{
             user_id: user.id,
             level_id: levelId,
-            mode: 'copy', // should be either copy or send
+            mode: state.mode, // Use the current mode (copy or send)
             time_sec: elapsedTime,
             tone_replays: replayCount,
             mistakes: mistakesMap,
@@ -147,7 +149,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
     };
     
     saveResults();
-  }, [completed, user]);
+  }, [completed, user, responseTimes, mistakesMap, levelId, elapsedTime, replayCount, state.mode]);
   // Format time as MM:SS with hover tooltip for precise seconds
   const formatTime = (totalSec: number) => {
     const minutes = Math.floor(totalSec / 60);
@@ -181,15 +183,25 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
     return `${styles.bar} ${styles.slow}`;
   };
 
+  // Get mode-specific title
+  const getModeTitle = () => {
+    if (state.mode === 'send') {
+      return 'Sending Practice Complete!';
+    }
+    return 'Level Complete!';
+  };
+
   return (
     <div className={styles.resultsContainer}>
-      <h2>{completed ? 'Level Complete!' : 'Level Incomplete'}</h2>
+      <h2>{completed ? getModeTitle() : 'Level Incomplete'}</h2>
       
       <div className={styles.summary}>
         <p className={styles.time}>
           Time: <span title={`${elapsedTime.toFixed(2)}s`}>{formatTime(elapsedTime)}</span>
         </p>
-        <p className={styles.replays}>Replays: {replayCount}</p>
+        {state.mode === 'copy' && (
+          <p className={styles.replays}>Replays: {replayCount}</p>
+        )}
       </div>
       
       {struggles.length > 0 && (
