@@ -7,11 +7,19 @@ import MasteryDisplay from '../MasteryDisplay/MasteryDisplay';
 // Constants
 const TARGET_POINTS = 3;
 const COMPLETED_WEIGHT = 0.2;
+const MIN_RESPONSE_TIME = 0.8; // seconds
+const MAX_RESPONSE_TIME = 7; // seconds
+const INCORRECT_PENALTY = 0.7; // 30% reduction
 
 interface SendingModeProps {}
 
+interface CharTiming {
+  char: string;
+  time: number;
+}
+
 const SendingMode: React.FC<SendingModeProps> = () => {
-  const { state, startTest, endTest, updateCharPoints } = useAppState();
+  const { state, startTest, endTest, updateCharPoints, saveResponseTimes } = useAppState();
   const [audioContextInstance, setAudioContextInstance] = useState<ReturnType<typeof createAudioContext> | null>(null);
   
   // Initialize audio context on client-side only
@@ -37,6 +45,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
   const [sendingActive, setSendingActive] = useState(false);
   const [guidedSendActive, setGuidedSendActive] = useState(false);
+  const [allMastered, setAllMastered] = useState(false);
+  const [responseTimes, setResponseTimes] = useState<CharTiming[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  
+  // Time tracking
+  const charStartTimeRef = useRef<number>(0);
   
   // Pick next character to practice sending
   const pickNextChar = useCallback(() => {
@@ -72,6 +86,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setDecodedOutput('');
     setCodeBuffer('');
     setWordBuffer('');
+    setAllMastered(false);
+    setResponseTimes([]);
     
     // Clear the send queue and key state
     sendQueueRef.current = [];
@@ -86,9 +102,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     const nextChar = pickNextChar();
     setSendCurrentChar(nextChar);
     setSendCurrentMistakes(0);
-    setSendStatus(`Send the character: ${nextChar.toUpperCase()}`);
+    setSendStatus('');
     setKeyerOutput('');
     setCodeBuffer('');
+    
+    // Set the start time for response time tracking
+    charStartTimeRef.current = Date.now();
   }, [pickNextChar]);
   
   // Finish send test
@@ -102,12 +121,22 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
     console.log('Reset key state and queue');
     
+    // Save response times to database
+    if (responseTimes.length > 0) {
+      saveResponseTimes(responseTimes);
+    }
+    
     endTest(true);
     
     // Display results
     const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
-    setSendResults(`Test completed! You've mastered ${masteredCount} out of ${state.chars.length} characters.`);
-  }, [state.chars, endTest]);
+    const totalCount = state.chars.length;
+    const avgTime = responseTimes.length > 0 
+      ? (responseTimes.reduce((sum, item) => sum + item.time, 0) / responseTimes.length).toFixed(2)
+      : '0';
+      
+    setSendResults(`You've mastered ${masteredCount}/${totalCount} characters. Average response time: ${avgTime}s`);
+  }, [state.chars, endTest, responseTimes, saveResponseTimes]);
   
   // Make sure we're using the same timing as the original application
   useEffect(() => {
@@ -150,47 +179,86 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     await audioContextInstance.playTone(300, 150, 0.5); // Lower frequency, shorter duration, reduced volume
   }, [audioContextInstance]);
   
+  // Calculate response time points
+  const calculatePointsForTime = useCallback((responseTime: number) => {
+    const seconds = responseTime / 1000;
+    if (seconds <= MIN_RESPONSE_TIME) return 1;
+    if (seconds >= MAX_RESPONSE_TIME) return 0;
+    
+    // Linear scale between min and max response times
+    return 1 - ((seconds - MIN_RESPONSE_TIME) / (MAX_RESPONSE_TIME - MIN_RESPONSE_TIME));
+  }, []);
+  
+  // Check if all characters are mastered
+  const checkAllMastered = useCallback(() => {
+    return state.chars.every(c => (state.charPoints[c] || 0) >= TARGET_POINTS);
+  }, [state.chars, state.charPoints]);
+  
   // Handle when a word/character is completed
   const handleWordComplete = useCallback((word: string) => {
     if (!guidedSendActive) return;
     
+    // Calculate response time
+    const responseTime = Date.now() - charStartTimeRef.current;
+    
     // Check if the sent word matches the current character
     if (word.toLowerCase() === sendCurrentChar.toLowerCase()) {
+      // Clear any error message
+      setErrorMessage('');
+      
+      // Points based on response time
+      const responsePoints = calculatePointsForTime(responseTime);
+      
+      // Add to response times log
+      setResponseTimes(prev => [...prev, { char: sendCurrentChar, time: responseTime / 1000 }]);
+      
       // Correct!
-      updateCharPoints(sendCurrentChar, (state.charPoints[sendCurrentChar] || 0) + 1);
-      setSendStatus(`Correct! You sent: ${word}`);
+      updateCharPoints(sendCurrentChar, (state.charPoints[sendCurrentChar] || 0) + responsePoints);
+      
+      // Clear the current character to indicate a successful completion
+      setSendCurrentChar('');
       
       // Check if all characters are mastered
-      const allMastered = state.chars.every(c => (state.charPoints[c] || 0) >= TARGET_POINTS);
-      if (allMastered) {
-        finishSendTest();
-      } else {
-        // Go to next character after a delay - match original feedbackDelay of 750ms
-        setTimeout(nextSendQuestion, 750);
+      const newAllMastered = checkAllMastered();
+      
+      // If all are mastered now but weren't before, set the flag
+      if (newAllMastered && !allMastered) {
+        setAllMastered(true);
       }
+      // If all were already mastered, finish the test
+      else if (newAllMastered && allMastered) {
+        finishSendTest();
+        return;
+      }
+      
+      // Go to next character after a delay - match original feedbackDelay of 750ms
+      setTimeout(nextSendQuestion, 750);
     } else {
       // Incorrect
       setSendCurrentMistakes(prev => prev + 1);
-      setSendStatus(`Incorrect! You sent: ${word}. Try again to send: ${sendCurrentChar.toUpperCase()}`);
       
-      // Reduce points for mistakes
+      // Show error message
+      setErrorMessage(`You sent "${word}" instead of "${sendCurrentChar}"`);
+      
+      // Reduce points for mistakes - now 30% reduction
       const currentPoints = state.charPoints[sendCurrentChar] || 0;
-      const newPoints = Math.max(0, currentPoints * 0.75);
+      const newPoints = Math.max(0, currentPoints * INCORRECT_PENALTY);
       updateCharPoints(sendCurrentChar, newPoints);
       
-      // Play error sound, then clear status after delay - match original
-      playErrorSound().then(() => {
-        setTimeout(() => {
-          setSendStatus('');
-        }, 750);
-      });
+      // Play error sound
+      playErrorSound();
+      
+      // Clear error message after delay
+      setTimeout(() => {
+        setErrorMessage('');
+      }, 2000);
     }
     
     // Clear the keyer display
     setKeyerOutput('');
     setCodeBuffer('');
     setWordBuffer('');
-  }, [guidedSendActive, sendCurrentChar, state.chars, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound]);
+  }, [guidedSendActive, sendCurrentChar, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, checkAllMastered, allMastered]);
   
   // Clear current output
   const handleClear = useCallback(() => {
@@ -433,17 +501,30 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         <>
           <div className={styles.sendCurrentMeta}>
             <div className={styles.sendCurrentLevel}>{sendProgress}</div>
-            <div className={styles.sendCurrentChar}>{sendStatus}</div>
           </div>
           
           <MasteryDisplay targetPoints={TARGET_POINTS} />
+          
+          <div className={styles.currentCharDisplay}>
+            {sendCurrentChar && (
+              <div className={styles.bigCharacter}>{sendCurrentChar.toUpperCase()}</div>
+            )}
+          </div>
+          
+          {errorMessage && (
+            <div className={styles.errorMessage}>
+              {errorMessage}
+            </div>
+          )}
           
           <div className={styles.sendingInstructions}>
             Use ← key for <span className={styles.dot}>·</span> and → key for <span className={styles.dash}>–</span>
           </div>
           
-          <div className={styles.keyerOutput}>{keyerOutput}</div>
-          <div className={styles.decodedOutput}>{decodedOutput}</div>
+          <div className={styles.keyerDisplay}>
+            <div className={styles.keyerOutput}>{keyerOutput}</div>
+            <div className={styles.decodedOutput}>{decodedOutput}</div>
+          </div>
           
           <div className={styles.controls}>
             <button 
