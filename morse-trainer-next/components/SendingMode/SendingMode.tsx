@@ -4,6 +4,7 @@ import { useAppState } from '../../contexts/AppStateContext';
 import { createAudioContext, invMorseMap, morseMap, isBrowser } from '../../utils/morse';
 import MasteryDisplay from '../MasteryDisplay/MasteryDisplay';
 import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
+import { trainingLevels } from '../../utils/levels';
 
 // Constants
 const TARGET_POINTS = 3;
@@ -20,7 +21,7 @@ interface CharTiming {
 }
 
 const SendingMode: React.FC<SendingModeProps> = () => {
-  const { state, startTest, endTest, updateCharPoints, saveResponseTimes } = useAppState();
+  const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel } = useAppState();
   const [audioContextInstance, setAudioContextInstance] = useState<ReturnType<typeof createAudioContext> | null>(null);
   
   // Initialize audio context on client-side only
@@ -543,10 +544,28 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   const handleNextLevel = useCallback(() => {
     setShowResults(false);
-    // Here you would navigate to the next level
-    // For now, we'll just restart
-    startSendTest();
-  }, [startSendTest]);
+    
+    // Get current level index
+    const currentLevelIndex = trainingLevels.findIndex(l => l.id === state.selectedLevelId);
+    console.log('Moving from level index:', currentLevelIndex);
+    
+    if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
+      // Move to next level
+      const nextLevel = trainingLevels[currentLevelIndex + 1];
+      console.log('Moving to next level:', nextLevel.id);
+      
+      // Set the next level and start a new test
+      selectLevel(nextLevel.id);
+      
+      // Start a new test with the new level after a short delay to ensure state is updated
+      setTimeout(() => {
+        startSendTest();
+      }, 300);
+    } else {
+      // If we're at the last level, just restart the current level
+      startSendTest();
+    }
+  }, [state.selectedLevelId, startSendTest, selectLevel]);
   
   return (
     <div className={styles.sendingTrainer}>
