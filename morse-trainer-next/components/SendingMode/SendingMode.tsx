@@ -45,7 +45,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
   const [sendingActive, setSendingActive] = useState(false);
   const [guidedSendActive, setGuidedSendActive] = useState(false);
-  const [allMastered, setAllMastered] = useState(false);
   const [responseTimes, setResponseTimes] = useState<CharTiming[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [feedbackState, setFeedbackState] = useState<'none' | 'correct' | 'incorrect'>('none');
@@ -88,7 +87,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setDecodedOutput('');
     setCodeBuffer('');
     setWordBuffer('');
-    setAllMastered(false);
     setResponseTimes([]);
     
     // Clear the send queue and key state
@@ -216,24 +214,29 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Add to response times log
       setResponseTimes(prev => [...prev, { char: sendCurrentChar, time: responseTime / 1000 }]);
       
+      // Check if this will be the final character that completes mastery
+      const currentPoints = state.charPoints[sendCurrentChar] || 0;
+      const newPoints = currentPoints + responsePoints;
+      const willCompleteMastery = newPoints >= TARGET_POINTS;
+      
+      // Check if all other characters are already mastered
+      const otherCharsMastered = state.chars
+        .filter(c => c !== sendCurrentChar)
+        .every(c => (state.charPoints[c] || 0) >= TARGET_POINTS);
+      
       // Correct!
-      updateCharPoints(sendCurrentChar, (state.charPoints[sendCurrentChar] || 0) + responsePoints);
+      updateCharPoints(sendCurrentChar, newPoints);
+      
+      // If this was the last character needed for mastery, finish the test
+      if (willCompleteMastery && otherCharsMastered) {
+        setTimeout(() => {
+          finishSendTest();
+        }, 750);
+        return;
+      }
       
       // Clear the current character to indicate a successful completion
       setSendCurrentChar('');
-      
-      // Check if all characters are mastered
-      const newAllMastered = checkAllMastered();
-      
-      // If all are mastered now but weren't before, set the flag
-      if (newAllMastered && !allMastered) {
-        setAllMastered(true);
-      }
-      // If all were already mastered, finish the test
-      else if (newAllMastered && allMastered) {
-        finishSendTest();
-        return;
-      }
       
       // Reset feedback after a delay
       setTimeout(() => {
@@ -268,7 +271,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setKeyerOutput('');
     setCodeBuffer('');
     setWordBuffer('');
-  }, [guidedSendActive, sendCurrentChar, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, checkAllMastered, allMastered]);
+  }, [guidedSendActive, sendCurrentChar, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, checkAllMastered]);
   
   // Clear current output
   const handleClear = useCallback(() => {
@@ -536,7 +539,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           
           <div className={styles.keyerDisplay}>
             <div className={styles.keyerOutput}>{keyerOutput}</div>
-            <div className={styles.decodedOutput}>{decodedOutput}</div>
           </div>
           
           <div className={styles.actionHints}>
