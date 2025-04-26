@@ -138,20 +138,25 @@ const TrainingMode: React.FC = () => {
         setStatus('Correct!');
         setWaitingForInput(false);
         
-        // Calculate points for this character
-        let pointsToAdd = 1;
-        
-        // Fast answers get bonus points
-        if (responseTime < 0.8) {
-          pointsToAdd = 1.5;
+        // Calculate points based on response time (0.8s = 1 point, 7s = 0 points)
+        let pointsToAdd = 0;
+        if (responseTime <= 0.4) {
+          pointsToAdd = 1.25; // Extra bonus for extremely fast responses
+          setStatus('Correct! (Lightning fast!)');
+        } else if (responseTime <= 0.8) {
+          pointsToAdd = 1; // Full point for fast responses
           setStatus('Correct! (Fast answer)');
+        } else if (responseTime < 7) {
+          // Linear scale between 0.8s and 7s
+          pointsToAdd = 1 - ((responseTime - 0.8) / 6.2);
+          pointsToAdd = Math.max(0, pointsToAdd); // Ensure non-negative
         }
         
         // Update character points
         const newPoints = (state.charPoints[target] || 0) + pointsToAdd;
         updateCharPoints(target, newPoints);
         
-        console.log(`Character ${target} updated: ${state.charPoints[target] || 0} → ${newPoints} points`);
+        console.log(`Character ${target} updated: ${state.charPoints[target] || 0} → ${newPoints} points (${pointsToAdd} added, response time: ${responseTime.toFixed(2)}s)`);
         
         // Delay before next question
         setTimeout(() => {
@@ -186,9 +191,9 @@ const TrainingMode: React.FC = () => {
         setStatus('Incorrect! Try again.');
         setWaitingForInput(false);
         
-        // Lose 25% of points for this character
+        // Lose 30% of points for this character (changed from 25%)
         const currentPoints = state.charPoints[target] || 0;
-        const newPoints = Math.max(0, currentPoints * 0.75);
+        const newPoints = Math.max(0, currentPoints * 0.7);
         updateCharPoints(target, newPoints);
         
         // Update strike count for checkpoint levels
