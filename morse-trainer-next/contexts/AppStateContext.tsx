@@ -7,6 +7,11 @@ interface CharPoints {
   [key: string]: number;
 }
 
+interface CharTiming {
+  char: string;
+  time: number;
+}
+
 type Mode = 'copy' | 'send' | 'race';
 type TestType = 'training' | 'time' | 'words' | 'custom' | 'race';
 
@@ -55,6 +60,9 @@ interface AppStateContextType {
   
   // Character points
   updateCharPoints: (char: string, points: number) => void;
+  
+  // Response times
+  saveResponseTimes: (times: CharTiming[]) => void;
 }
 
 // Create the context with a default value
@@ -298,6 +306,34 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     }));
   };
   
+  // Save response times to localStorage
+  const saveResponseTimes = (times: CharTiming[]) => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      // Get existing response times
+      const existingTimesStr = localStorage.getItem('morseResponseTimes');
+      const existingTimes = existingTimesStr ? JSON.parse(existingTimesStr) : [];
+      
+      // Add timestamp to the new batch
+      const newEntry = {
+        timestamp: new Date().toISOString(),
+        mode: state.mode,
+        level: state.selectedLevelId,
+        times
+      };
+      
+      // Add to existing data
+      const updatedTimes = [...existingTimes, newEntry];
+      
+      // Save back to localStorage
+      localStorage.setItem('morseResponseTimes', JSON.stringify(updatedTimes));
+      console.log('Saved response times to localStorage', newEntry);
+    } catch (error) {
+      console.error('Error saving response times to localStorage:', error);
+    }
+  };
+  
   const contextValue: AppStateContextType = {
     state,
     selectLevel,
@@ -312,6 +348,7 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     setMode,
     setTestType,
     updateCharPoints,
+    saveResponseTimes
   };
   
   return (
