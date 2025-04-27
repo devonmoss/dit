@@ -50,6 +50,12 @@ interface PresenceState {
   }[];
 }
 
+// Helper function to get display name for a user
+const getUserDisplayName = (user: any) => {
+  if (!user) return 'Anonymous';
+  return user.user_metadata?.username || 'Anonymous';
+};
+
 const RaceMode: React.FC = () => {
   const router = useRouter();
   const { state } = useAppState();
@@ -127,7 +133,7 @@ const RaceMode: React.FC = () => {
       .insert([{
         race_id: race.id,
         user_id: user.id,
-        name: user.email || 'Anonymous',
+        name: getUserDisplayName(user),
         progress: 0,
         finished: false,
       }]);
@@ -143,7 +149,7 @@ const RaceMode: React.FC = () => {
       text: text,
       participants: [{
         id: user.id,
-        name: user.email || 'Anonymous',
+        name: getUserDisplayName(user),
         progress: 0,
         finished: false
       }],
@@ -217,7 +223,7 @@ const RaceMode: React.FC = () => {
       if (status === 'SUBSCRIBED' && user) {
         await channel.track({
           user_id: user.id,
-          user_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Anonymous',
+          user_name: getUserDisplayName(user),
           progress: 0,
         });
       }
