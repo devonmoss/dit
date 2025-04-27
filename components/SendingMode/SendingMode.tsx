@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './SendingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
-import { createAudioContext, invMorseMap, morseMap, isBrowser } from '../../utils/morse';
+import { createAudioContext, invMorseMap, isBrowser } from '../../utils/morse';
 import MasteryDisplay from '../MasteryDisplay/MasteryDisplay';
 import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
 import { trainingLevels } from '../../utils/levels';
@@ -13,7 +13,11 @@ const MIN_RESPONSE_TIME = 0.8; // seconds
 const MAX_RESPONSE_TIME = 7; // seconds
 const INCORRECT_PENALTY = 0.7; // 30% reduction
 
-interface SendingModeProps {}
+/* eslint-disable @typescript-eslint/no-empty-object-type */
+interface SendingModeProps {
+  // Empty interface for future props
+}
+/* eslint-enable @typescript-eslint/no-empty-object-type */
 
 interface CharTiming {
   char: string;
@@ -33,22 +37,30 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Sending state
   const [sendCurrentChar, setSendCurrentChar] = useState('');
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const [sendCurrentMistakes, setSendCurrentMistakes] = useState(0);
   const [sendStatus, setSendStatus] = useState('');
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   const [sendResults, setSendResults] = useState('');
   const [sendProgress, setSendProgress] = useState('');
   const [keyerOutput, setKeyerOutput] = useState('');
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const [decodedOutput, setDecodedOutput] = useState('');
   const [codeBuffer, setCodeBuffer] = useState('');
   const [wordBuffer, setWordBuffer] = useState('');
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   // Track key state with useState for UI updates
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const [keyState, setKeyState] = useState({ ArrowLeft: false, ArrowRight: false });
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   // Track key state with a ref for immediate access in event handlers
   const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
   const [sendingActive, setSendingActive] = useState(false);
   const [guidedSendActive, setGuidedSendActive] = useState(false);
   const [responseTimes, setResponseTimes] = useState<CharTiming[]>([]);
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const [errorMessage, setErrorMessage] = useState<string>('');
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   const [feedbackState, setFeedbackState] = useState<'none' | 'correct' | 'incorrect'>('none');
   const [incorrectChar, setIncorrectChar] = useState<string>('');
   const [strikeCount, setStrikeCount] = useState(0);
@@ -87,6 +99,19 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     return pool[pool.length - 1].char;
   }, [state.chars, state.charPoints]);
   
+  // Next character to send
+  const nextSendQuestion = useCallback(() => {
+    const nextChar = pickNextChar();
+    setSendCurrentChar(nextChar);
+    setSendCurrentMistakes(0);
+    setSendStatus('');
+    setKeyerOutput('');
+    setCodeBuffer('');
+    
+    // Set the start time for response time tracking
+    charStartTimeRef.current = Date.now();
+  }, [pickNextChar]);
+  
   // Start Send Test
   const startSendTest = useCallback(() => {
     startTest();
@@ -115,20 +140,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Need a slight delay to ensure state is updated
     setTimeout(nextSendQuestion, 100);
-  }, [startTest]);
-  
-  // Next character to send
-  const nextSendQuestion = useCallback(() => {
-    const nextChar = pickNextChar();
-    setSendCurrentChar(nextChar);
-    setSendCurrentMistakes(0);
-    setSendStatus('');
-    setKeyerOutput('');
-    setCodeBuffer('');
-    
-    // Set the start time for response time tracking
-    charStartTimeRef.current = Date.now();
-  }, [pickNextChar]);
+  }, [startTest, nextSendQuestion]);
   
   // Finish send test
   const finishSendTest = useCallback((isCompleted = true) => {
@@ -166,7 +178,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Show the results component
     setShowResults(true);
-  }, [state.chars, endTest, responseTimes, saveResponseTimes]);
+  }, [state.chars, state.charPoints, endTest, responseTimes, saveResponseTimes]);
   
   // Make sure we're using the same timing as the original application
   useEffect(() => {
@@ -186,7 +198,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     // Match original implementation behavior directly
     return new Promise<void>((resolve) => {
       // Use the WebAudio API directly as in the original code
-      if (window.AudioContext || (window as any).webkitAudioContext) {
+      if (window.AudioContext || window.webkitAudioContext) {
         const tmpContext = audioContextInstance.getRawContext();
         const osc = tmpContext.createOscillator();
         osc.frequency.value = 600; 
@@ -219,10 +231,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     return 1 - ((seconds - MIN_RESPONSE_TIME) / (MAX_RESPONSE_TIME - MIN_RESPONSE_TIME));
   }, []);
   
-  // Check if all characters are mastered
+  // Check if all characters are mastered (function not used but kept for future reference)
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const checkAllMastered = useCallback(() => {
     return state.chars.every(c => (state.charPoints[c] || 0) >= TARGET_POINTS);
   }, [state.chars, state.charPoints]);
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   
   // Handle when a word/character is completed
   const handleWordComplete = useCallback((word: string) => {
@@ -324,27 +338,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setKeyerOutput('');
     setCodeBuffer('');
     setWordBuffer('');
-  }, [guidedSendActive, sendCurrentChar, state.chars, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, checkAllMastered, isCheckpoint, strikeLimit, strikeCount]);
-  
-  // Clear current output
-  const handleClear = useCallback(() => {
-    setKeyerOutput('');
-    setDecodedOutput('');
-    setCodeBuffer('');
-    setWordBuffer('');
-  }, []);
-  
+  }, [guidedSendActive, sendCurrentChar, state.chars, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, isCheckpoint, strikeLimit, strikeCount]);
   
   // Queue of user-triggered symbols to support taps during play
   // In the original implementation, sendQueue was a mutable array 
   // We'll use a ref to match that mutable behavior
   const sendQueueRef = useRef<string[]>([]);
-
-  // Paddle key handlers - Exactly match original implementation
-  // These are redundant now - we've moved the implementation to the useEffect
-  // Keep them as empty stubs but they're no longer used
-  const handleKeyUp = useCallback(() => {}, []);
-  const handleKeyDown = useCallback(() => {}, []);
   
   // Main sending loop - Exactly following original implementation for consistent behavior
   // Uses wait function with setTimeout instead of requestAnimationFrame for more consistent timing
