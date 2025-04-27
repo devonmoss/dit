@@ -83,7 +83,7 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       mode: 'copy',
       testType: 'training',
       testActive: false,
-      chars: [...defaultChars],
+      chars: [],  // Initialize empty, will be set below based on selectedLevelId
     };
     
     // Only run localStorage loading on client side
@@ -123,9 +123,17 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
         level => !initialState.completedLevels.includes(level.id)
       );
       
-      initialState.selectedLevelId = firstIncomplete 
-        ? firstIncomplete.id 
-        : trainingLevels[trainingLevels.length - 1].id;
+      const selectedLevel = firstIncomplete 
+        ? firstIncomplete
+        : trainingLevels[trainingLevels.length - 1];
+        
+      initialState.selectedLevelId = selectedLevel.id;
+      
+      // Set the character set to match the selected level
+      initialState.chars = [...selectedLevel.chars];
+      
+      console.log('Initial state setup - Setting level ID to:', selectedLevel.id);
+      console.log('Initial state setup - Setting chars to:', selectedLevel.chars);
     }
     
     return initialState;
