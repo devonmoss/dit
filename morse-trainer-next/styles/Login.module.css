@@ -4,16 +4,16 @@
   align-items: center;
   min-height: 100vh;
   padding: 2rem;
-  background-color: #f5f5f5;
+  background-color: var(--background-color);
 }
 
 .formContainer {
   width: 100%;
   max-width: 450px;
   padding: 2.5rem;
-  background-color: white;
+  background-color: var(--primary-bg);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--box-shadow);
 }
 
 .title {
@@ -21,7 +21,7 @@
   font-weight: 600;
   text-align: center;
   margin-bottom: 1.5rem;
-  color: #333;
+  color: var(--text-color);
 }
 
 .toggleContainer {
@@ -29,7 +29,7 @@
   margin-bottom: 2rem;
   border-radius: 6px;
   overflow: hidden;
-  border: 1px solid #eaeaea;
+  border: 1px solid var(--border-color);
 }
 
 .toggleButton {
@@ -37,14 +37,15 @@
   padding: 0.75rem;
   font-size: 1rem;
   border: none;
-  background-color: #f9f9f9;
+  background-color: var(--primary-bg);
+  color: var(--muted-text);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .activeToggle {
-  background-color: var(--primary-color, #0070f3);
-  color: white;
+  background-color: var(--accent-color);
+  color: var(--background-color);
   font-weight: 500;
 }
 
@@ -63,33 +64,35 @@
 .formGroup label {
   font-size: 0.9rem;
   font-weight: 500;
-  color: #555;
+  color: var(--text-color);
 }
 
 .formGroup input {
   padding: 0.75rem;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: 1rem;
+  background-color: var(--secondary-bg);
+  color: var(--text-color);
   transition: border-color 0.2s;
 }
 
 .formGroup input:focus {
   outline: none;
-  border-color: var(--primary-color, #0070f3);
-  box-shadow: 0 0 0 2px rgba(0, 112, 243, 0.1);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(0, 230, 118, 0.1);
 }
 
 .error {
-  color: #e53e3e;
+  color: var(--error-color);
   font-size: 0.9rem;
   margin-top: -0.5rem;
 }
 
 .submitButton {
   padding: 0.75rem;
-  background-color: var(--primary-color, #0070f3);
-  color: white;
+  background-color: var(--accent-color);
+  color: var(--background-color);
   border: none;
   border-radius: 4px;
   font-size: 1rem;
@@ -99,7 +102,7 @@
 }
 
 .submitButton:hover {
-  background-color: var(--primary-color-dark, #0058c7);
+  background-color: #00c853;
 }
 
 .submitButton:disabled {
@@ -112,14 +115,14 @@
   align-items: center;
   text-align: center;
   margin: 1.5rem 0;
-  color: #999;
+  color: var(--muted-text);
 }
 
 .separator::before,
 .separator::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid #eaeaea;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .separator span {
@@ -148,7 +151,7 @@
 }
 
 .returnHome a {
-  color: var(--primary-color, #0070f3);
+  color: var(--accent-color);
   text-decoration: none;
   font-size: 0.9rem;
   cursor: pointer;
