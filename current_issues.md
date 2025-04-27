@@ -1,6 +1,3 @@
-BUGS:
-    - when first going to training the character set is not always set to the currently selected level.
-
 LOOK INTO:
     - does the debug thingy for mastery only show up when doing local dev?
 

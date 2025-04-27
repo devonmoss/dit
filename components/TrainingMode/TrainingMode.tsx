@@ -50,6 +50,30 @@ const TrainingMode: React.FC = () => {
   const isCheckpoint = currentLevel?.type === 'checkpoint';
   const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
   
+  // Ensure level characters are correctly loaded on mount
+  useEffect(() => {
+    if (currentLevel && state.chars.length > 0) {
+      // Check if current state.chars matches the expected level's chars
+      const levelChars = currentLevel.chars;
+      const stateChars = state.chars;
+      
+      // Compare arrays to see if they have the same characters
+      const sameLength = levelChars.length === stateChars.length;
+      const allCharsPresent = levelChars.every(c => stateChars.includes(c));
+      const noExtraChars = stateChars.every(c => levelChars.includes(c));
+      
+      if (!(sameLength && allCharsPresent && noExtraChars)) {
+        console.log('Characters mismatch detected on mount:');
+        console.log('Current level:', state.selectedLevelId);
+        console.log('Expected chars:', levelChars);
+        console.log('Actual chars:', stateChars);
+        
+        // Re-select the level to fix characters
+        selectLevel(state.selectedLevelId);
+      }
+    }
+  }, [currentLevel, state.chars, state.selectedLevelId, selectLevel]);
+  
   // Debug logging
   useEffect(() => {
     console.log('---------------------------------------');
