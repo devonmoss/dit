@@ -198,7 +198,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     // Match original implementation behavior directly
     return new Promise<void>((resolve) => {
       // Use the WebAudio API directly as in the original code
-      if (window.AudioContext || window.webkitAudioContext) {
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      if (window.AudioContext || (window as any).webkitAudioContext) {
+      /* eslint-enable @typescript-eslint/no-explicit-any */
         const tmpContext = audioContextInstance.getRawContext();
         const osc = tmpContext.createOscillator();
         osc.frequency.value = 600; 
