@@ -1,13 +1,10 @@
 import React, { useEffect } from 'react';
-import { useRouter } from 'next/router';
 import Layout from '../components/Layout/Layout';
 import RaceMode from '../components/RaceMode';
 import { useAppState } from '../contexts/AppStateContext';
 
 export default function RacePage() {
-  const router = useRouter();
-  const { id } = router.query;
-  const { setMode, setTestType } = useAppState();
+  const { setTestType } = useAppState();
   
   // When loading the race page, ensure test type is set to race
   // but preserving the current copy/send mode
