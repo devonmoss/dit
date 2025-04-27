@@ -8,6 +8,7 @@ import { useRouter } from 'next/router';
 // Import TestType from AppStateContext
 import type { AppState } from '../../contexts/AppStateContext';
 type TestType = AppState['testType'];
+type Theme = AppState['theme'];
 
 const TopMenu: React.FC = () => {
   const { 
@@ -17,7 +18,8 @@ const TopMenu: React.FC = () => {
     setTestType, 
     setWpm, 
     setVolume, 
-    setSendWpm 
+    setSendWpm,
+    setTheme
   } = useAppState();
   
   const router = useRouter();
@@ -66,6 +68,11 @@ const TopMenu: React.FC = () => {
   
   const handleSendSpeedChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSendWpm(parseInt(event.target.value, 10));
+  };
+  
+  const handleThemeChange = (theme: Theme) => {
+    setTheme(theme);
+    setShowSettings(false);
   };
 
   // If not mounted yet, render a minimal placeholder version without interactive elements
@@ -218,6 +225,23 @@ const TopMenu: React.FC = () => {
                     onChange={handleSendSpeedChange} 
                   />
                 </label>
+              </li>
+              <li>
+                <label>Theme:</label>
+                <div className={styles.themeOptions}>
+                  <button 
+                    className={`${styles.themeButton} ${state.theme === 'default' ? styles.activeTheme : ''}`}
+                    onClick={() => handleThemeChange('default')}
+                  >
+                    Default
+                  </button>
+                  <button 
+                    className={`${styles.themeButton} ${state.theme === 'catppuccin-mocha' ? styles.activeTheme : ''}`}
+                    onClick={() => handleThemeChange('catppuccin-mocha')}
+                  >
+                    Catppuccin Mocha
+                  </button>
+                </div>
               </li>
               <li>
                 <button 
