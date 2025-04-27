@@ -107,7 +107,9 @@ const EnhancedRaceMode: React.FC = () => {
   const [raceMode, setRaceMode] = useState<'copy' | 'send'>('copy');
   const [participants, setParticipants] = useState<RaceParticipant[]>([]);
   // Presence state for connected participants
-  const [onlineUsers, setOnlineUsers] = useState<{ user_id: string; name: string }[]>([]);
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
   const [userProgress, setUserProgress] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -461,9 +463,12 @@ const EnhancedRaceMode: React.FC = () => {
         });
       
       // Presence: sync, join, and leave events (Supabase JS v2)
-      channel
-        .on('presence', { event: 'sync' }, () => {
-          const state = channel.presenceState();
+      if (channel) {
+        channel
+          .on('presence', { event: 'sync' }, () => {
+            // Non-null assertion since we've checked above that channel is not null
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            const state = channel!.presenceState();
           // state values are arrays of metadata objects
           const users = Object.values(state).map((presences: Array<AnyRecord>) => presences[0]);
           setOnlineUsers(users);
@@ -476,13 +481,14 @@ const EnhancedRaceMode: React.FC = () => {
           // leftPresences is an array of metadata objects
           setOnlineUsers(prev => prev.filter(u => !leftPresences.some((l: AnyRecord) => l.user_id === u.user_id)));
         });
+      }
 
       // Subscribe to presence and then announce ourselves once joined
-      channel.subscribe((status: string) => {
+      channel?.subscribe((status: string) => {
         console.log('Channel subscription status:', status);
         if (status === 'SUBSCRIBED') {
           console.log('Channel subscribed, tracking presence for user:', presenceUserId);
-          channel.track({ 
+          channel?.track({ 
             user_id: presenceUserId, 
             name: getUserDisplayName(currentUser)
           });
@@ -1051,10 +1057,12 @@ const EnhancedRaceMode: React.FC = () => {
   }, []);
   
   // Helper function to get display name for a user
-  const getUserDisplayName = useCallback((user: { user_metadata?: { username?: string } }) => {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const getUserDisplayName = useCallback((user: any) => {
     if (!user) return 'Anonymous';
-    return user.user_metadata?.username || 'Anonymous';
+    return user.user_metadata?.username || user.user_metadata?.full_name || 'Anonymous';
   }, []);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
   
   // Render appropriate stage of race
   return (
