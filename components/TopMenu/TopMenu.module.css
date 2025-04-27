@@ -169,4 +169,33 @@
 .settingsItem:hover {
   background-color: var(--secondary-bg, #2a2a2a);
   color: var(--text-color, #e0e0e0);
+}
+
+/* Theme switcher styles */
+.themeOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.themeButton {
+  background-color: var(--secondary-bg, #2a2a2a);
+  color: var(--text-color, #e0e0e0);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.themeButton:hover {
+  background-color: var(--border-color, #333);
+}
+
+.themeButton.activeTheme {
+  background-color: var(--accent-color, #00e676);
+  color: var(--primary-bg, #1f1f1f);
 } 

@@ -12,6 +12,21 @@
   --box-shadow: 0 2px 5px rgba(0,0,0,0.5);
 }
 
+/* Catppuccin Mocha Theme */
+[data-theme="catppuccin-mocha"] {
+  --font-family: monospace;
+  --background-color: #1e1e2e; /* Base */
+  --text-color: #cdd6f4; /* Text */
+  --primary-bg: #313244; /* Surface0 */
+  --secondary-bg: #45475a; /* Surface1 */
+  --accent-color: #a6e3a1; /* Green */
+  --error-color: #f38ba8; /* Red */
+  --warning-color: #fab387; /* Peach */
+  --border-color: #45475a; /* Surface1 */
+  --muted-text: #9399b2; /* Subtext0 */
+  --box-shadow: 0 2px 5px rgba(17, 17, 27, 0.5); /* Adjusted for Mocha */
+}
+
 * {
   box-sizing: border-box;
   padding: 0;

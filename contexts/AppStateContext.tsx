@@ -14,6 +14,7 @@ interface CharTiming {
 
 type Mode = 'copy' | 'send' | 'race';
 type TestType = 'training' | 'time' | 'words' | 'race';
+type Theme = 'default' | 'catppuccin-mocha';
 
 export interface AppState {
   // Current selected level
@@ -26,6 +27,7 @@ export interface AppState {
   wpm: number;
   volume: number;
   sendWpm: number;
+  theme: Theme;
   // Current mode and test type
   mode: Mode;
   testType: TestType;
@@ -53,6 +55,7 @@ interface AppStateContextType {
   setWpm: (wpm: number) => void;
   setVolume: (volume: number) => void;
   setSendWpm: (wpm: number) => void;
+  setTheme: (theme: Theme) => void;
   
   // Mode and test type
   setMode: (mode: Mode) => void;
@@ -80,6 +83,7 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       wpm: 20,
       volume: 75,
       sendWpm: 20,
+      theme: 'default',
       mode: 'copy',
       testType: 'training',
       testActive: false,
@@ -104,6 +108,12 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       const storedSendWpm = parseInt(localStorage.getItem('morseSendWpm') || '', 10);
       if (!isNaN(storedSendWpm) && storedSendWpm > 0) {
         initialState.sendWpm = storedSendWpm;
+      }
+      
+      // Load theme from localStorage
+      const storedTheme = localStorage.getItem('morseTheme');
+      if (storedTheme === 'default' || storedTheme === 'catppuccin-mocha') {
+        initialState.theme = storedTheme;
       }
       
       // Load completed levels from localStorage
@@ -342,31 +352,54 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  const contextValue: AppStateContextType = {
-    state,
-    selectLevel,
-    getCurrentLevel,
-    markLevelCompleted,
-    startTest,
-    startTestWithLevelId,
-    endTest,
-    setWpm,
-    setVolume,
-    setSendWpm,
-    setMode,
-    setTestType,
-    updateCharPoints,
-    saveResponseTimes
+  // Theme setting function
+  const setTheme = (theme: Theme) => {
+    setState(prev => ({
+      ...prev,
+      theme
+    }));
+    
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('morseTheme', theme);
+      
+      // Apply the theme to the document root
+      document.documentElement.setAttribute('data-theme', theme);
+    }
   };
   
+  // Apply theme from state when the app loads
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', state.theme);
+    }
+  }, [state.theme]);
+  
+  // Provide all the values to the context
   return (
-    <AppStateContext.Provider value={contextValue}>
+    <AppStateContext.Provider value={{
+      state,
+      selectLevel,
+      getCurrentLevel,
+      markLevelCompleted,
+      startTest,
+      startTestWithLevelId,
+      endTest,
+      setWpm,
+      setVolume,
+      setSendWpm,
+      setTheme,
+      setMode,
+      setTestType,
+      updateCharPoints,
+      saveResponseTimes
+    }}>
       {children}
     </AppStateContext.Provider>
   );
 };
 
-// Custom hook to use the app state context
+// Custom hook to use the AppState context
 export const useAppState = () => {
   const context = useContext(AppStateContext);
   if (context === undefined) {
