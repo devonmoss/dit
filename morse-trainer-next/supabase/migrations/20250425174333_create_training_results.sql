@@ -13,6 +13,8 @@ create table if not exists public.training_results (
   times jsonb
 );
 
+ALTER TABLE public.training_results ENABLE ROW LEVEL SECURITY;
+
 create policy "Enable insert for users based on user_id"
 on "public"."training_results" 
 as permissive
