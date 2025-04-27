@@ -41,7 +41,6 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
   const { user } = useAuth();
   const { state } = useAppState();
   const [historyAvgTimes, setHistoryAvgTimes] = useState<Record<string, number>>({});
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const resultsSaved = useRef(false);
   
   // Handle keyboard shortcuts
@@ -65,7 +64,6 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
     const fetchHistory = async () => {
       if (!user || !completed) return;
       
-      setIsLoadingHistory(true);
       try {
         // Fetch previous training results data for this level
         const { data, error } = await supabase
@@ -102,8 +100,6 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
         }
       } catch (err) {
         console.error('Error loading historical data:', err);
-      } finally {
-        setIsLoadingHistory(false);
       }
     };
     
@@ -160,6 +156,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
 
   // Get top struggles
   const struggles = Object.entries(mistakesMap)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     .filter(([_, count]) => count > 0)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);

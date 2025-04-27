@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styles from './TrainingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
 import { createAudioContext, morseMap, isBrowser } from '../../utils/morse';
@@ -10,11 +10,6 @@ import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
 const TARGET_POINTS = 3;
 const FEEDBACK_DELAY = 750; // ms
 const COMPLETED_WEIGHT = 0.2; // Weight for already mastered characters
-
-interface LevelWithStrikeLimit {
-  chars: string[];
-  strikeLimit?: number;
-}
 
 const TrainingMode: React.FC = () => {
   const { state, startTest, endTest, updateCharPoints, selectLevel, startTestWithLevelId } = useAppState();
@@ -37,7 +32,6 @@ const TrainingMode: React.FC = () => {
   const [replayCount, setReplayCount] = useState(0);
   const [questionStartTime, setQuestionStartTime] = useState<number | null>(null);
   const [responseTimes, setResponseTimes] = useState<{char: string, time: number}[]>([]);
-  const [firstTryCount, setFirstTryCount] = useState(0);
   const [mistakesMap, setMistakesMap] = useState<Record<string, number>>({});
   const [testResults, setTestResults] = useState<{
     completed: boolean;
@@ -154,10 +148,6 @@ const TrainingMode: React.FC = () => {
         // Correct input
         const responseTime = questionStartTime ? (Date.now() - questionStartTime) / 1000 : 0;
         setResponseTimes(prev => [...prev, { char: currentChar, time: responseTime }]);
-        
-        if (currentMistakes === 0) {
-          setFirstTryCount(prev => prev + 1);
-        }
         
         // Update success feedback
         setStatus('Correct!');
@@ -285,7 +275,6 @@ const TrainingMode: React.FC = () => {
     setReplayCount(0);
     setQuestionStartTime(null);
     setResponseTimes([]);
-    setFirstTryCount(0);
     setMistakesMap({});
     setTestResults(null);
     
@@ -299,6 +288,7 @@ const TrainingMode: React.FC = () => {
   }, [startTest, nextQuestion]);
   
   // Set up keyboard listeners
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */
   useEffect(() => {
     if (state.testActive) {
       document.addEventListener('keydown', handleKeydown);
@@ -476,7 +466,6 @@ const TrainingMode: React.FC = () => {
             setReplayCount(0);
             setQuestionStartTime(null);
             setResponseTimes([]);
-            setFirstTryCount(0);
             setMistakesMap({});
             
             // Get current level index
