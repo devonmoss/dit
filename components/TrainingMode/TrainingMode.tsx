@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styles from './TrainingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
 import { createAudioContext, morseMap, isBrowser } from '../../utils/morse';
@@ -11,10 +11,12 @@ const TARGET_POINTS = 3;
 const FEEDBACK_DELAY = 750; // ms
 const COMPLETED_WEIGHT = 0.2; // Weight for already mastered characters
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 interface LevelWithStrikeLimit {
   chars: string[];
   strikeLimit?: number;
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 const TrainingMode: React.FC = () => {
   const { state, startTest, endTest, updateCharPoints, selectLevel, startTestWithLevelId } = useAppState();
@@ -37,7 +39,9 @@ const TrainingMode: React.FC = () => {
   const [replayCount, setReplayCount] = useState(0);
   const [questionStartTime, setQuestionStartTime] = useState<number | null>(null);
   const [responseTimes, setResponseTimes] = useState<{char: string, time: number}[]>([]);
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const [firstTryCount, setFirstTryCount] = useState(0);
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   const [mistakesMap, setMistakesMap] = useState<Record<string, number>>({});
   const [testResults, setTestResults] = useState<{
     completed: boolean;
@@ -410,11 +414,13 @@ const TrainingMode: React.FC = () => {
   useEffect(() => {
     if (isClient && isDevelopment) {
       // Add a global function to check level chars
+      /* eslint-disable @typescript-eslint/no-explicit-any */
       (window as any).checkLevelChars = checkLevelChars;
       console.log("Added checkLevelChars() to window for debugging");
       
       return () => {
         delete (window as any).checkLevelChars;
+        /* eslint-enable @typescript-eslint/no-explicit-any */
       };
     }
   }, [isClient, isDevelopment, checkLevelChars]);

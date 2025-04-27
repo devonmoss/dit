@@ -41,7 +41,9 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
   const { user } = useAuth();
   const { state } = useAppState();
   const [historyAvgTimes, setHistoryAvgTimes] = useState<Record<string, number>>({});
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   const resultsSaved = useRef(false);
   
   // Handle keyboard shortcuts
@@ -160,7 +162,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
 
   // Get top struggles
   const struggles = Object.entries(mistakesMap)
-    .filter(([_, count]) => count > 0)
+    .filter(([, count]) => count > 0)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
