@@ -270,7 +270,7 @@ const EnhancedRaceMode: React.FC = () => {
           .insert([{
             race_id: raceId,
             user_id: participantUserId,
-            name: currentUser.email || 'Anonymous',
+            name: getUserDisplayName(currentUser),
             progress: 0,
             finished: false
           }])
@@ -479,7 +479,7 @@ const EnhancedRaceMode: React.FC = () => {
           console.log('Channel subscribed, tracking presence for user:', presenceUserId);
           channel.track({ 
             user_id: presenceUserId, 
-            name: currentUser.email || currentUser.user_metadata?.full_name || 'Anonymous' 
+            name: getUserDisplayName(currentUser)
           });
         } else if (status === 'SUBSCRIPTION_ERROR') {
           console.error('Channel subscription error - check Supabase credentials and connection');
@@ -568,7 +568,7 @@ const EnhancedRaceMode: React.FC = () => {
         .insert([{
           race_id: race.id,
           user_id: participantUserId,
-          name: currentUser.email || 'Anonymous',
+          name: getUserDisplayName(currentUser),
           progress: 0,
           finished: false
         }])
@@ -579,7 +579,7 @@ const EnhancedRaceMode: React.FC = () => {
       setRaceText(text);
       setParticipants([{
         id: participantUserId,
-        name: currentUser.email || 'Anonymous',
+        name: getUserDisplayName(currentUser),
         progress: 0,
         finished: false
       }]);
@@ -1041,6 +1041,12 @@ const EnhancedRaceMode: React.FC = () => {
       return anonUserIdMapRef.current[userId];
     }
     return userId;
+  }, []);
+  
+  // Helper function to get display name for a user
+  const getUserDisplayName = useCallback((user: any) => {
+    if (!user) return 'Anonymous';
+    return user.user_metadata?.username || 'Anonymous';
   }, []);
   
   // Render appropriate stage of race

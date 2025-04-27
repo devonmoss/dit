@@ -4,6 +4,7 @@ placeholders for other modes:
     - get rid of 'custom'
 
 race mode: 
+    - lol, am i supposed to use the 'realtime' schema?
     - implement send mode
     - is the WPM calculation correct? Is it special for CW?
     - allow the users to play again. incorporate some way for them to play again with different char set
