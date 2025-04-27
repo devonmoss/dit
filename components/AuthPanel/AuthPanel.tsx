@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './AuthPanel.module.css';
 import { useAuth } from '../../contexts/AuthContext';
+import { isBrowser } from '../../utils/morse';
 import { useRouter } from 'next/router';
 
 const AuthPanel: React.FC = () => {

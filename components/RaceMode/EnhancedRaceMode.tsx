@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import styles from './RaceMode.module.css';
-import { createAudioContext, isBrowser } from '../../utils/morse';
+import { createAudioContext, morseMap, isBrowser } from '../../utils/morse';
 import supabase from '../../utils/supabase';
 import { useMorseAudio } from '../../hooks/useMorseAudio';
 import { useAppState } from '../../contexts/AppStateContext';
@@ -10,7 +10,7 @@ import RaceInfo from '../RaceInfo/RaceInfo';
 import RaceShareUI from '../RaceShareUI/RaceShareUI';
 import RaceParticipants from '../RaceParticipants/RaceParticipants';
 import CountdownTimer from '../CountdownTimer/CountdownTimer';
-import { trainingLevels } from '../../utils/levels';
+import { trainingLevels, TrainingLevel } from '../../utils/levels';
 import { v4 as uuidv4 } from 'uuid';
 
 interface RaceParticipant {
@@ -22,6 +22,19 @@ interface RaceParticipant {
   errorCount?: number;
   raceTime?: number; // Duration in seconds
 }
+
+// Message type for WebSocket participant updates
+interface ParticipantUpdateMessage {
+  type: 'progress_update' | 'finish_race';
+  user_id: string;
+  race_id: string;
+  progress: number;
+  finished?: boolean;
+  finish_time?: number;
+}
+
+// No-op function to prevent reference errors during hot reload
+const syncProgressToDatabase = () => {};
 
 enum RaceStage {
   INFO = 'info',
@@ -678,7 +691,6 @@ const EnhancedRaceMode: React.FC = () => {
   }, [raceId, startTime, getCurrentUser, raceText.length, errorCount]);
   
   // Handle user input during race
-  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (raceStage !== RaceStage.RACING) return;
     

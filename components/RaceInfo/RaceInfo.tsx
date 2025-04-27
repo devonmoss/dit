@@ -67,7 +67,7 @@ const RaceInfo: React.FC<RaceInfoProps> = ({ onCreateRace }) => {
         </ul>
         
         <p className={styles.instruction}>
-          Click &quot;Create Race&quot; to generate a race that you can share with friends.
+          Click "Create Race" to generate a race that you can share with friends.
         </p>
       </div>
       

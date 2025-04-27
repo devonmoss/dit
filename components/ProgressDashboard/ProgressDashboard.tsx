@@ -116,7 +116,7 @@ const ProgressDashboard: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <h2>My Progress</h2>
           <button className={styles.closeButton} onClick={onClose}>×</button>
         </div>
-        <div className={styles.noData}>You haven&apos;t completed any training sessions yet.</div>
+        <div className={styles.noData}>You haven't completed any training sessions yet.</div>
       </div>
     );
   }
