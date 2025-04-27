@@ -39,9 +39,15 @@ const TopMenu: React.FC = () => {
   const handleTestTypeClick = (testType: TestType) => {
     setTestType(testType);
     
-    // Navigate to /race when race is clicked
+    // Handle navigation based on test type
     if (testType === 'race') {
       router.push('/race');
+    } else if (testType === 'training') {
+      router.push('/');
+    } else if (testType === 'time') {
+      router.push('/time');
+    } else if (testType === 'words') {
+      router.push('/words');
     }
   };
   
@@ -111,6 +117,7 @@ const TopMenu: React.FC = () => {
             className={`${styles.menuItem} ${state.testType === 'time' ? styles.active : ''}`}
             onClick={() => handleTestTypeClick('time')}
             disabled={true} // Feature not yet implemented
+            title="Coming soon! Complete as many characters as possible in a set amount of time."
           >
             time
           </button>
@@ -118,6 +125,7 @@ const TopMenu: React.FC = () => {
             className={`${styles.menuItem} ${state.testType === 'words' ? styles.active : ''}`}
             onClick={() => handleTestTypeClick('words')}
             disabled={true} // Feature not yet implemented
+            title="Coming soon! Identify or send words of various sizes."
           >
             words
           </button>
@@ -126,13 +134,6 @@ const TopMenu: React.FC = () => {
             onClick={() => handleTestTypeClick('training')}
           >
             training
-          </button>
-          <button 
-            className={`${styles.menuItem} ${state.testType === 'custom' ? styles.active : ''}`}
-            onClick={() => handleTestTypeClick('custom')}
-            disabled={true} // Feature not yet implemented
-          >
-            custom
           </button>
           <button 
             className={`${styles.menuItem} ${state.testType === 'race' ? styles.active : ''} ${styles.raceMenuItem}`}

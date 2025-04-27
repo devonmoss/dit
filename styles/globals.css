@@ -354,12 +354,6 @@ a.menu-item {
   cursor: pointer;
 }
 
-/* For proper positioning of race link after custom */
-.menu-section .menu-item[data-mode="custom"] + .menu-item[data-mode="race"],
-.menu-section .custom-mode-item + .race-mode-item {
-  margin-left: 4px;
-}
-
 #level-selector {
   position: relative;
 }

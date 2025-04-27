@@ -13,7 +13,7 @@ interface CharTiming {
 }
 
 type Mode = 'copy' | 'send' | 'race';
-type TestType = 'training' | 'time' | 'words' | 'custom' | 'race';
+type TestType = 'training' | 'time' | 'words' | 'race';
 
 export interface AppState {
   // Current selected level
