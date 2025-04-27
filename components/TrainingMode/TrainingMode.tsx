@@ -341,10 +341,16 @@ const TrainingMode: React.FC = () => {
   }, [state.testActive, handleKeydown, finishTest]);
   
   const [isClient, setIsClient] = useState(false);
+  const [isDevelopment, setIsDevelopment] = useState(false);
   
-  // Only render debug elements on client-side
+  // Only render debug elements on client-side and in development environment
   useEffect(() => {
     setIsClient(true);
+    
+    // Check if we're in a development environment (localhost or 127.0.0.1)
+    if (isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      setIsDevelopment(true);
+    }
   }, []);
   
   // Helper to check if we have all the right characters for the level
@@ -376,9 +382,9 @@ const TrainingMode: React.FC = () => {
     }
   }, [state.selectedLevelId, state.chars]);
   
-  // Add our check function to the debug panel
+  // Add our check function to the debug panel only in development
   useEffect(() => {
-    if (isClient) {
+    if (isClient && isDevelopment) {
       // Add a global function to check level chars
       (window as any).checkLevelChars = checkLevelChars;
       console.log("Added checkLevelChars() to window for debugging");
@@ -387,12 +393,12 @@ const TrainingMode: React.FC = () => {
         delete (window as any).checkLevelChars;
       };
     }
-  }, [isClient, checkLevelChars]);
+  }, [isClient, isDevelopment, checkLevelChars]);
   
   return (
     <div className={styles.trainingContainer}>
-      {/* Debug state information - only visible on client */}
-      {isClient && (
+      {/* Debug state information - only visible on client in development */}
+      {isClient && isDevelopment && (
         <div style={{ 
           position: 'fixed', 
           bottom: '10px', 
