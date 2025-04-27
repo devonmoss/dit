@@ -8,9 +8,10 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string) => Promise<{ error: any, user: User | null }>;
+  signUp: (email: string, password: string, username: string) => Promise<{ error: any, user: User | null }>;
   signOut: () => Promise<void>;
   signInWithGithub: () => Promise<void>;
+  updateUsername: (username: string) => Promise<{ error: any }>;
 }
 
 // Create context with default value
@@ -22,13 +23,76 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Check and handle GitHub user's username if needed
+  const handleGitHubUsername = async (user: User) => {
+    try {
+      // Check if the user already has a username in metadata
+      if (user.user_metadata?.username) {
+        return;
+      }
+      
+      // Check if the user has a profile in the database
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
+      
+      // Skip if we can't fetch the profile
+      if (!profile) return;
+      
+      // If the username is auto-generated (starts with user_)
+      if (profile.username.startsWith('user_')) {
+        // Extract GitHub username from user metadata
+        const githubUsername = user.user_metadata?.user_name || 
+                               user.user_metadata?.preferred_username;
+        
+        if (githubUsername) {
+          // Check if this GitHub username is already taken
+          const { data: existingUser, error: usernameCheckError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('username', githubUsername)
+            .neq('id', user.id)
+            .single();
+          
+          // Only update if the username is not taken by another user
+          if (usernameCheckError && usernameCheckError.code === 'PGRST116') {
+            // Update the user metadata with the username
+            await supabase.auth.updateUser({
+              data: { username: githubUsername }
+            });
+            
+            // Update the profile record
+            await supabase
+              .from('profiles')
+              .update({ username: githubUsername })
+              .eq('id', user.id);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error processing GitHub username:', error);
+    }
+  };
+
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
-        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          setUser(session.user);
+          
+          // Check and handle GitHub user's username
+          if (session.user.app_metadata.provider === 'github') {
+            await handleGitHubUsername(session.user);
+          }
+        } else {
+          setUser(null);
+        }
       } catch (error) {
         console.error('Error getting session:', error);
       } finally {
@@ -40,9 +104,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (event, session) => {
         setSession(session);
-        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          setUser(session.user);
+          
+          // For GitHub sign-ins, handle username
+          if (event === 'SIGNED_IN' && session.user.app_metadata.provider === 'github') {
+            await handleGitHubUsername(session.user);
+          }
+        } else {
+          setUser(null);
+        }
+        
         setLoading(false);
       }
     );
@@ -64,14 +139,106 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Sign up with email/password
-  const signUp = async (email: string, password: string) => {
+  // Sign up with email/password and username
+  const signUp = async (email: string, password: string, username: string) => {
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      // Check if username already exists
+      const { data: existingUsers, error: lookupError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .single();
+      
+      if (lookupError && lookupError.code !== 'PGRST116') {
+        // An error occurred (not the "no rows returned" error)
+        return { error: lookupError, user: null };
+      }
+      
+      if (existingUsers) {
+        // Username already exists
+        return { 
+          error: { message: 'Username already taken' }, 
+          user: null 
+        };
+      }
+      
+      // Create the user with username in metadata
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: {
+            username
+          }
+        }
+      });
+      
+      if (data.user && !error) {
+        // Create a profile record with the username
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            username
+          });
+          
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+          return { error: profileError, user: data.user };
+        }
+      }
+      
       return { error, user: data.user };
     } catch (error) {
       console.error('Error signing up:', error);
       return { error, user: null };
+    }
+  };
+
+  // Update username
+  const updateUsername = async (username: string) => {
+    if (!user) {
+      return { error: { message: 'No user is logged in' } };
+    }
+    
+    try {
+      // Check if username already exists
+      const { data: existingUsers, error: lookupError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .neq('id', user.id)
+        .single();
+      
+      if (lookupError && lookupError.code !== 'PGRST116') {
+        // An error occurred (not the "no rows returned" error)
+        return { error: lookupError };
+      }
+      
+      if (existingUsers) {
+        // Username already exists
+        return { error: { message: 'Username already taken' } };
+      }
+      
+      // Update the user metadata with the new username
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: { username }
+      });
+      
+      if (metadataError) {
+        return { error: metadataError };
+      }
+      
+      // Update the profile record
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ username })
+        .eq('id', user.id);
+      
+      return { error: profileError };
+    } catch (error) {
+      console.error('Error updating username:', error);
+      return { error };
     }
   };
 
@@ -106,6 +273,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signUp,
     signOut,
     signInWithGithub,
+    updateUsername
   };
 
   return (

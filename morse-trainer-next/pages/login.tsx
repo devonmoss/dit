@@ -1,133 +1,234 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Layout from '../components/Layout/Layout';
-import supabase from '../utils/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import Head from 'next/head';
+import styles from '../styles/Login.module.css';
 
-export default function Login() {
+const LoginPage: React.FC = () => {
   const router = useRouter();
+  const { user, signIn, signUp, signInWithGithub } = useAuth();
+  
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [username, setUsername] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-
-  const handleAuth = async (e: React.FormEvent) => {
+  
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      router.push('/');
+    }
+  }, [user, router]);
+  
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
-    setMessage('');
-
+    
+    if (!email || !password) {
+      setError('Email and password are required');
+      setLoading(false);
+      return;
+    }
+    
     try {
-      if (isSignUp) {
-        // Sign up
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-        setMessage('Check your email for the confirmation link!');
+      const { error: signInError } = await signIn(email, password);
+      
+      if (signInError) {
+        setError(signInError.message);
       } else {
-        // Sign in
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
         router.push('/');
       }
-    } catch (error: any) {
-      setMessage(error.message || 'An error occurred');
+    } catch (err) {
+      setError('An unexpected error occurred');
+      console.error('Sign in error:', err);
     } finally {
       setLoading(false);
     }
   };
-
+  
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    
+    if (!email || !password || !username) {
+      setError('Email, password, and username are required');
+      setLoading(false);
+      return;
+    }
+    
+    // Simple username validation
+    if (username.length < 3) {
+      setError('Username must be at least 3 characters');
+      setLoading(false);
+      return;
+    }
+    
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      setError('Username can only contain letters, numbers, underscores and hyphens');
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      const { error: signUpError } = await signUp(email, password, username);
+      
+      if (signUpError) {
+        setError(signUpError.message);
+      } else {
+        // Successful signup will automatically log the user in
+        router.push('/');
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+      console.error('Sign up error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleGithubLogin = async () => {
+    try {
+      await signInWithGithub();
+      // Note: This will redirect the user away from this page
+    } catch (err) {
+      setError('An error occurred while signing in with GitHub');
+      console.error('GitHub sign in error:', err);
+    }
+  };
+  
   return (
-    <Layout>
-      <div style={{ maxWidth: '400px', margin: '0 auto', padding: '2rem 1rem' }}>
-        <h1>{isSignUp ? 'Create Account' : 'Log In'}</h1>
-        
-        <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div>
-            <label htmlFor="email" style={{ display: 'block', marginBottom: '0.5rem' }}>Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              style={{ 
-                width: '100%', 
-                padding: '0.5rem',
-                borderRadius: '4px',
-                border: '1px solid #ccc'
-              }}
-            />
+    <>
+      <Head>
+        <title>{isSignUp ? 'Sign Up' : 'Log In'} | Morse Trainer</title>
+      </Head>
+      
+      <div className={styles.container}>
+        <div className={styles.formContainer}>
+          <h1 className={styles.title}>{isSignUp ? 'Create an Account' : 'Welcome Back'}</h1>
+          
+          <div className={styles.toggleContainer}>
+            <button 
+              className={`${styles.toggleButton} ${!isSignUp ? styles.activeToggle : ''}`}
+              onClick={() => setIsSignUp(false)}
+            >
+              Log In
+            </button>
+            <button 
+              className={`${styles.toggleButton} ${isSignUp ? styles.activeToggle : ''}`}
+              onClick={() => setIsSignUp(true)}
+            >
+              Sign Up
+            </button>
           </div>
           
-          <div>
-            <label htmlFor="password" style={{ display: 'block', marginBottom: '0.5rem' }}>Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={{ 
-                width: '100%', 
-                padding: '0.5rem',
-                borderRadius: '4px',
-                border: '1px solid #ccc'
-              }}
-            />
+          {isSignUp ? (
+            <form onSubmit={handleSignUp} className={styles.form}>
+              <div className={styles.formGroup}>
+                <label htmlFor="username">Username</label>
+                <input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Choose a username"
+                  required
+                />
+              </div>
+              
+              <div className={styles.formGroup}>
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your email address"
+                  required
+                />
+              </div>
+              
+              <div className={styles.formGroup}>
+                <label htmlFor="password">Password</label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a password"
+                  required
+                />
+              </div>
+              
+              {error && <div className={styles.error}>{error}</div>}
+              
+              <button 
+                type="submit" 
+                className={styles.submitButton}
+                disabled={loading}
+              >
+                {loading ? 'Creating Account...' : 'Create Account'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleLogin} className={styles.form}>
+              <div className={styles.formGroup}>
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your email address"
+                  required
+                />
+              </div>
+              
+              <div className={styles.formGroup}>
+                <label htmlFor="password">Password</label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Your password"
+                  required
+                />
+              </div>
+              
+              {error && <div className={styles.error}>{error}</div>}
+              
+              <button 
+                type="submit" 
+                className={styles.submitButton}
+                disabled={loading}
+              >
+                {loading ? 'Logging In...' : 'Log In'}
+              </button>
+            </form>
+          )}
+          
+          <div className={styles.separator}>
+            <span>or</span>
           </div>
           
           <button 
-            type="submit" 
-            disabled={loading}
-            style={{
-              backgroundColor: 'var(--primary-color)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '0.75rem',
-              fontSize: '1rem',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1
-            }}
+            onClick={handleGithubLogin}
+            className={styles.githubButton}
           >
-            {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Log In'}
+            Continue with GitHub
           </button>
           
-          {message && (
-            <div style={{ 
-              marginTop: '1rem', 
-              padding: '0.75rem',
-              backgroundColor: message.includes('error') ? '#ffe6e6' : '#e6ffe6',
-              borderRadius: '4px'
-            }}>
-              {message}
-            </div>
-          )}
-          
-          <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--primary-color)',
-                cursor: 'pointer',
-                textDecoration: 'underline'
-              }}
-            >
-              {isSignUp ? 'Already have an account? Log In' : 'Need an account? Sign Up'}
-            </button>
+          <div className={styles.returnHome}>
+            <a onClick={() => router.push('/')}>Return to Home</a>
           </div>
-        </form>
+        </div>
       </div>
-    </Layout>
+    </>
   );
-} 
+};
+
+export default LoginPage; 
