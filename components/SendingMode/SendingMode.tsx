@@ -1,19 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// Define timeout type
-type TimeoutId = ReturnType<typeof setTimeout>;
-
-// Add the timeout types to window
-declare global {
-  interface Window { 
-    setTimeout(callback: (...args: any[]) => void, ms: number): number;
-    clearTimeout(timeoutId: number): void;
-  }
-}
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './SendingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
-import { createAudioContext, invMorseMap, isBrowser } from '../../utils/morse';
+import { createAudioContext, invMorseMap, morseMap, isBrowser } from '../../utils/morse';
 import MasteryDisplay from '../MasteryDisplay/MasteryDisplay';
 import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
 import { trainingLevels } from '../../utils/levels';
@@ -25,9 +13,7 @@ const MIN_RESPONSE_TIME = 0.8; // seconds
 const MAX_RESPONSE_TIME = 7; // seconds
 const INCORRECT_PENALTY = 0.7; // 30% reduction
 
-interface SendingModeProps {
-  // Empty interface is fine for this component as it doesn't need props
-}
+interface SendingModeProps {}
 
 interface CharTiming {
   char: string;
@@ -101,27 +87,15 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     return pool[pool.length - 1].char;
   }, [state.chars, state.charPoints]);
   
-  // Next character to send
-  const nextSendQuestion = useCallback(() => {
-    const nextChar = pickNextChar();
-    setSendCurrentChar(nextChar);
-    setSendCurrentMistakes(0);
-    setSendStatus('');
-    setKeyerOutput('');
-    setCodeBuffer('');
-    
-    // Set the start time for response time tracking
-    charStartTimeRef.current = Date.now();
-  }, [pickNextChar]);
-  
   // Start Send Test
   const startSendTest = useCallback(() => {
     startTest();
     setSendingActive(true);
     setGuidedSendActive(true);
     setSendCurrentChar('');
+    setSendCurrentMistakes(0);
+    setSendStatus('');
     setSendResults('');
-    setSendProgress('');
     setKeyerOutput('');
     setDecodedOutput('');
     setCodeBuffer('');
@@ -141,7 +115,20 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Need a slight delay to ensure state is updated
     setTimeout(nextSendQuestion, 100);
-  }, [startTest, nextSendQuestion]);
+  }, [startTest]);
+  
+  // Next character to send
+  const nextSendQuestion = useCallback(() => {
+    const nextChar = pickNextChar();
+    setSendCurrentChar(nextChar);
+    setSendCurrentMistakes(0);
+    setSendStatus('');
+    setKeyerOutput('');
+    setCodeBuffer('');
+    
+    // Set the start time for response time tracking
+    charStartTimeRef.current = Date.now();
+  }, [pickNextChar]);
   
   // Finish send test
   const finishSendTest = useCallback((isCompleted = true) => {
@@ -232,7 +219,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     return 1 - ((seconds - MIN_RESPONSE_TIME) / (MAX_RESPONSE_TIME - MIN_RESPONSE_TIME));
   }, []);
   
-  // Check all characters are mastered
+  // Check if all characters are mastered
   const checkAllMastered = useCallback(() => {
     return state.chars.every(c => (state.charPoints[c] || 0) >= TARGET_POINTS);
   }, [state.chars, state.charPoints]);
@@ -246,70 +233,98 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Check if the sent word matches the current character
     if (word.toLowerCase() === sendCurrentChar.toLowerCase()) {
-      // Success! Calculate points and update
-      const points = calculatePointsForTime(responseTime) * (1 - (sendCurrentMistakes * INCORRECT_PENALTY));
-      updateCharPoints(sendCurrentChar, points);
+      // Set feedback to correct
+      setFeedbackState('correct');
+      setErrorMessage('');
+      setIncorrectChar('');
       
-      // Record response time
+      // Points based on response time
+      const responsePoints = calculatePointsForTime(responseTime);
+      
+      // Add to response times log
       setResponseTimes(prev => [...prev, { char: sendCurrentChar, time: responseTime / 1000 }]);
       
-      // Check if all characters are mastered
-      const allMastered = checkAllMastered();
+      // Check if this will be the final character that completes mastery
+      const currentPoints = state.charPoints[sendCurrentChar] || 0;
+      const newPoints = currentPoints + responsePoints;
+      const willCompleteMastery = newPoints >= TARGET_POINTS;
       
-      // Clear word buffer for next input
-      setWordBuffer('');
-      setKeyerOutput('');
-      setCodeBuffer('');
+      // Check if all other characters are already mastered
+      const otherCharsMastered = state.chars
+        .filter(c => c !== sendCurrentChar)
+        .every(c => (state.charPoints[c] || 0) >= TARGET_POINTS);
       
-      // Visual feedback for correct input
-      setFeedbackState('correct');
-      setTimeout(() => setFeedbackState('none'), 500);
+      // Correct!
+      updateCharPoints(sendCurrentChar, newPoints);
       
-      // In checkpoint levels, stop if all chars mastered
-      if (isCheckpoint && allMastered) {
-        finishSendTest(true);
+      // If this was the last character needed for mastery, finish the test
+      if (willCompleteMastery && otherCharsMastered) {
+        setTimeout(() => {
+          finishSendTest(true);
+        }, 750);
         return;
       }
       
-      // Proceed to next character or end test
+      // Clear the current character to indicate a successful completion
+      setSendCurrentChar('');
+      
+      // Reset feedback after a delay
       setTimeout(() => {
-        nextSendQuestion();
-      }, 1000);
+        setFeedbackState('none');
+      }, 750);
+      
+      // Go to next character after a delay - match original feedbackDelay of 750ms
+      setTimeout(nextSendQuestion, 750);
     } else {
-      // Incorrect! Show error feedback
+      // Incorrect
       setSendCurrentMistakes(prev => prev + 1);
-      setMistakesMap(prev => ({ 
-        ...prev, 
-        [sendCurrentChar]: (prev[sendCurrentChar] || 0) + 1 
-      }));
+      
+      // Update mistakes map for results
+      setMistakesMap(prev => {
+        const currentCount = prev[sendCurrentChar] || 0;
+        return {
+          ...prev,
+          [sendCurrentChar]: currentCount + 1
+        };
+      });
+      
+      // Set feedback to incorrect
+      setFeedbackState('incorrect');
+      setIncorrectChar(word);
+      
+      // Reduce points for mistakes - now 30% reduction
+      const currentPoints = state.charPoints[sendCurrentChar] || 0;
+      const newPoints = Math.max(0, currentPoints * INCORRECT_PENALTY);
+      updateCharPoints(sendCurrentChar, newPoints);
+      
+      // For checkpoint levels, count strikes
+      if (isCheckpoint && strikeLimit) {
+        const newStrikeCount = strikeCount + 1;
+        setStrikeCount(newStrikeCount);
+        
+        // If we've reached the strike limit, fail the test
+        if (newStrikeCount >= strikeLimit) {
+          setTimeout(() => {
+            finishSendTest(false); // Failed
+          }, 1000);
+          return;
+        }
+      }
       
       // Play error sound
       playErrorSound();
       
-      // Visual feedback for incorrect input
-      setFeedbackState('incorrect');
-      setIncorrectChar(word);
+      // Reset feedback after delay
       setTimeout(() => {
         setFeedbackState('none');
-        setWordBuffer('');
-        setKeyerOutput('');
-        setCodeBuffer('');
-      }, 1000);
-      
-      // In checkpoint levels, track strikes
-      if (isCheckpoint) {
-        const newStrikeCount = strikeCount + 1;
-        setStrikeCount(newStrikeCount);
-        if (strikeLimit && newStrikeCount >= strikeLimit) {
-          // Failed the checkpoint test
-          finishSendTest(false);
-          return;
-        }
-      }
+      }, 2000);
     }
-  }, [guidedSendActive, sendCurrentChar, sendCurrentMistakes, calculatePointsForTime, updateCharPoints, 
-      checkAllMastered, isCheckpoint, finishSendTest, nextSendQuestion, playErrorSound, strikeCount, 
-      strikeLimit, state.charPoints]);
+    
+    // Clear the keyer display
+    setKeyerOutput('');
+    setCodeBuffer('');
+    setWordBuffer('');
+  }, [guidedSendActive, sendCurrentChar, state.chars, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, checkAllMastered, isCheckpoint, strikeLimit, strikeCount]);
   
   // Clear current output
   const handleClear = useCallback(() => {
@@ -336,9 +351,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   useEffect(() => {
     if (!sendingActive || !isBrowser) return;
     
-    let lastSymbol = '';
+    let lastSymbol: string | null = null;
     let lastTime = Date.now();
-    let timeoutId: TimeoutId | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
     let active = true;
     // Using local variables to track state to avoid closure issues
     let localCodeBuffer = '';

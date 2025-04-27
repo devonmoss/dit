@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import styles from './RaceMode.module.css';
-import { createAudioContext, isBrowser } from '../../utils/morse';
+import { createAudioContext, morseMap, isBrowser } from '../../utils/morse';
 import supabase from '../../utils/supabase';
 import { useMorseAudio } from '../../hooks/useMorseAudio';
 import { useAppState } from '../../contexts/AppStateContext';
 import useAuth from '../../hooks/useAuth';
-import { trainingLevels } from '../../utils/levels';
+import { trainingLevels, TrainingLevel } from '../../utils/levels';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface RaceParticipant {
@@ -42,6 +42,14 @@ interface Payload {
   winner?: string;
 }
 
+interface PresenceState {
+  [key: string]: { 
+    user_id: string;
+    user_name: string;
+    progress: number;
+  }[];
+}
+
 // Helper function to get display name for a user
 const getUserDisplayName = (user: any) => {
   if (!user) return 'Anonymous';
@@ -67,22 +75,26 @@ const RaceMode: React.FC = () => {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [raceText, setRaceText] = useState('');
   const [shareUrl, setShareUrl] = useState('');
+  const [countdown, setCountdown] = useState(0);
   const [currentChar, setCurrentChar] = useState('');
   const [waitingForInput, setWaitingForInput] = useState(false);
   const [progress, setProgress] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [finishTime, setFinishTime] = useState<number | null>(null);
   const [raceStatus, setRaceStatus] = useState<RaceStatus>('waiting');
   const [lobbyId, setLobbyId] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [currentText, setCurrentText] = useState('');
   const [countDown, setCountDown] = useState(3);
   const [myProgress, setMyProgress] = useState(0);
+  const [showSharingLink, setShowSharingLink] = useState(false);
+  const [shareURL, setShareURL] = useState("");
   
   const channelRef = useRef<RealtimeChannel | null>(null);
   const textRef = useRef('');
   
   // Create a new race
-  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const createRace = useCallback(async () => {
     if (!user) return;
     
@@ -175,6 +187,7 @@ const RaceMode: React.FC = () => {
       .on('broadcast', { event: 'race_start' }, (payload: { payload: Payload }) => {
         if (payload.payload.text) {
           textRef.current = payload.payload.text;
+          setCurrentText(payload.payload.text);
         }
         setRaceStatus('countdown');
         
@@ -231,12 +244,13 @@ const RaceMode: React.FC = () => {
     
     // Set local state to countdown
     setRaceState(prev => prev ? { ...prev, status: 'countdown' } : null);
+    setCountdown(5); // 5 second countdown
     
     // Start countdown
     let count = 5;
     const countdownInterval = setInterval(async () => {
       count -= 1;
-      setCountDown(count);
+      setCountdown(count);
       
       if (count <= 0) {
         clearInterval(countdownInterval);
@@ -307,14 +321,30 @@ const RaceMode: React.FC = () => {
       
       // Check if race is complete
       if (newProgress >= raceText.length) {
-        /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
         const endTime = Date.now();
-        if (raceState) {
-          setRaceState({
-            ...raceState,
-            status: 'finished'
+        setFinishTime(endTime);
+        
+        // Update participant as finished
+        supabase
+          .from('race_participants')
+          .update({ 
+            finished: true,
+            finish_time: endTime,
+            progress: raceText.length
+          })
+          .eq('race_id', raceState.id)
+          .eq('user_id', userId);
+          
+        // Broadcast race end
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'race_end',
+            payload: { winner: userId }
           });
         }
+        
+        setRaceStatus('finished');
         stopAudio();
       } else {
         // Play next character
@@ -338,20 +368,11 @@ const RaceMode: React.FC = () => {
         }, 750); // Match training mode delay
       });
     }
-  }, [raceState, waitingForInput, currentChar, progress, raceText, user, audioContextInstance, channelRef, setMyProgress, setRaceStatus, setErrorCount, stopAudio, supabase]);
+  }, [raceState, waitingForInput, currentChar, progress, raceText, user, audioContextInstance, channelRef, setMyProgress, setRaceStatus, setFinishTime, setErrorCount, stopAudio, supabase]);
   
   // Copy share URL to clipboard
-  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
-  const copyShareUrl = useCallback(async () => {
-    if (!shareUrl) return;
-    
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      alert('Race link copied to clipboard!');
-    } catch (err) {
-      console.error('Failed to copy lobby link:', err);
-      alert('Failed to copy lobby link. Please select and copy it manually.');
-    }
+  const copyShareUrl = useCallback(() => {
+    navigator.clipboard.writeText(shareUrl);
   }, [shareUrl]);
   
   // Set up keyboard listener for race
@@ -478,7 +499,6 @@ const RaceMode: React.FC = () => {
   }, [router.query, joinRace, stopAudio]);
   
   // Render race progress indicators
-  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const renderProgress = () => {
     if (!raceState) return null;
     
@@ -509,7 +529,6 @@ const RaceMode: React.FC = () => {
   };
   
   // Render race results
-  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const renderResults = () => {
     if (!raceState || raceState.status !== 'finished') return null;
     
@@ -563,6 +582,47 @@ const RaceMode: React.FC = () => {
     const newLobbyId = Math.random().toString(36).substring(2, 8);
     await router.push(`/race?lobby=${newLobbyId}`);
   };
+  
+  // Add a replay function to replay the current character
+  const replayCurrentChar = useCallback(() => {
+    if (raceStatus !== 'racing' || !textRef.current || textRef.current.length === 0) return;
+    
+    // Calculate the current character index based on progress
+    const charIndex = Math.min(
+      Math.floor((myProgress / 100) * (textRef.current?.length || 0)),
+      (textRef.current?.length || 0) - 1
+    );
+    // Play the current character again if available
+    const charToPlay = textRef.current[charIndex];
+    if (charToPlay) {
+      playMorseCode(charToPlay).catch(err => {
+        console.error("Error replaying character:", err);
+      });
+    }
+  }, [raceStatus, myProgress, playMorseCode]);
+  
+  // Handle Tab key press to replay character
+  useEffect(() => {
+    if (raceStatus !== 'racing') return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        e.preventDefault(); // Prevent tab from changing focus
+        replayCurrentChar();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [raceStatus, replayCurrentChar]);
+  
+  // Add error handling for audio playback
+  const playSoundWithErrorHandling = useCallback((char: string) => {
+    return playMorseCode(char).catch(err => {
+      console.error("Error playing morse code:", err);
+      // Continue with race even if audio fails
+    });
+  }, [playMorseCode]);
   
   if (!user) {
     return (
@@ -652,19 +712,15 @@ const RaceMode: React.FC = () => {
             
             <div className={styles.raceControls}>
               <button 
-                onClick={() => {
-                  if (raceStatus === 'racing') {
-                    setWaitingForInput(false);
-                    audioContextInstance?.playMorse(currentChar).then(() => {
-                      setWaitingForInput(true);
-                    });
-                  }
-                }}
+                onClick={replayCurrentChar}
                 className={styles.replayButton}
                 disabled={raceStatus !== 'racing'}
               >
                 Replay Sound
               </button>
+              <div className={styles.hint}>
+                Press Tab to replay the current character sound
+              </div>
             </div>
           </div>
         )}
