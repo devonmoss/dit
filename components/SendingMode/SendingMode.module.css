@@ -29,7 +29,7 @@
 }
 
 .startButton:hover {
-  background-color: #3a5d97;
+  background-color: var(--secondary-bg);
 }
 
 .sendCurrentMeta {

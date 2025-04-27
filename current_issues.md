@@ -1,3 +1,9 @@
+BUGS:
+    - when first going to training the character set is not always set to the currently selected level.
+
+LOOK INTO:
+    - does the debug thingy for mastery only show up when doing local dev?
+
 placeholders for other modes:
     - time: Coming soon! Complete as many characters as possible in a set amount of time.
     - words: Coming soon! Identify or send words of various sizes. 
