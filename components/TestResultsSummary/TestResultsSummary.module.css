@@ -168,10 +168,6 @@
 /* XP Section Styles */
 .xpSection {
   background-color: var(--bg-tertiary);
-  border-radius: 8px;
-  padding: 15px;
-  margin: 30px 0;
-  border-left: 4px solid var(--accent-color);
   opacity: 1;
   transform: translateY(0);
   transition: all 0.3s ease;
@@ -205,13 +201,53 @@
 .xpTotal {
   font-size: 1.5rem;
   font-weight: bold;
-  margin: 10px 0;
+  /* margin: 10px 0; */
   text-align: center;
+  position: relative;
 }
 
 .xpValue {
-  color: var(--accent-color);
+  color: var(--warning-color);
   animation: textPulse 2s infinite;
+  cursor: pointer;
+}
+
+.xpBreakdownContainer {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 175px;
+  max-width: 300px;
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+}
+
+.xpBreakdownContainer:before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 100%;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid var(--bg-tertiary);
+}
+
+.xpTotal:hover .xpBreakdownContainer {
+  opacity: 1;
+  visibility: visible;
+  z-index: 1010;
 }
 
 @keyframes textPulse {
@@ -243,7 +279,7 @@
 }
 
 .xpAmount {
-  color: var(--accent-color);
+  color: var(--warning-color);
   font-weight: bold;
 }
 

@@ -326,6 +326,36 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
         {state.mode === 'copy' && (
           <p className={styles.replays}>Replays: {replayCount}</p>
         )}
+              {/* XP Earned Section */}
+      {user && earnedXp && earnedXp.total > 0 && (
+        <div className={`${styles.xpSection} ${showingXpAnimation ? styles.animateXp : ''}`}>
+          <div className={styles.xpTotal}>
+            <span className={styles.xpValue}>+{earnedXp.total} XP</span>
+            
+            {/* XP Breakdown - Only shown on hover */}
+            <div className={styles.xpBreakdownContainer}>
+              <ul className={styles.xpBreakdown}>
+                {Object.entries(earnedXp.breakdown).map(([source, amount]) => (
+                  <li key={source}>
+                    <span className={styles.xpSource}>
+                      {source.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())}:
+                    </span>
+                    <span className={styles.xpAmount}>+{amount} XP</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          
+          {/* Level Up Message */}
+          {!levelUpEarned && (
+            <div className={styles.levelUp}>
+              <h4>Level Up!</h4>
+              <p>You&apos;ve reached!</p>
+            </div>
+          )}
+        </div>
+      )}
       </div>
       
       {struggles.length > 0 && (
@@ -387,35 +417,15 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
         </table>
       </div>
       
-      {/* XP Earned Section */}
-      {user && earnedXp && earnedXp.total > 0 && (
-        <div className={`${styles.xpSection} ${showingXpAnimation ? styles.animateXp : ''}`}>
-          <h3>Experience Earned</h3>
-          <div className={styles.xpTotal}>
-            <span className={styles.xpValue}>+{earnedXp.total} XP</span>
-          </div>
-          
-          {/* XP Breakdown */}
-          <ul className={styles.xpBreakdown}>
-            {Object.entries(earnedXp.breakdown).map(([source, amount]) => (
-              <li key={source}>
-                <span className={styles.xpSource}>
-                  {source.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())}:
-                </span>
-                <span className={styles.xpAmount}>+{amount} XP</span>
-              </li>
-            ))}
-          </ul>
-          
+         <div> 
           {/* Level Up Message */}
-          {levelUpEarned && (
+          {!levelUpEarned && (
             <div className={styles.levelUp}>
               <h4>Level Up!</h4>
               <p>You&apos;ve reached a new level of Morse code mastery!</p>
             </div>
           )}
         </div>
-      )}
       
       <div className={styles.actions}>
         <button 
