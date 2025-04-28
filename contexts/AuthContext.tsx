@@ -24,6 +24,7 @@ interface AuthContextType {
   signInWithGithub: () => Promise<void>;
   updateUsername: (username: string) => Promise<{ error: any }>;
   refreshXpInfo: () => Promise<void>;
+  updateXp: (newXp: number) => void;
 }
 
 // Create context with default value
@@ -282,7 +283,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Function to refresh the user's XP information
+  // Refresh XP information for the current user
   const refreshXpInfo = async () => {
     if (!user) {
       setXpInfo(null);
@@ -290,26 +291,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     
     setLoadingXp(true);
-    
     try {
-      const result = await getUserXpInfo(user.id);
+      const { success, xp, level, nextLevelXp, progress, tier, error } = await getUserXpInfo(user.id);
       
-      if (result.success && result.xp !== undefined) {
+      if (success && xp !== undefined) {
         setXpInfo({
-          xp: result.xp,
-          level: result.level || 1,
-          nextLevelXp: result.nextLevelXp || 100,
-          progress: result.progress || 0,
-          tier: result.tier || 'Novice'
+          xp,
+          level: level || 1,
+          nextLevelXp: nextLevelXp || 100,
+          progress: progress || 0,
+          tier: tier || 'Novice'
         });
+      } else if (error) {
+        console.error('Error fetching XP info:', error);
       }
     } catch (error) {
-      console.error('Error loading XP info:', error);
+      console.error('Error in refreshXpInfo:', error);
     } finally {
       setLoadingXp(false);
     }
   };
   
+  // Add a function to manually update XP (useful for animations)
+  const updateXp = (newXp: number) => {
+    if (!xpInfo) return;
+    
+    // Create a copy of the current xpInfo with updated XP
+    setXpInfo(prevInfo => {
+      if (!prevInfo) return null;
+      return {
+        ...prevInfo,
+        xp: newXp
+      };
+    });
+  };
+
   // Load XP info when user changes
   useEffect(() => {
     refreshXpInfo();
@@ -326,7 +342,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signOut,
     signInWithGithub,
     updateUsername,
-    refreshXpInfo
+    refreshXpInfo,
+    updateXp
   };
 
   return (

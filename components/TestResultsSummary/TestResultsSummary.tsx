@@ -44,7 +44,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
   onRepeat,
   onNext
 }) => {
-  const { user, refreshXpInfo } = useAuth();
+  const { user, refreshXpInfo, updateXp } = useAuth();
   const { state, getCurrentLevel } = useAppState();
   const [historyAvgTimes, setHistoryAvgTimes] = useState<Record<string, number>>({});
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -52,7 +52,6 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
   /* eslint-enable @typescript-eslint/no-unused-vars */
   const resultsSaved = useRef(false);
   const [earnedXp, setEarnedXp] = useState<{ total: number, breakdown: Record<string, number> } | null>(null);
-  const [showingXpAnimation, setShowingXpAnimation] = useState(false);
   const [levelUpEarned, setLevelUpEarned] = useState(false);
   
   // Handle keyboard shortcuts
@@ -208,7 +207,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
           });
         }
         
-        // 4. Save the total
+        // 4. Save the earned XP data for local use
         try {
           setEarnedXp({ 
             total: totalXp, 
@@ -238,16 +237,19 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
               if (typeof refreshXpInfo === 'function') {
                 try {
                   await refreshXpInfo();
+                  
+                  // If we have the result data, update the XP directly 
+                  // This will trigger the animation in the XpDisplay component
+                  if (result.result && result.result.new_xp) {
+                    updateXp(result.result.new_xp);
+                  }
+                  
                 } catch (refreshError) {
                   console.error('Error refreshing XP info:', refreshError);
                 }
               } else {
                 console.error('refreshXpInfo is not a function:', { refreshXpInfo });
               }
-              
-              // Show XP animation
-              setShowingXpAnimation(true);
-              setTimeout(() => setShowingXpAnimation(false), 3000);
               
               // Check if user leveled up
               if (result.leveledUp) {
@@ -273,7 +275,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
     saveResults();
     
     // Only depend on completed state and user to minimize re-runs
-  }, [completed, user, levelId, responseTimes, mistakesMap, state.mode, state.completedLevels, getCurrentLevel, elapsedTime, replayCount, refreshXpInfo]);
+  }, [completed, user, levelId, responseTimes, mistakesMap, state.mode, state.completedLevels, getCurrentLevel, elapsedTime, replayCount, refreshXpInfo, updateXp]);
   // Format time as MM:SS with hover tooltip for precise seconds
   const formatTime = (totalSec: number) => {
     const minutes = Math.floor(totalSec / 60);
@@ -326,36 +328,6 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
         {state.mode === 'copy' && (
           <p className={styles.replays}>Replays: {replayCount}</p>
         )}
-              {/* XP Earned Section */}
-      {user && earnedXp && earnedXp.total > 0 && (
-        <div className={`${styles.xpSection} ${showingXpAnimation ? styles.animateXp : ''}`}>
-          <div className={styles.xpTotal}>
-            <span className={styles.xpValue}>+{earnedXp.total} XP</span>
-            
-            {/* XP Breakdown - Only shown on hover */}
-            <div className={styles.xpBreakdownContainer}>
-              <ul className={styles.xpBreakdown}>
-                {Object.entries(earnedXp.breakdown).map(([source, amount]) => (
-                  <li key={source}>
-                    <span className={styles.xpSource}>
-                      {source.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())}:
-                    </span>
-                    <span className={styles.xpAmount}>+{amount} XP</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          
-          {/* Level Up Message */}
-          {!levelUpEarned && (
-            <div className={styles.levelUp}>
-              <h4>Level Up!</h4>
-              <p>You&apos;ve reached!</p>
-            </div>
-          )}
-        </div>
-      )}
       </div>
       
       {struggles.length > 0 && (
@@ -417,15 +389,13 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
         </table>
       </div>
       
-         <div> 
-          {/* Level Up Message */}
-          {!levelUpEarned && (
-            <div className={styles.levelUp}>
-              <h4>Level Up!</h4>
-              <p>You&apos;ve reached a new level of Morse code mastery!</p>
-            </div>
-          )}
+      {/* Keep only the level up message */}
+      {levelUpEarned && (
+        <div className={styles.levelUp}>
+          <h4>Level Up!</h4>
+          <p>You&apos;ve reached a new level!</p>
         </div>
+      )}
       
       <div className={styles.actions}>
         <button 

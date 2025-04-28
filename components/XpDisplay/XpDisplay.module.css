@@ -1,14 +1,15 @@
 .xpDisplay {
+  position: relative;
   display: flex;
   align-items: center;
-  background-color: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 8px 12px;
-  gap: 10px;
+  border-radius: 1rem;
+  padding: 0.25rem 0.5rem;
+  background-color: #333;
+  color: white;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  max-width: 100%;
+  transition: all 0.2s ease-out;
+  min-height: 2rem;
+  z-index: 1;
 }
 
 .xpDisplay:hover {
@@ -17,109 +18,136 @@
 }
 
 .compact {
-  padding: 4px 8px;
-  border-radius: 8px;
-  gap: 6px;
+  padding: 0.25rem;
 }
 
 .levelBadge {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
-  height: 24px;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 50%;
-  background-color: var(--text-primary);
-  color: var(--bg-primary);
+  background-color: white;
+  color: #333;
   font-weight: bold;
-  font-size: 14px;
-}
-
-.compact .levelBadge {
-  min-width: 20px;
-  height: 20px;
-  font-size: 12px;
+  margin-right: 0.5rem;
 }
 
 .tierName {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
+  font-size: 0.85rem;
+  margin-right: 0.5rem;
+  min-width: 80px;
 }
 
 .progressContainer {
-  flex: 1;
-  height: 8px;
-  background-color: var(--bg-primary);
-  border-radius: 4px;
-  overflow: hidden;
   position: relative;
-  min-width: 50px;
-}
-
-.compact .progressContainer {
-  height: 6px;
-  min-width: 30px;
+  flex-grow: 1;
+  height: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 0.25rem;
+  overflow: hidden;
 }
 
 .progressBar {
   height: 100%;
-  background-color: var(--accent-color);
-  transition: width 0.3s ease;
+  background-color: white;
+  transition: width 0.5s ease-out;
+  transform-origin: center;
 }
 
 .progressText {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 10px;
-  color: var(--text-primary);
-  white-space: nowrap;
-  text-shadow: 0 0 2px var(--bg-primary);
+  top: -1.2rem;
+  right: 0;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.8);
 }
 
-.loading {
-  font-size: 12px;
-  color: var(--text-secondary);
+/* Tier color variations */
+.tierNovice {
+  background-color: #6c757d;
 }
 
-/* Tier colors */
-.tierNovice .progressBar {
-  background-color: #64B5F6; /* Light blue */
+.tierApprentice {
+  background-color: #28a745;
 }
 
-.tierApprentice .progressBar {
-  background-color: #81C784; /* Light green */
+.tierOperator {
+  background-color: #007bff;
 }
 
-.tierOperator .progressBar {
-  background-color: #FFD54F; /* Light amber */
+.tierExpert {
+  background-color: #fd7e14;
 }
 
-.tierExpert .progressBar {
-  background-color: #FF8A65; /* Light orange */
+.tierMaster {
+  background-color: #dc3545;
 }
 
-.tierMaster .progressBar {
-  background-color: #BA68C8; /* Light purple */
+.tierLegend {
+  background-color: #9932cc;
 }
 
-.tierLegend .progressBar {
-  background: linear-gradient(90deg, #FF6B6B, #FFD166, #06D6A0, #118AB2, #073B4C);
-  background-size: 400% 400%;
-  animation: gradientShift 3s ease infinite;
+/* XP animation styles */
+.xpNotification {
+  position: absolute;
+  right: -5px;
+  top: -10px;
+  color: #ffdd00;
+  font-weight: bold;
+  font-size: 0.9rem;
+  opacity: 0;
+  pointer-events: none;
+  text-shadow: 0 0 5px rgba(0,0,0,0.7);
+  z-index: 10;
 }
 
-@keyframes gradientShift {
+.xpAnimating {
+  animation: xpBounce 2.5s ease-out forwards;
+}
+
+.impactAnimation .progressBar {
+  animation: barImpact 0.5s ease-out;
+}
+
+@keyframes xpBounce {
   0% {
-    background-position: 0% 50%;
+    opacity: 0;
+    transform: translateY(0);
   }
-  50% {
-    background-position: 100% 50%;
+  10% {
+    opacity: 1;
+    transform: translateY(-25px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-10px);
+  }
+  80% {
+    opacity: 0.8;
+    transform: translateY(0);
   }
   100% {
-    background-position: 0% 50%;
+    opacity: 0;
+    transform: translateY(0);
+  }
+}
+
+@keyframes barImpact {
+  0% {
+    transform: scaleY(1);
+  }
+  25% {
+    transform: scaleY(1.4);
+  }
+  50% {
+    transform: scaleY(0.8);
+  }
+  75% {
+    transform: scaleY(1.2);
+  }
+  100% {
+    transform: scaleY(1);
   }
 }
