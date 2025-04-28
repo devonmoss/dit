@@ -1498,16 +1498,16 @@ const EnhancedRaceMode: React.FC = () => {
   return (
     <div className={styles.container}>
       {raceStage === RaceStage.INFO && (
-        <>
-          <RaceModeSelector 
-            onSelectMode={(mode) => setRaceMode(mode)} 
-            selectedMode={raceMode} 
-          />
-          <RaceInfo 
-            onCreateRace={() => createRace({ mode: raceMode })} 
-            raceMode={raceMode}
-          />
-        </>
+        <RaceInfo 
+          onCreateRace={() => createRace({ mode: raceMode })} 
+          raceMode={raceMode}
+          modeSelector={
+            <RaceModeSelector 
+              onSelectMode={(mode) => setRaceMode(mode)} 
+              selectedMode={raceMode} 
+            />
+          }
+        />
       )}
       
       {raceStage === RaceStage.SHARE && (
