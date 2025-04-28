@@ -240,8 +240,16 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
                   
                   // If we have the result data, update the XP directly 
                   // This will trigger the animation in the XpDisplay component
-                  if (result.result && result.result.new_xp) {
-                    updateXp(result.result.new_xp);
+                  if (result.result) {
+                    // First check if user leveled up
+                    if (result.leveledUp) {
+                      setLevelUpEarned(true);
+                    }
+                    
+                    // Then update the XP to trigger the animation
+                    if (result.result.new_xp) {
+                      updateXp(result.result.new_xp);
+                    }
                   }
                   
                 } catch (refreshError) {
@@ -249,11 +257,6 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
                 }
               } else {
                 console.error('refreshXpInfo is not a function:', { refreshXpInfo });
-              }
-              
-              // Check if user leveled up
-              if (result.leveledUp) {
-                setLevelUpEarned(true);
               }
             } else {
               console.error('Failed to award XP:', result);

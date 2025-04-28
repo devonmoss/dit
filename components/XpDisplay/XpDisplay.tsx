@@ -11,19 +11,46 @@ const XpDisplay: React.FC<XpDisplayProps> = ({ compact = false, onClick }) => {
   const { xpInfo, loadingXp } = useAuth();
   const [earningsAnimation, setEarningsAnimation] = useState<{amount: number, active: boolean} | null>(null);
   const [impactAnimation, setImpactAnimation] = useState(false);
+  const [leveledUp, setLeveledUp] = useState(false);
+  const [badgeProgress, setBadgeProgress] = useState(0);
+  
   const prevXp = useRef<number | null>(null);
+  const prevLevel = useRef<number | null>(null);
+  const hasTrainedSinceLevelUp = useRef(false);
+  
+  // Update badge progress separately to ensure smooth animation
+  useEffect(() => {
+    if (xpInfo) {
+      setBadgeProgress(xpInfo.progress);
+    }
+  }, [xpInfo?.progress]);
   
   // Check for XP changes and trigger animation
   useEffect(() => {
-    if (!xpInfo || !prevXp.current) {
-      // Initialize reference without animation
-      prevXp.current = xpInfo?.xp || 0;
+    if (!xpInfo) {
       return;
+    }
+    
+    // Initialize references if not set
+    if (prevXp.current === null) {
+      prevXp.current = xpInfo.xp;
+    }
+    
+    if (prevLevel.current === null) {
+      prevLevel.current = xpInfo.level;
+      // Check local storage for level up state to persist across page refreshes
+      const storedLevelUp = localStorage.getItem('leveledUp');
+      if (storedLevelUp === 'true') {
+        setLeveledUp(true);
+      }
     }
     
     // Check if XP has increased
     if (xpInfo.xp > prevXp.current) {
       const earned = xpInfo.xp - prevXp.current;
+      
+      // User has earned XP, mark that they've trained since level up
+      hasTrainedSinceLevelUp.current = true;
       
       // Trigger the earning animation
       setEarningsAnimation({
@@ -43,9 +70,28 @@ const XpDisplay: React.FC<XpDisplayProps> = ({ compact = false, onClick }) => {
       }, 2500);
     }
     
-    // Update reference
+    // Check if level has increased
+    if (xpInfo.level > prevLevel.current) {
+      // User has leveled up, enable the leveledUp animation
+      setLeveledUp(true);
+      // Store level up state in local storage
+      localStorage.setItem('leveledUp', 'true');
+      // Reset the trained since level up flag
+      hasTrainedSinceLevelUp.current = false;
+    }
+    
+    // Update references
     prevXp.current = xpInfo.xp;
+    prevLevel.current = xpInfo.level;
   }, [xpInfo]);
+  
+  // Reset leveled up state when user completes a new training after leveling up
+  useEffect(() => {
+    if (hasTrainedSinceLevelUp.current && leveledUp) {
+      setLeveledUp(false);
+      localStorage.removeItem('leveledUp');
+    }
+  }, [hasTrainedSinceLevelUp.current, leveledUp]);
   
   if (loadingXp) {
     return (
@@ -83,12 +129,28 @@ const XpDisplay: React.FC<XpDisplayProps> = ({ compact = false, onClick }) => {
   const tierName = xpInfo.tier || 'Novice';
   const tierColorClass = getTierColorClass(tierName);
   
+  // Get tier color for badge fill
+  const getBadgeFillColor = (): string => {
+    if (leveledUp) return 'var(--badge-leveled-up-color, #ffdd00)';
+    
+    switch (tierName) {
+      case 'Novice': return 'var(--badge-novice-color, #6c757d)';
+      case 'Apprentice': return 'var(--badge-apprentice-color, #28a745)';
+      case 'Operator': return 'var(--badge-operator-color, #007bff)';
+      case 'Expert': return 'var(--badge-expert-color, #fd7e14)';
+      case 'Master': return 'var(--badge-master-color, #dc3545)';
+      case 'Legend': return 'var(--badge-legend-color, #9932cc)';
+      default: return 'white';
+    }
+  };
+  
   return (
     <div 
       className={`${styles.xpDisplay} ${compact ? styles.compact : ''} ${tierColorClass} ${impactAnimation ? styles.impactAnimation : ''}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
+      title={`Level ${xpInfo.level} ${tierName}: ${xpInfo.xp}/${xpInfo.nextLevelXp} XP (${xpInfo.progress}%)`}
     >
       {/* XP notification animation */}
       {earningsAnimation && earningsAnimation.active && (
@@ -97,8 +159,15 @@ const XpDisplay: React.FC<XpDisplayProps> = ({ compact = false, onClick }) => {
         </div>
       )}
       
-      <div className={styles.levelBadge}>
-        {xpInfo.level}
+      <div className={`${styles.levelBadge} ${leveledUp ? styles.leveledUp : ''}`}>
+        <div 
+          className={styles.levelBadgeBackground} 
+          style={{ 
+            height: `${badgeProgress}%`,
+            backgroundColor: getBadgeFillColor()
+          }}
+        ></div>
+        <span className={styles.levelBadgeValue}>{xpInfo.level}</span>
       </div>
       
       {!compact && (
