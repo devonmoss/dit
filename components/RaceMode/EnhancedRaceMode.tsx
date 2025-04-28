@@ -132,6 +132,7 @@ const EnhancedRaceMode: React.FC = () => {
   // Track when we last sent a database update to avoid too many requests
   const lastUpdateTimeRef = useRef<number>(0);
   const pendingUpdateRef = useRef<boolean>(false);
+  const raceFinishedRef = useRef<boolean>(false);
   
   // First, add a state for the visual feedback
   const [showCorrectIndicator, setShowCorrectIndicator] = useState(false);
@@ -702,6 +703,13 @@ const EnhancedRaceMode: React.FC = () => {
   const finishRace = useCallback(async () => {
     const currentUser = getCurrentUser();
     if (!currentUser || !raceId || !startTime) return;
+    
+    // Prevent multiple executions
+    if (raceFinishedRef.current) {
+      console.log('Race already finished, preventing duplicate execution');
+      return;
+    }
+    raceFinishedRef.current = true;
     
     const endTime = Date.now();
     setFinishTime(endTime);

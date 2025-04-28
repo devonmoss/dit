@@ -126,6 +126,9 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
     const saveResults = async () => {
       if (!user || !completed || resultsSaved.current) return;
       
+      // Set this flag immediately to prevent multiple executions
+      resultsSaved.current = true;
+      
       try {
         // Calculate average times per character
         const avgTimes: Record<string, number> = {};
@@ -262,15 +265,15 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
             });
           }
         }
-          
-        resultsSaved.current = true;
       } catch (err) {
         console.error('Error saving training result:', err);
       }
     };
     
     saveResults();
-  }, [completed, user, responseTimes, mistakesMap, levelId, elapsedTime, replayCount, state.mode, getCurrentLevel, state.completedLevels, refreshXpInfo]);
+    
+    // Only depend on completed state and user to minimize re-runs
+  }, [completed, user, levelId, responseTimes, mistakesMap, state.mode, state.completedLevels, getCurrentLevel, elapsedTime, replayCount, refreshXpInfo]);
   // Format time as MM:SS with hover tooltip for precise seconds
   const formatTime = (totalSec: number) => {
     const minutes = Math.floor(totalSec / 60);
