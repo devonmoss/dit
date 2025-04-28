@@ -132,7 +132,7 @@
 }
 
 .correct {
-  color: var(--accent-color);
+  color: var(--success-color);
   font-weight: bold;
 }
 
@@ -226,7 +226,7 @@
 }
 
 .newRaceButton:hover {
-  background-color: #00c853;
+  background-color: var(--button-hover);
 }
 
 .progressInfo {
@@ -248,7 +248,7 @@
 
 .progressFill {
   height: 100%;
-  background-color: #00e676;
+  background-color: var(--accent-color);
   border-radius: 5px;
   transition: width 0.3s ease;
 }
@@ -386,8 +386,8 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: rgba(0, 255, 0, 0.3);
-  color: #00c853;
+  background-color: var(--success-bg-color);
+  color: var(--success-color);
   font-size: 3rem;
   padding: 1rem;
   border-radius: 1rem;

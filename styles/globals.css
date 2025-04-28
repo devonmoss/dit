@@ -5,7 +5,11 @@
   --primary-bg: #1f1f1f;
   --secondary-bg: #2a2a2a;
   --accent-color: #00e676;
+  --success-color: #00e676;
+  --success-bg-color: rgba(0, 230, 118, 0.3);
+  --button-hover: #00c853;
   --error-color: #ff1744;
+  --error-bg-color: rgba(255, 23, 68, 0.3);
   --warning-color: #ff9100;
   --border-color: #333;
   --muted-text: #777;
@@ -19,8 +23,12 @@
   --text-color: #cdd6f4; /* Text */
   --primary-bg: #313244; /* Surface0 */
   --secondary-bg: #45475a; /* Surface1 */
-  --accent-color: #a6e3a1; /* Green */
+  --accent-color: #89b4fa; /* Blue */
+  --success-color: #a6e3a1; /* Green */
+  --success-bg-color: rgba(166, 227, 161, 0.3); /* Green with opacity */
+  --button-hover: #b4befe; /* Lavender */
   --error-color: #f38ba8; /* Red */
+  --error-bg-color: rgba(243, 139, 168, 0.3); /* Red with opacity */
   --warning-color: #fab387; /* Peach */
   --border-color: #45475a; /* Surface1 */
   --muted-text: #9399b2; /* Subtext0 */
@@ -753,13 +761,13 @@ a.menu-item {
 }
 
 .status-feedback.success {
-  background-color: rgba(76, 175, 80, 0.3);
-  color: #2e7d32;
+  background-color: var(--success-bg-color);
+  color: var(--success-color);
 }
 
 .status-feedback.error {
-  background-color: rgba(244, 67, 54, 0.3);
-  color: #c62828;
+  background-color: var(--error-bg-color);
+  color: var(--error-color);
 }
 
 /* Race participant list styling */
