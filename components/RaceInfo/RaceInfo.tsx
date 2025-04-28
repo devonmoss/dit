@@ -45,18 +45,13 @@ const RaceInfo: React.FC<RaceInfoProps> = ({ onCreateRace, raceMode = 'copy' }) 
       <h2>Create a Morse Code Race</h2>
       
       <div className={styles.raceDetails}>
-        <p>You are about to create a race with the following settings:</p>
+        <p>Your race will have the following settings:</p>
         
         <ul className={styles.detailsList}>
           <li>
             <strong>Race Mode:</strong>{' '}
             <span className={styles.modeName}>
               {raceMode === 'copy' ? 'Copy Mode' : 'Send Mode'}
-            </span>
-            <span className={styles.modeDescription}>
-              {raceMode === 'copy' 
-                ? ' (listen to Morse code and type the character you hear)' 
-                : ' (see characters and send them using arrow keys)'}
             </span>
           </li>
           <li>
