@@ -134,6 +134,13 @@ const EnhancedRaceMode: React.FC = () => {
   // Add a reference to store the mapped anonymous user IDs
   const anonUserIdMapRef = useRef<{[key: string]: string}>({});
   
+  // For send mode with arrow keys (similar to SendingMode)
+  const [keyState, setKeyState] = useState({ ArrowLeft: false, ArrowRight: false });
+  const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
+  const [keyerOutput, setKeyerOutput] = useState('');
+  const [codeBuffer, setCodeBuffer] = useState('');
+  const sendQueueRef = useRef<string[]>([]);
+  
   // Throttled function to update the database - only sends updates every 500ms at most
   const updateProgressInDatabase = useCallback((progress: number, userId: string) => {
     if (!raceId) return;
@@ -810,20 +817,271 @@ const EnhancedRaceMode: React.FC = () => {
     playMorseChar(raceText[currentCharIndex]);
   }, [raceStage, raceText, currentCharIndex, playMorseChar]);
   
-  // Update the handleKeyDown function to include the visual feedback
+  // Play sound for a dot or dash - similar to playSendSymbol in SendingMode
+  const playSendSymbol = useCallback(async (symbol: string) => {
+    if (!audioContext) return;
+    const sendUnit = 1200 / state.sendWpm;
+    const duration = symbol === '.' ? sendUnit : sendUnit * 3;
+    
+    return new Promise<void>((resolve) => {
+      if (window.AudioContext) {
+        const tmpContext = audioContext.getRawContext();
+        const osc = tmpContext.createOscillator();
+        osc.frequency.value = 600; 
+        osc.type = 'sine';
+        osc.connect(tmpContext.destination);
+        osc.start();
+        setTimeout(() => {
+          osc.stop();
+          resolve();
+        }, duration);
+      } else {
+        setTimeout(resolve, duration);
+      }
+    });
+  }, [audioContext, state.sendWpm]);
+
+  // Process Morse code for send mode
+  const decodeMorseCode = useCallback((code: string) => {
+    // This is the inverse morse mapping from morse representation to characters
+    const invMorseMap: {[key: string]: string} = {
+      ".-": "a", "-...": "b", "-.-.": "c", "-..": "d", ".": "e",
+      "..-.": "f", "--.": "g", "....": "h", "..": "i", ".---": "j",
+      "-.-": "k", ".-..": "l", "--": "m", "-.": "n", "---": "o",
+      ".--.": "p", "--.-": "q", ".-.": "r", "...": "s", "-": "t",
+      "..-": "u", "...-": "v", ".--": "w", "-..-": "x", "-.--": "y",
+      "--..": "z", ".----": "1", "..---": "2", "...--": "3", "....-": "4",
+      ".....": "5", "-....": "6", "--...": "7", "---..": "8", "----.": "9",
+      "-----": "0", ".-.-.-": ".", "--..--": ",", "..--..": "?", 
+      ".----.": "'", "-.-.--": "!", "-..-.": "/", "-.--.": "(", 
+      "-.--.-": ")", ".-...": "&", "---...": ":", "-.-.-.": ";", 
+      "-...-": "=", ".-.-.": "+", "-....-": "-", "..--.-": "_",
+      ".-..-.": "\"", "...-..-": "$", ".--.-": "@", "/": " "
+    };
+    
+    return invMorseMap[code] || "?";
+  }, []);
+
+  // Handle completed morse input
+  const handleMorseComplete = useCallback((code: string) => {
+    if (raceStage !== RaceStage.RACING) return;
+    
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+    
+    const decodedChar = decodeMorseCode(code);
+    const expectedChar = raceText[currentCharIndex]?.toLowerCase();
+    
+    if (decodedChar === expectedChar) {
+      // Show correct indicator
+      setShowCorrectIndicator(true);
+      
+      // Slight pause before continuing
+      setTimeout(() => {
+        setShowCorrectIndicator(false);
+        
+        // Correct input
+        const newInput = userInput + decodedChar;
+        setUserInput(newInput);
+        
+        // Calculate new progress
+        const newProgress = Math.round(((currentCharIndex + 1) / raceText.length) * 100);
+        setUserProgress(newProgress);
+        
+        // Update latest progress reference for database syncing
+        latestProgressRef.current = currentCharIndex + 1;
+        
+        // Clear keyer output and code buffer
+        setKeyerOutput('');
+        setCodeBuffer('');
+        
+        // Move to next character
+        const nextCharIndex = currentCharIndex + 1;
+        setCurrentCharIndex(nextCharIndex);
+        
+        // Update progress in database
+        if (raceId) {
+          // Send progress update by updating the database - realtime changes will propagate to all clients
+          if (channelRef.current) {
+            // Update our progress reference
+            latestProgressRef.current = currentCharIndex + 1;
+            
+            // Mark that we have a new update, but let the throttling handle when to actually send it
+            pendingUpdateRef.current = true;
+            
+            // Get the mapped ID for anonymous users
+            let userId = currentUser.id;
+            if (currentUser.id.startsWith('anon-') && anonUserIdMapRef.current[currentUser.id]) {
+              userId = anonUserIdMapRef.current[currentUser.id];
+            }
+            
+            // Try to update, but the throttle mechanism will decide if it happens now or later
+            updateProgressInDatabase(currentCharIndex + 1, userId);
+          }
+          
+          // Check if user has completed the race
+          if (nextCharIndex >= raceText.length) {
+            finishRace();
+            stopAudio();
+          }
+        }
+      }, 400); // 400ms pause
+    } else {
+      // Incorrect input - play error sound
+      setErrorCount(prev => prev + 1);
+      
+      // Clear keyer output and code buffer for next attempt
+      setKeyerOutput('');
+      setCodeBuffer('');
+      
+      if (audioContext) {
+        audioContext.playErrorSound().catch(err => {
+          console.error("Error playing error sound:", err);
+        });
+      }
+    }
+  }, [raceStage, getCurrentUser, decodeMorseCode, raceText, currentCharIndex, userInput, raceId, 
+      channelRef, anonUserIdMapRef, updateProgressInDatabase, finishRace, stopAudio, audioContext]);
+
+  // Key processing interval for send mode
+  useEffect(() => {
+    if (raceStage !== RaceStage.RACING || raceMode !== 'send') return;
+    
+    let lastTime = Date.now();
+    let timeoutId: NodeJS.Timeout | null = null;
+    let active = true;
+    
+    // Track the local code buffer for closure
+    let localCodeBuffer = '';
+    
+    const wait = (ms: number): Promise<void> => {
+      return new Promise(resolve => {
+        timeoutId = setTimeout(() => {
+          resolve();
+        }, ms);
+      });
+    };
+    
+    const sendLoop = async () => {
+      while (active && raceStage === RaceStage.RACING && raceMode === 'send') {
+        const now = Date.now();
+        const gap = now - lastTime;
+        const sendUnit = 1200 / state.sendWpm;
+        
+        // Letter gap detection: >=3 units and we have code to process
+        if (gap >= sendUnit * 3 && localCodeBuffer) {
+          // Process the code
+          handleMorseComplete(localCodeBuffer);
+          
+          // Reset local code buffer
+          localCodeBuffer = '';
+          setCodeBuffer('');
+          setKeyerOutput('');
+          
+          lastTime = now;
+        }
+        
+        // Process any queued symbols from arrow key presses
+        let symbol: string | undefined;
+        
+        // Check the queue first (dots/dashes from arrow keys)
+        if (sendQueueRef.current.length > 0) {
+          symbol = sendQueueRef.current.shift();
+          
+          if (symbol) {
+            // Play the symbol sound
+            await playSendSymbol(symbol);
+            
+            // Update the display
+            setKeyerOutput(prev => prev + symbol);
+            setCodeBuffer(prev => prev + symbol);
+            localCodeBuffer += symbol;
+            
+            // Update last time
+            lastTime = Date.now();
+          }
+        }
+        
+        await wait(10);
+      }
+    };
+    
+    // Start the send loop
+    sendLoop();
+    
+    return () => {
+      active = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [raceStage, raceMode, state.sendWpm, handleMorseComplete, playSendSymbol]);
+
+  // Update the handleKeyDown function to handle both copy and send modes
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (raceStage !== RaceStage.RACING) return;
     
     const currentUser = getCurrentUser();
     if (!currentUser) return;
     
-    // Tab key for replaying current character
+    // Tab key for replaying current character (in copy mode only)
     if (e.key === 'Tab') {
       e.preventDefault(); // Prevent tab from changing focus
-      replayCurrent();
+      if (raceMode === 'copy') {
+        replayCurrent();
+      }
       return;
     }
     
+    // Special handling for send mode with arrow keys
+    if (raceMode === 'send') {
+      // Handle paddle key presses for send mode
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        
+        // Only queue a dot if key wasn't already pressed
+        if (!keyStateRef.current.ArrowLeft) {
+          sendQueueRef.current.push('.');
+        }
+        
+        // Update ref state immediately
+        keyStateRef.current.ArrowLeft = true;
+        
+        // Update React state for UI rendering
+        setKeyState(prev => ({ ...prev, ArrowLeft: true }));
+        return;
+      } 
+      else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        
+        // Only queue a dash if key wasn't already pressed
+        if (!keyStateRef.current.ArrowRight) {
+          sendQueueRef.current.push('-');
+        }
+        
+        // Update ref state immediately
+        keyStateRef.current.ArrowRight = true;
+        
+        // Update React state for UI rendering
+        setKeyState(prev => ({ ...prev, ArrowRight: true }));
+        return;
+      }
+      
+      // Process other keys in send mode
+      if (e.key === 'Escape') {
+        // Cancel race
+        e.preventDefault();
+        // Clear send queue and state
+        sendQueueRef.current = [];
+        keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
+        setKeyState({ ArrowLeft: false, ArrowRight: false });
+        return;
+      }
+      
+      return; // Don't process other keys in send mode
+    }
+    
+    // Below is the copy mode logic (only process character keys in copy mode)
     // Only process alphanumeric keys and basic punctuation
     if (!/^[a-zA-Z0-9\s.,?!]$/.test(e.key)) return;
     
@@ -880,12 +1138,12 @@ const EnhancedRaceMode: React.FC = () => {
           if (nextCharIndex >= raceText.length) {
             finishRace();
             stopAudio();
-          } else {
-            // Play the next character
+          } else if (raceMode === 'copy') {
+            // Only play the next character in copy mode
             playMorseChar(raceText[nextCharIndex]);
           }
-        } else if (nextCharIndex < raceText.length) {
-          // If no database update, still play next character
+        } else if (nextCharIndex < raceText.length && raceMode === 'copy') {
+          // If no database update, still play next character (in copy mode only)
           playMorseChar(raceText[nextCharIndex]);
         }
       }, 400); // 400ms pause
@@ -895,24 +1153,29 @@ const EnhancedRaceMode: React.FC = () => {
       
       if (audioContext) {
         audioContext.playErrorSound().then(() => {
-          // Short delay before replaying the current character
-          setTimeout(() => {
-            if (currentCharIndex < raceText.length) {
-              playMorseChar(raceText[currentCharIndex]);
-            }
-          }, 750); // Match the delay used in training mode
+          // Short delay before replaying the current character (in copy mode only)
+          if (raceMode === 'copy') {
+            setTimeout(() => {
+              if (currentCharIndex < raceText.length) {
+                playMorseChar(raceText[currentCharIndex]);
+              }
+            }, 750); // Match the delay used in training mode
+          }
         }).catch(err => {
           console.error("Error playing error sound:", err);
-          // Even if error sound fails, still replay the character
-          setTimeout(() => {
-            if (currentCharIndex < raceText.length) {
-              playMorseChar(raceText[currentCharIndex]);
-            }
-          }, 750);
+          // Even if error sound fails, still replay the character (in copy mode only)
+          if (raceMode === 'copy') {
+            setTimeout(() => {
+              if (currentCharIndex < raceText.length) {
+                playMorseChar(raceText[currentCharIndex]);
+              }
+            }, 750);
+          }
         });
       }
     }
-  }, [raceStage, raceText, raceId, getCurrentUser, finishRace, stopAudio, currentCharIndex, playMorseChar, audioContext, userInput, updateProgressInDatabase]);
+  }, [raceStage, raceText, raceId, getCurrentUser, finishRace, stopAudio, currentCharIndex, 
+      playMorseChar, audioContext, userInput, updateProgressInDatabase, raceMode, replayCurrent]);
   
   // Calculate race statistics for results view - use useMemo directly
   const stats = React.useMemo(() => {
@@ -930,15 +1193,43 @@ const EnhancedRaceMode: React.FC = () => {
     };
   }, [startTime, finishTime, raceText.length, errorCount]);
   
+  // Handle keyup event for send mode
+  const handleKeyUp = useCallback((e: KeyboardEvent) => {
+    if (raceStage !== RaceStage.RACING || raceMode !== 'send') return;
+    
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      
+      // Update ref state immediately
+      keyStateRef.current[e.key as 'ArrowLeft' | 'ArrowRight'] = false;
+      
+      // Update React state for UI rendering
+      setKeyState(prev => ({ ...prev, [e.key]: false }));
+    }
+  }, [raceStage, raceMode]);
+
   // Set up keyboard listeners for racing
   useEffect(() => {
     if (raceStage !== RaceStage.RACING) return;
     
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [raceStage, handleKeyDown]);
+    
+    // Add keyup listener for send mode
+    if (raceMode === 'send') {
+      document.addEventListener('keyup', handleKeyUp);
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      
+      // Clean up keyup listener
+      if (raceMode === 'send') {
+        document.removeEventListener('keyup', handleKeyUp);
+      }
+    };
+  }, [raceStage, handleKeyDown, raceMode, handleKeyUp]);
   
-  // Effect to start playing the first character when race begins
+  // Effect to start the race when race begins (only play sound in copy mode)
   useEffect(() => {
     if (raceStage === RaceStage.RACING && raceText && raceText.length > 0 && currentCharIndex === 0) {
       const currentUser = getCurrentUser();
@@ -965,17 +1256,20 @@ const EnhancedRaceMode: React.FC = () => {
           });
       }
       
-      // Slight delay to make sure UI is ready
-      setTimeout(() => {
-        playMorseChar(raceText[0])
-          .catch(err => {
-            console.error("Error playing first character:", err);
-            // If there's an error, we still want to allow the user to progress
-            // by providing a replay button
-          });
-      }, 500);
+      // Only play the sound in copy mode, not in send mode
+      if (raceMode === 'copy') {
+        // Slight delay to make sure UI is ready
+        setTimeout(() => {
+          playMorseChar(raceText[0])
+            .catch(err => {
+              console.error("Error playing first character:", err);
+              // If there's an error, we still want to allow the user to progress
+              // by providing a replay button
+            });
+        }, 500);
+      }
     }
-  }, [raceStage, raceText, currentCharIndex, playMorseChar, getCurrentUser, raceId]);
+  }, [raceStage, raceText, currentCharIndex, playMorseChar, getCurrentUser, raceId, raceMode]);
   
   // Add cleanup effect to ensure final state is persisted
   useEffect(() => {
@@ -1135,22 +1429,35 @@ const EnhancedRaceMode: React.FC = () => {
               <div className={styles.typingInstructions}>
                 {raceMode === 'copy'
                   ? 'Listen for the Morse code and type the character you hear'
-                  : 'Type the character displayed as Morse code'
+                  : 'Use ← key for · and → key for – to send the character displayed'
                 }
               </div>
             </div>
             
             <div className={styles.raceControls}>
-              <button 
-                onClick={replayCurrent}
-                className={styles.replayButton}
-                title="Replay current character"
-              >
-                Replay Sound
-              </button>
-              <div className={styles.hint}>
-                Press Tab to replay the current character sound
-              </div>
+              {raceMode === 'copy' ? (
+                <>
+                  <button 
+                    onClick={replayCurrent}
+                    className={styles.replayButton}
+                    title="Replay current character"
+                  >
+                    Replay Sound
+                  </button>
+                  <div className={styles.hint}>
+                    Press Tab to replay the current character sound
+                  </div>
+                </>
+              ) : (
+                <div className={styles.morseControls}>
+                  <div className={styles.keyerDisplay}>
+                    <div className={styles.keyerOutput}>{keyerOutput}</div>
+                  </div>
+                  <div className={styles.hint}>
+                    Use ← key for · and → key for –
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
