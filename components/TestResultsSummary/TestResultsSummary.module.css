@@ -24,7 +24,7 @@
 
 .time, .replays {
   padding: 0.5rem 1rem;
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: var(--dark-overlay-bg);
   border-radius: 4px;
 }
 
@@ -78,7 +78,7 @@
 }
 
 .timesTable th {
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: var(--dark-overlay-bg);
 }
 
 .timeBarContainer {
@@ -159,6 +159,15 @@
   margin-top: 1.5rem;
   color: #888;
   font-size: 0.9rem;
+}
+
+.errorCount {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--error-bg-color);
+  color: var(--error-color);
+  border-radius: 12px;
+  font-weight: bold;
 }
 
 @media (max-width: 600px) {
