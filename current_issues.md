@@ -7,6 +7,10 @@ race mode:
     - is the WPM calculation correct? Is it special for CW?
     - allow the users to play again. incorporate some way for them to play again with different char set
 
+training mode:
+    - instead of displaying "fast answer" or "lightning quick" use some animations to indicate visually that they were fast
+    - provide this for sending training too (currently only shows users in copy)
+
 login improvements:
     - app should log the user right in when creating their user. currently signing up doesn't login until after the email has been verified
 
