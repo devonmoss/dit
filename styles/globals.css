@@ -9,6 +9,7 @@
   --success-bg-color: rgba(0, 230, 118, 0.3);
   --button-hover: #00c853;
   --error-color: #ff1744;
+  --error-color-rgb: 255, 23, 68; /* Red */
   --error-bg-color: rgba(255, 23, 68, 0.3);
   --warning-color: #ff9100;
   --border-color: #333;
@@ -41,7 +42,9 @@
   --success-bg-color: rgba(166, 227, 161, 0.3); /* Green with opacity */
   --button-hover: #b4befe; /* Lavender */
   --error-color: #f38ba8; /* Red */
-  --error-bg-color: rgba(243, 139, 168, 0.3); /* Red with opacity */
+  --error-color-rgb: 243, 139, 168; /* Red */
+  --error-bg-color: rgba(var(--error-color-rgb), 0.1); /* Red with opacity */
+  /* --error-bg-color: rgba(243, 139, 168, 0.2); Red with opacity */
   --warning-color: #fab387; /* Peach */
   --border-color: #45475a; /* Surface1 */
   --muted-text: #9399b2; /* Subtext0 */

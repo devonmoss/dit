@@ -1,30 +1,31 @@
 .resultsContainer {
-  margin: 20px auto;
-  padding: 20px;
-  background-color: var(--bg-secondary);
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem;
+  background-color: var(--primary-bg);
   border-radius: 8px;
   max-width: 800px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .resultsContainer h2 {
   text-align: center;
-  margin-bottom: 20px;
-  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  color: var(--accent-color);
+  font-size: 1.8rem;
 }
 
 .summary {
   display: flex;
-  justify-content: center;
-  gap: 40px;
-  margin-bottom: 20px;
+  justify-content: space-around;
+  margin-bottom: 1.5rem;
   font-size: 1.2rem;
 }
 
 .time, .replays {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  padding: 0.5rem 1rem;
+  background-color: var(--dark-overlay-bg);
+  border-radius: 4px;
 }
 
 .time span, .replays span {
@@ -33,38 +34,40 @@
 }
 
 .strugglesSection {
-  margin-bottom: 30px;
+  margin-bottom: 2rem;
 }
 
 .strugglesSection h3 {
-  font-size: 1.1rem;
-  margin-bottom: 10px;
-  color: var(--text-primary);
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
 }
 
 .strugglesList {
+  list-style-type: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 15px;
+  gap: 0.5rem;
   list-style: none;
   padding: 0;
 }
 
 .strugglesList li {
-  background-color: var(--bg-tertiary);
-  padding: 5px 10px;
+  background-color: var(--error-bg-color);
+  padding: 0.3rem 0.6rem;
   border-radius: 4px;
+  border: 1px solid var(--error-color);
   font-size: 0.9rem;
 }
 
 .timesSection {
-  margin-bottom: 30px;
+  margin-bottom: 2rem;
 }
 
 .timesSection h3 {
-  font-size: 1.1rem;
-  margin-bottom: 15px;
-  color: var(--text-primary);
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  color: var(--text-color);
 }
 
 .timesTable {
@@ -72,17 +75,16 @@
   border-collapse: collapse;
 }
 
-.timesTable th {
+.timesTable th, .timesTable td {
   text-align: left;
-  padding: 8px;
-  font-weight: 600;
+  font-family: var(--font-family);
+  padding: 0.5rem;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-secondary);
 }
 
-.timesTable td {
-  padding: 8px;
-  border-bottom: 1px solid var(--border-muted);
+.timesTable th {
+  background-color: var(--dark-overlay-bg);
 }
 
 .timeBarContainer {
@@ -92,22 +94,22 @@
 }
 
 .bar {
-  height: 12px;
-  border-radius: 3px;
+  height: 10px;
+  border-radius: 4px;
   min-width: 5px;
   transition: width 0.3s ease;
 }
 
 .fast {
-  background-color: #4caf50;
+  background-color: var(--success-color);
 }
 
 .medium {
-  background-color: #ff9800;
+  background-color: var(--warning-color);
 }
 
 .slow {
-  background-color: #f44336;
+  background-color: var(--error-color);
 }
 
 .noData {
