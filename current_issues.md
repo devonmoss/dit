@@ -7,6 +7,9 @@ race mode:
     - is the WPM calculation correct? Is it special for CW?
     - allow the users to play again. incorporate some way for them to play again with different char set
 
+xp leveling improvements:
+    - remove ui from level summary details and just show animation in navbar by level indicator showing +240 or however many points they got. That would be much cleaner
+
 training mode:
     - instead of displaying "fast answer" or "lightning quick" use some animations to indicate visually that they were fast
     - provide this for sending training too (currently only shows users in copy)
@@ -16,9 +19,10 @@ login improvements:
 
 custom themes:
     - template out a specific color for "correct" and "incorrect" items. this way we can use theme specific colors for these critical ui elements but still use a different color for other ui elements. An example is in catppuccin. it would be nice to change buttons and menu from green to like pink or purple but we still want green and red for times when the user gets it right or wrong. or strikes in the checkpoint levels should still be red. etc.
+    - move theme switcher to its own spot
+    - add several more popular themes
     - catppuccin refinements:
         - use a pink color instead of the green accent but make sure things that should be green (like feedback on correct items is green?)
-        - assets/social/latte_github.svg
 
 icons throughout the ui:
     - copy
@@ -43,6 +47,3 @@ my progress:
     - might want to rename to something more like 'user stats' and make it reachable from clicking on the username
     - show heatmap of user activity
     - show insightful charts about recognition of each character
-
-implement an xp and leveling system
-    - you get points for doing trainings, tests, races. (maybe just points for every char identified or sent?)
