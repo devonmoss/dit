@@ -14,8 +14,10 @@ training mode:
 login improvements:
     - app should log the user right in when creating their user. currently signing up doesn't login until after the email has been verified
 
-catppuccin refinements:
-    - use a pink color instead of the green accent but make sure things that should be green (like feedback on correct items is green?)
+custom themes:
+    - template out a specific color for "correct" and "incorrect" items. this way we can use theme specific colors for these critical ui elements but still use a different color for other ui elements. An example is in catppuccin. it would be nice to change buttons and menu from green to like pink or purple but we still want green and red for times when the user gets it right or wrong. or strikes in the checkpoint levels should still be red. etc.
+    - catppuccin refinements:
+        - use a pink color instead of the green accent but make sure things that should be green (like feedback on correct items is green?)
 
 icons throughout the ui:
     - copy
