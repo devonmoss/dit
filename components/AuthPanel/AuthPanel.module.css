@@ -104,12 +104,12 @@
 
 .xpDisplayWrapper {
   cursor: pointer;
-  transition: transform 0.2s ease-out;
+  transition: opacity 0.2s ease-out;
 }
 
-/* .xpDisplayWrapper:hover {
-  transform: translateY(-2px);
-} */
+.xpDisplayWrapper:hover {
+  opacity: 0.9;
+}
 
 .fullXpDisplay {
   margin-bottom: 15px;

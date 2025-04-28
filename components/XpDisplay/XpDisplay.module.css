@@ -12,13 +12,27 @@
   z-index: 1;
 }
 
+/* Add a transparent version for AuthPanel */
+.transparent {
+  background-color: transparent;
+  box-shadow: none;
+  padding: 0.25rem 0;
+}
+
 .xpDisplay:hover {
-  transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.transparent:hover {
+  box-shadow: none;
 }
 
 .compact {
   padding: 0.25rem;
+}
+
+.transparent.compact {
+  padding: 0;
 }
 
 .levelBadge {
@@ -66,10 +80,10 @@
 }
 
 @keyframes colorCycle {
-  0% { background-color: #ffdd00; }
-  33% { background-color: #ff9500; }
-  66% { background-color: #ff5252; }
-  100% { background-color: #ffdd00; }
+  0% { background-color: var(--level-up-color-1); }
+  33% { background-color: var(--level-up-color-2); }
+  66% { background-color: var(--level-up-color-3); }
+  100% { background-color: var(--level-up-color-1); }
 }
 
 @keyframes textPulse {
@@ -95,7 +109,7 @@
 
 .progressBar {
   height: 100%;
-  background-color: white;
+  background-color: var(--accent-color);
   transition: width 0.5s ease-out;
   transform-origin: center;
 }
@@ -110,27 +124,27 @@
 
 /* Tier color variations */
 .tierNovice {
-  background-color: #6c757d;
+  background-color: var(--tier-novice-bg);
 }
 
 .tierApprentice {
-  background-color: #28a745;
+  background-color: var(--tier-apprentice-bg);
 }
 
 .tierOperator {
-  background-color: #007bff;
+  background-color: var(--tier-operator-bg);
 }
 
 .tierExpert {
-  background-color: #fd7e14;
+  background-color: var(--tier-expert-bg);
 }
 
 .tierMaster {
-  background-color: #dc3545;
+  background-color: var(--tier-master-bg);
 }
 
 .tierLegend {
-  background-color: #9932cc;
+  background-color: var(--tier-legend-bg);
 }
 
 /* XP animation styles */
