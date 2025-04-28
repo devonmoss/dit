@@ -71,7 +71,7 @@ const AuthPanel: React.FC = () => {
       
       {/* Toggle button to show/hide auth panel */}
       <a className={`${styles.authToggle} ${user ? styles.loggedIn : ''}`} onClick={handleToggleForm}>
-        {user ? `Account (${user.user_metadata?.username || 'User'})` : 'Login / Sign Up'}
+        {user ? `${user.user_metadata?.username || 'User'}` : 'Login / Sign Up'}
       </a>
       
       {/* User info and logout button */}
