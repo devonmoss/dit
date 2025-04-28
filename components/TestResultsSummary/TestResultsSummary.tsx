@@ -3,6 +3,12 @@ import styles from './TestResultsSummary.module.css';
 import useAuth from '../../hooks/useAuth';
 import supabase from '../../utils/supabase';
 import { useAppState } from '../../contexts/AppStateContext';
+import { 
+  awardXp, 
+  calculateTrainingXp, 
+  calculateLevelCompletionXp,
+  XpSource 
+} from '../../utils/xpSystem';
 
 interface CharTimeData {
   char: string;
@@ -38,13 +44,16 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
   onRepeat,
   onNext
 }) => {
-  const { user } = useAuth();
-  const { state } = useAppState();
+  const { user, refreshXpInfo } = useAuth();
+  const { state, getCurrentLevel } = useAppState();
   const [historyAvgTimes, setHistoryAvgTimes] = useState<Record<string, number>>({});
   /* eslint-disable @typescript-eslint/no-unused-vars */
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   /* eslint-enable @typescript-eslint/no-unused-vars */
   const resultsSaved = useRef(false);
+  const [earnedXp, setEarnedXp] = useState<{ total: number, breakdown: Record<string, number> } | null>(null);
+  const [showingXpAnimation, setShowingXpAnimation] = useState(false);
+  const [levelUpEarned, setLevelUpEarned] = useState(false);
   
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -133,7 +142,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
         
         // Save training result to Supabase
         await supabase
-            .from('training_results')
+          .from('training_results')
           .insert([{
             user_id: user.id,
             level_id: levelId,
@@ -144,6 +153,116 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
             times: avgTimes,
           }]);
           
+        // Calculate and award XP
+        // 1. Calculate training session XP
+        let trainingXp = { total: 0, breakdown: {} };
+        let levelCompletionXp = { total: 0, breakdown: {} };
+        let totalXp = 0;
+        let combinedBreakdown = {};
+        
+        try {
+          const totalMistakes = Object.values(mistakesMap).reduce((a, b) => a + b, 0);
+          console.log('Calculating XP with:', { 
+            charsLength: responseTimes.length, 
+            totalMistakes, 
+            completed 
+          });
+          
+          trainingXp = calculateTrainingXp(
+            responseTimes.length, // Characters studied
+            totalMistakes,
+            responseTimes,
+            completed
+          );
+          
+          // 2. Calculate level completion XP if this is the first time completing this level
+          const currentLevel = getCurrentLevel();
+          levelCompletionXp = { total: 0, breakdown: {} };
+          
+          if (completed && currentLevel && !state.completedLevels.includes(levelId)) {
+            levelCompletionXp = calculateLevelCompletionXp(
+              levelId, 
+              currentLevel.type === 'checkpoint'
+            );
+          }
+          
+          // 3. Combine XP from both sources
+          totalXp = trainingXp.total + levelCompletionXp.total;
+          combinedBreakdown = {
+            ...trainingXp.breakdown,
+            ...(levelCompletionXp.total > 0 ? { levelCompletion: levelCompletionXp.total } : {})
+          };
+          
+          console.log('XP calculation results:', { trainingXp, levelCompletionXp, totalXp, combinedBreakdown });
+        } catch (error) {
+          console.error('Error calculating XP:', error, { 
+            responseTimes, 
+            mistakesMap, 
+            levelId, 
+            completed,
+            currentLevel: getCurrentLevel(),
+            completedLevels: state.completedLevels
+          });
+        }
+        
+        // 4. Save the total
+        try {
+          setEarnedXp({ 
+            total: totalXp, 
+            breakdown: combinedBreakdown 
+          });
+        } catch (error) {
+          console.error('Error setting earned XP:', error, { totalXp, combinedBreakdown });
+        }
+        
+        // 5. Award XP to the user
+        if (totalXp > 0) {
+          try {
+            console.log('Awarding XP:', { userId: user.id, totalXp, mode: state.mode });
+            const result = await awardXp(
+              user.id,
+              totalXp, 
+              XpSource.TRAINING, 
+              {
+                level_id: levelId,
+                mode: state.mode,
+                completed
+              }
+            );
+            
+            if (result.success) {
+              // Refresh the XP info in the auth context
+              if (typeof refreshXpInfo === 'function') {
+                try {
+                  await refreshXpInfo();
+                } catch (refreshError) {
+                  console.error('Error refreshing XP info:', refreshError);
+                }
+              } else {
+                console.error('refreshXpInfo is not a function:', { refreshXpInfo });
+              }
+              
+              // Show XP animation
+              setShowingXpAnimation(true);
+              setTimeout(() => setShowingXpAnimation(false), 3000);
+              
+              // Check if user leveled up
+              if (result.leveledUp) {
+                setLevelUpEarned(true);
+              }
+            } else {
+              console.error('Failed to award XP:', result);
+            }
+          } catch (error) {
+            console.error('Error awarding XP:', error, { 
+              userId: user.id, 
+              totalXp, 
+              levelId, 
+              mode: state.mode 
+            });
+          }
+        }
+          
         resultsSaved.current = true;
       } catch (err) {
         console.error('Error saving training result:', err);
@@ -151,7 +270,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
     };
     
     saveResults();
-  }, [completed, user, responseTimes, mistakesMap, levelId, elapsedTime, replayCount, state.mode]);
+  }, [completed, user, responseTimes, mistakesMap, levelId, elapsedTime, replayCount, state.mode, getCurrentLevel, state.completedLevels, refreshXpInfo]);
   // Format time as MM:SS with hover tooltip for precise seconds
   const formatTime = (totalSec: number) => {
     const minutes = Math.floor(totalSec / 60);
@@ -264,6 +383,36 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
           </tbody>
         </table>
       </div>
+      
+      {/* XP Earned Section */}
+      {user && earnedXp && earnedXp.total > 0 && (
+        <div className={`${styles.xpSection} ${showingXpAnimation ? styles.animateXp : ''}`}>
+          <h3>Experience Earned</h3>
+          <div className={styles.xpTotal}>
+            <span className={styles.xpValue}>+{earnedXp.total} XP</span>
+          </div>
+          
+          {/* XP Breakdown */}
+          <ul className={styles.xpBreakdown}>
+            {Object.entries(earnedXp.breakdown).map(([source, amount]) => (
+              <li key={source}>
+                <span className={styles.xpSource}>
+                  {source.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())}:
+                </span>
+                <span className={styles.xpAmount}>+{amount} XP</span>
+              </li>
+            ))}
+          </ul>
+          
+          {/* Level Up Message */}
+          {levelUpEarned && (
+            <div className={styles.levelUp}>
+              <h4>Level Up!</h4>
+              <p>You&apos;ve reached a new level of Morse code mastery!</p>
+            </div>
+          )}
+        </div>
+      )}
       
       <div className={styles.actions}>
         <button 
