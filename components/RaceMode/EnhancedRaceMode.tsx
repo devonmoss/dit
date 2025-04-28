@@ -73,14 +73,14 @@ const RaceModeSelector: React.FC<{
           onClick={() => onSelectMode('copy')}
         >
           <h4>Copy Mode</h4>
-          <p>Listen to Morse code and type the character you hear</p>
+          <p>Identify the characters you hear</p>
         </button>
         <button 
           className={`${styles.modeButton} ${selectedMode === 'send' ? styles.selectedMode : ''}`}
           onClick={() => onSelectMode('send')}
         >
           <h4>Send Mode</h4>
-          <p>See characters and type them as Morse code</p>
+          <p>Send the characters you see</p>
         </button>
       </div>
     </div>
