@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
-import styles from './RaceMode.module.css';
-import { createAudioContext, isBrowser } from '../../utils/morse';
-import supabase from '../../utils/supabase';
-import { useMorseAudio } from '../../hooks/useMorseAudio';
-import { useAppState } from '../../contexts/AppStateContext';
-import useAuth from '../../hooks/useAuth';
-import RaceInfo from '../RaceInfo/RaceInfo';
-import RaceShareUI from '../RaceShareUI/RaceShareUI';
-import RaceParticipants from '../RaceParticipants/RaceParticipants';
-import CountdownTimer from '../CountdownTimer/CountdownTimer';
-import { trainingLevels } from '../../utils/levels';
+import styles from './RaceMode/RaceMode.module.css';
+import { createAudioContext, isBrowser } from '../utils/morse';
+import supabase from '../utils/supabase';
+import { useMorseAudio } from '../hooks/useMorseAudio';
+import { useAppState } from '../contexts/AppStateContext';
+import useAuth from '../hooks/useAuth';
+import RaceInfo from './RaceInfo/RaceInfo';
+import RaceShareUI from './RaceShareUI/RaceShareUI';
+import RaceParticipants from './RaceParticipants/RaceParticipants';
+import CountdownTimer from './CountdownTimer/CountdownTimer';
+import { trainingLevels } from '../utils/levels';
 import { v4 as uuidv4 } from 'uuid';
-import { awardXp, calculateRaceXp, XpSource } from '../../utils/xpSystem';
+import { awardXp, calculateRaceXp, XpSource } from '../utils/xpSystem';
 
 // Utility type for suppressing eslint errors
 /* eslint-disable @typescript-eslint/no-explicit-any */

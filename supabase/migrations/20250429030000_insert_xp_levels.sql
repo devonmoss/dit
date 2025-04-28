@@ -1,15 +1,15 @@
--- Create the xp_levels table if it doesn't exist
+-- Make sure we have the xp_levels table
 CREATE TABLE IF NOT EXISTS xp_levels (
   level INTEGER PRIMARY KEY,
   required_xp INTEGER NOT NULL,
-  tier TEXT NOT NULL
+  title TEXT NOT NULL
 );
 
 -- Clear existing data to avoid duplicates
 TRUNCATE TABLE xp_levels;
 
 -- Insert level thresholds
-INSERT INTO xp_levels (level, required_xp, tier) VALUES
+INSERT INTO xp_levels (level, required_xp, title) VALUES
 -- Novice tier (levels 1-5)
 (1, 0, 'Novice'),
 (2, 100, 'Novice'),
@@ -45,4 +45,16 @@ INSERT INTO xp_levels (level, required_xp, tier) VALUES
 (27, 71000, 'Legend'),
 (28, 82000, 'Legend'),
 (29, 94000, 'Legend'),
-(30, 110000, 'Legend');
+(30, 110000, 'Legend'),
+-- Mythic tier (levels 31-35)
+(31, 130000, 'Mythic'),
+(32, 150000, 'Mythic'),
+(33, 175000, 'Mythic'),
+(34, 205000, 'Mythic'),
+(35, 240000, 'Mythic'),
+-- Transcendent tier (levels 36-40)
+(36, 280000, 'Transcendent'),
+(37, 325000, 'Transcendent'),
+(38, 375000, 'Transcendent'),
+(39, 430000, 'Transcendent'),
+(40, 490000, 'Transcendent');

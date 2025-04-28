@@ -8,6 +8,7 @@ interface XpInfo {
   level: number;
   nextLevelXp: number;
   progress: number;
+  tier: string; // Added to match XpDisplay component
 }
 
 // Define the auth context type
@@ -298,7 +299,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           xp: result.xp,
           level: result.level || 1,
           nextLevelXp: result.nextLevelXp || 100,
-          progress: result.progress || 0
+          progress: result.progress || 0,
+          tier: result.tier || 'Novice'
         });
       }
     } catch (error) {
