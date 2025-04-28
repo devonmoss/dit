@@ -7,6 +7,7 @@ import { trainingLevels } from '../../utils/levels';
 interface RaceInfoProps {
   onCreateRace: () => void;
   raceMode?: 'copy' | 'send';
+  modeSelector?: React.ReactNode;
 }
 
 // Create a client-only component for the character list
@@ -16,7 +17,7 @@ const CharacterList = dynamic(() => Promise.resolve(({ chars }: { chars: string[
   </span>
 )), { ssr: false });
 
-const RaceInfo: React.FC<RaceInfoProps> = ({ onCreateRace, raceMode = 'copy' }) => {
+const RaceInfo: React.FC<RaceInfoProps> = ({ onCreateRace, raceMode = 'copy', modeSelector }) => {
   const { state } = useAppState();
   const [hydrated, setHydrated] = useState(false);
   
@@ -43,6 +44,12 @@ const RaceInfo: React.FC<RaceInfoProps> = ({ onCreateRace, raceMode = 'copy' }) 
   return (
     <div className={styles.raceInfoContainer}>
       <h2>Create a Morse Code Race</h2>
+      
+      {modeSelector && (
+        <div className={styles.modeSelectorContainer}>
+          {modeSelector}
+        </div>
+      )}
       
       <div className={styles.raceDetails}>
         <p>Your race will have the following settings:</p>
