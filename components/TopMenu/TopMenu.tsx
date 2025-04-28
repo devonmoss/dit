@@ -104,26 +104,14 @@ const TopMenu: React.FC = () => {
         <div className={styles.menuWrapper}>
         {/* Left section - Mode Selection */}
         <div className={styles.menuSection}>
-          <label className={`${styles.menuItem} ${state.mode === 'copy' ? styles.active : ''}`}>
-            <input 
-              type="radio" 
-              name="mode" 
-              value="copy" 
-              checked={state.mode === 'copy'} 
-              onChange={handleModeChange} 
-            />
-            copy
-          </label>
-          <label className={`${styles.menuItem} ${state.mode === 'send' ? styles.active : ''}`}>
-            <input 
-              type="radio" 
-              name="mode" 
-              value="send" 
-              checked={state.mode === 'send'} 
-              onChange={handleModeChange} 
-            />
-            send
-          </label>
+          <div 
+            className={styles.toggleTrack} 
+            onClick={() => setMode(state.mode === 'copy' ? 'send' : 'copy')}
+          >
+            <span className={`${styles.toggleLabel} ${state.mode === 'copy' ? styles.activeLabel : ''}`}>copy</span>
+            <span className={`${styles.toggleLabel} ${state.mode === 'send' ? styles.activeLabel : ''}`}>send</span>
+            <div className={`${styles.toggleThumb} ${state.mode === 'send' ? styles.toggleRight : ''}`}></div>
+          </div>
         </div>
         
         {/* Middle section - Test Types */}

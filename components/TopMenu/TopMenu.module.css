@@ -12,6 +12,57 @@
   z-index: 1000;
 }
 
+/* Toggle Switch for copy/send mode */
+.toggleTrack {
+  position: relative;
+  width: 140px;
+  height: 32px;
+  background-color: var(--secondary-bg);
+  border-radius: 30px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  margin: 0 4px;
+  overflow: hidden;
+}
+
+.toggleTrack:hover {
+  background-color: var(--border-color);
+}
+
+.toggleLabel {
+  font-size: 14px;
+  color: var(--muted-text);
+  padding: 0 8px;
+  z-index: 1;
+  transition: color 0.3s ease;
+  user-select: none;
+}
+
+.activeLabel {
+  color: var(--background-color) !important;
+  font-weight: bold;
+}
+
+.toggleThumb {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 68px;
+  height: 24px;
+  background-color: var(--accent-color);
+  border-radius: 20px;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggleRight {
+  transform: translateX(64px);
+}
+
 .menuWrapper {
   display: flex;
   justify-content: space-between;
