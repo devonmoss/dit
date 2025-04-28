@@ -593,6 +593,42 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     }
   }, [state.selectedLevelId, startSendTest, selectLevel]);
   
+  // Add a new effect to handle level changes
+  useEffect(() => {
+    // When the level ID changes and we're in an active sending session, reset local state
+    if (sendingActive) {
+      console.log('Level changed during active sending session - resetting local state');
+      setSendingActive(false);
+      setGuidedSendActive(false);
+      setResponseTimes([]);
+      setMistakesMap({});
+      setStrikeCount(0);
+      setShowResults(false);
+      
+      // Clear any remaining keyer state
+      sendQueueRef.current = [];
+      keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
+    }
+  }, [state.selectedLevelId]);
+  
+  // Monitor global testActive state
+  useEffect(() => {
+    // If global test is not active but our local sending is still active, reset it
+    if (!state.testActive && sendingActive) {
+      console.log('Global test inactive but local sending still active - resetting local state');
+      setSendingActive(false);
+      setGuidedSendActive(false);
+      setResponseTimes([]);
+      setMistakesMap({});
+      setStrikeCount(0);
+      setShowResults(false);
+      
+      // Clear any remaining keyer state
+      sendQueueRef.current = [];
+      keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
+    }
+  }, [state.testActive, sendingActive]);
+  
   return (
     <div className={styles.sendingTrainer}>
       {showResults ? (
