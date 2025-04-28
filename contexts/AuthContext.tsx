@@ -2,26 +2,42 @@ import React, { createContext, useState, useEffect, useContext, ReactNode } from
 import { User, Session } from '@supabase/supabase-js';
 import supabase from '../utils/supabase';
 
+// XP information type
+interface XpInfo {
+  xp: number;
+  level: number;
+  nextLevelXp: number;
+  progress: number;
+}
+
 // Define the auth context type
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  xpInfo: XpInfo | null;
+  loadingXp: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, username: string) => Promise<{ error: any, user: User | null }>;
   signOut: () => Promise<void>;
   signInWithGithub: () => Promise<void>;
   updateUsername: (username: string) => Promise<{ error: any }>;
+  refreshXpInfo: () => Promise<void>;
 }
 
 // Create context with default value
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Import the XP utility functions
+import { getUserXpInfo } from '../utils/xpSystem';
 
 // Auth provider component
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [xpInfo, setXpInfo] = useState<XpInfo | null>(null);
+  const [loadingXp, setLoadingXp] = useState(false);
 
   // Check and handle GitHub user's username if needed
   const handleGitHubUsername = async (user: User) => {
@@ -265,15 +281,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Function to refresh the user's XP information
+  const refreshXpInfo = async () => {
+    if (!user) {
+      setXpInfo(null);
+      return;
+    }
+    
+    setLoadingXp(true);
+    
+    try {
+      const result = await getUserXpInfo(user.id);
+      
+      if (result.success && result.xp !== undefined) {
+        setXpInfo({
+          xp: result.xp,
+          level: result.level || 1,
+          nextLevelXp: result.nextLevelXp || 100,
+          progress: result.progress || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error loading XP info:', error);
+    } finally {
+      setLoadingXp(false);
+    }
+  };
+  
+  // Load XP info when user changes
+  useEffect(() => {
+    refreshXpInfo();
+  }, [user]);
+
   const value: AuthContextType = {
     user,
     session,
     loading,
+    xpInfo,
+    loadingXp,
     signIn,
     signUp,
     signOut,
     signInWithGithub,
-    updateUsername
+    updateUsername,
+    refreshXpInfo
   };
 
   return (
