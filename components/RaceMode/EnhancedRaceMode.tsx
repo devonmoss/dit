@@ -1444,7 +1444,9 @@ const EnhancedRaceMode: React.FC = () => {
         <div className={styles.raceContainer}>
           <div className={styles.morseText}>
             <div className={styles.textDisplay}>
-              <h3>Type the characters as you hear them:</h3>
+              <h3>{raceMode === 'copy' 
+                ? 'Type the characters as you hear them:' 
+                : 'Send the characters you see using Morse code:'}</h3>
               <div className={styles.textContainer}>
                 {/* Display progress but not the actual characters */}
                 <div className={styles.progressBar}>
