@@ -74,13 +74,16 @@ INSERT INTO "auth"."audit_log_entries" ("instance_id", "id", "payload", "created
 	('00000000-0000-0000-0000-000000000000', '73852938-4597-44cf-ba05-13f355b6b1ec', '{"action":"logout","actor_id":"b27090bb-bc7c-4eff-ac63-d50b058daf2f","actor_username":"test2@user.com","actor_via_sso":false,"log_type":"account"}', '2025-04-26 14:24:21.637399+00', ''),
 	('00000000-0000-0000-0000-000000000000', '47596406-e090-4f20-8fc6-0f08854342e1', '{"action":"login","actor_id":"8202244a-2521-4c98-850d-8ae966e6eae4","actor_username":"test@user.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}', '2025-04-26 22:25:19.618529+00', ''),
 	('00000000-0000-0000-0000-000000000000', '1a517f10-f5a1-4cb4-a1ac-b0139f7018e2', '{"action":"logout","actor_id":"8202244a-2521-4c98-850d-8ae966e6eae4","actor_username":"test@user.com","actor_via_sso":false,"log_type":"account"}', '2025-04-26 23:08:47.533516+00', ''),
-	('00000000-0000-0000-0000-000000000000', '94e6585d-541f-48ad-b00f-046e1f1b8bf9', '{"action":"user_signedup","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"dvnmss+w1ves@gmail.com","actor_via_sso":false,"log_type":"team","traits":{"provider":"email"}}', '2025-04-26 23:10:02.559273+00', ''),
-	('00000000-0000-0000-0000-000000000000', '12d96137-969f-4a51-a885-48e9c3afad7c', '{"action":"login","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"dvnmss+w1ves@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}', '2025-04-26 23:10:02.562699+00', ''),
-	('00000000-0000-0000-0000-000000000000', '1ca66a11-7c5c-4d3a-995e-f1464a7c38f5', '{"action":"login","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"dvnmss+w1ves@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}', '2025-04-26 23:31:07.159961+00', ''),
-	('00000000-0000-0000-0000-000000000000', 'a6ba1dd7-5e39-4f96-8246-53cd50b4c8db', '{"action":"token_refreshed","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"dvnmss+w1ves@gmail.com","actor_via_sso":false,"log_type":"token"}', '2025-04-26 23:36:14.644829+00', ''),
-	('00000000-0000-0000-0000-000000000000', '4013b5a6-8863-4625-a915-921af6bc4465', '{"action":"token_revoked","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"dvnmss+w1ves@gmail.com","actor_via_sso":false,"log_type":"token"}', '2025-04-26 23:36:14.645702+00', ''),
-	('00000000-0000-0000-0000-000000000000', '021790a1-b464-479f-a641-a673d2c4bf19', '{"action":"token_refreshed","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"dvnmss+w1ves@gmail.com","actor_via_sso":false,"log_type":"token"}', '2025-04-27 01:21:41.582221+00', ''),
-	('00000000-0000-0000-0000-000000000000', 'af8f4bc5-3df7-4554-b538-25f0e4b33f15', '{"action":"token_revoked","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"dvnmss+w1ves@gmail.com","actor_via_sso":false,"log_type":"token"}', '2025-04-27 01:21:41.583051+00', '');
+	('00000000-0000-0000-0000-000000000000', '94e6585d-541f-48ad-b00f-046e1f1b8bf9', '{"action":"user_signedup","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"test+w1ves@user.com","actor_via_sso":false,"log_type":"team","traits":{"provider":"email"}}', '2025-04-26 23:10:02.559273+00', ''),
+	('00000000-0000-0000-0000-000000000000', '12d96137-969f-4a51-a885-48e9c3afad7c', '{"action":"login","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"test+w1ves@user.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}', '2025-04-26 23:10:02.562699+00', ''),
+	('00000000-0000-0000-0000-000000000000', '1ca66a11-7c5c-4d3a-995e-f1464a7c38f5', '{"action":"login","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"test+w1ves@user.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}', '2025-04-26 23:31:07.159961+00', ''),
+	('00000000-0000-0000-0000-000000000000', 'a6ba1dd7-5e39-4f96-8246-53cd50b4c8db', '{"action":"token_refreshed","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"test+w1ves@user.com","actor_via_sso":false,"log_type":"token"}', '2025-04-26 23:36:14.644829+00', ''),
+	('00000000-0000-0000-0000-000000000000', '4013b5a6-8863-4625-a915-921af6bc4465', '{"action":"token_revoked","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"test+w1ves@user.com","actor_via_sso":false,"log_type":"token"}', '2025-04-26 23:36:14.645702+00', ''),
+	('00000000-0000-0000-0000-000000000000', '021790a1-b464-479f-a641-a673d2c4bf19', '{"action":"token_refreshed","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"test+w1ves@user.com","actor_via_sso":false,"log_type":"token"}', '2025-04-27 01:21:41.582221+00', ''),
+	('00000000-0000-0000-0000-000000000000', 'af8f4bc5-3df7-4554-b538-25f0e4b33f15', '{"action":"token_revoked","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"test+w1ves@user.com","actor_via_sso":false,"log_type":"token"}', '2025-04-27 01:21:41.583051+00', ''),
+	('00000000-0000-0000-0000-000000000000', 'c2b60463-9868-4b83-ab44-95b9f494286f', '{"action":"login","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"test+w1ves@user.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}', '2025-04-28 09:04:38.666414+00', ''),
+	('00000000-0000-0000-0000-000000000000', 'be55f6f2-497b-4ae9-80c3-8d415f2f262c', '{"action":"token_refreshed","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"test+w1ves@user.com","actor_via_sso":false,"log_type":"token"}', '2025-04-28 13:42:21.521352+00', ''),
+	('00000000-0000-0000-0000-000000000000', '7c8e2022-6ac4-430f-beed-47de4d14689e', '{"action":"token_revoked","actor_id":"d33faed5-7f82-4f58-a959-75db376239f6","actor_username":"test+w1ves@user.com","actor_via_sso":false,"log_type":"token"}', '2025-04-28 13:42:21.523318+00', '');
 
 
 --
@@ -96,7 +99,7 @@ INSERT INTO "auth"."audit_log_entries" ("instance_id", "id", "payload", "created
 INSERT INTO "auth"."users" ("instance_id", "id", "aud", "role", "email", "encrypted_password", "email_confirmed_at", "invited_at", "confirmation_token", "confirmation_sent_at", "recovery_token", "recovery_sent_at", "email_change_token_new", "email_change", "email_change_sent_at", "last_sign_in_at", "raw_app_meta_data", "raw_user_meta_data", "is_super_admin", "created_at", "updated_at", "phone", "phone_confirmed_at", "phone_change", "phone_change_token", "phone_change_sent_at", "email_change_token_current", "email_change_confirm_status", "banned_until", "reauthentication_token", "reauthentication_sent_at", "is_sso_user", "deleted_at", "is_anonymous") VALUES
 	('00000000-0000-0000-0000-000000000000', 'b27090bb-bc7c-4eff-ac63-d50b058daf2f', 'authenticated', 'authenticated', 'test2@user.com', '$2a$10$PqMTNgUzMUIFCnQ2VEH1QuTVo3fbnhgLrnfpz74KvU9TgfACzy24m', '2025-04-25 20:46:32.196735+00', NULL, '', NULL, '', NULL, '', '', NULL, '2025-04-26 14:24:01.818256+00', '{"provider": "email", "providers": ["email"]}', '{"email_verified": true}', NULL, '2025-04-25 20:46:32.191879+00', '2025-04-26 14:24:01.819782+00', NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL, false, NULL, false),
 	('00000000-0000-0000-0000-000000000000', '8202244a-2521-4c98-850d-8ae966e6eae4', 'authenticated', 'authenticated', 'test@user.com', '$2a$10$wFrzMD2YI.l4iSYXpysAVeGo5Sh8QS2qxgfAUfSe1vIAFztVTLlxe', '2025-04-25 20:46:17.356921+00', NULL, '', NULL, '', NULL, '', '', NULL, '2025-04-26 22:25:19.619599+00', '{"provider": "email", "providers": ["email"]}', '{"email_verified": true}', NULL, '2025-04-25 20:46:17.351624+00', '2025-04-26 22:25:19.621746+00', NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL, false, NULL, false),
-	('00000000-0000-0000-0000-000000000000', 'd33faed5-7f82-4f58-a959-75db376239f6', 'authenticated', 'authenticated', 'dvnmss+w1ves@gmail.com', '$2a$10$RV.neHmGP/67hL0Z6S9AWe/jcqn8OSzX0gvnF3D9Nv4Gl0bvUb66a', '2025-04-26 23:10:02.559842+00', NULL, '', NULL, '', NULL, '', '', NULL, '2025-04-26 23:31:07.160712+00', '{"provider": "email", "providers": ["email"]}', '{"sub": "d33faed5-7f82-4f58-a959-75db376239f6", "email": "dvnmss+w1ves@gmail.com", "username": "W1VES", "email_verified": true, "phone_verified": false}', NULL, '2025-04-26 23:10:02.553348+00', '2025-04-27 01:21:41.584656+00', NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL, false, NULL, false);
+	('00000000-0000-0000-0000-000000000000', 'd33faed5-7f82-4f58-a959-75db376239f6', 'authenticated', 'authenticated', 'test+w1ves@user.com', '$2a$10$RV.neHmGP/67hL0Z6S9AWe/jcqn8OSzX0gvnF3D9Nv4Gl0bvUb66a', '2025-04-26 23:10:02.559842+00', NULL, '', NULL, '', NULL, '', '', NULL, '2025-04-28 09:04:38.667397+00', '{"provider": "email", "providers": ["email"]}', '{"sub": "d33faed5-7f82-4f58-a959-75db376239f6", "email": "test+w1ves@user.com", "username": "W1VES", "email_verified": true, "phone_verified": false}', NULL, '2025-04-26 23:10:02.553348+00', '2025-04-28 13:42:21.581358+00', NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL, false, NULL, false);
 
 
 --
@@ -106,7 +109,7 @@ INSERT INTO "auth"."users" ("instance_id", "id", "aud", "role", "email", "encryp
 INSERT INTO "auth"."identities" ("provider_id", "user_id", "identity_data", "provider", "last_sign_in_at", "created_at", "updated_at", "id") VALUES
 	('8202244a-2521-4c98-850d-8ae966e6eae4', '8202244a-2521-4c98-850d-8ae966e6eae4', '{"sub": "8202244a-2521-4c98-850d-8ae966e6eae4", "email": "test@user.com", "email_verified": false, "phone_verified": false}', 'email', '2025-04-25 20:46:17.354656+00', '2025-04-25 20:46:17.354692+00', '2025-04-25 20:46:17.354692+00', '387b2dd5-f1a4-4931-bd6a-7010244ac6db'),
 	('b27090bb-bc7c-4eff-ac63-d50b058daf2f', 'b27090bb-bc7c-4eff-ac63-d50b058daf2f', '{"sub": "b27090bb-bc7c-4eff-ac63-d50b058daf2f", "email": "test2@user.com", "email_verified": false, "phone_verified": false}', 'email', '2025-04-25 20:46:32.192615+00', '2025-04-25 20:46:32.192649+00', '2025-04-25 20:46:32.192649+00', '44b54a0e-bdb2-4270-b2e0-b49711257798'),
-	('d33faed5-7f82-4f58-a959-75db376239f6', 'd33faed5-7f82-4f58-a959-75db376239f6', '{"sub": "d33faed5-7f82-4f58-a959-75db376239f6", "email": "dvnmss+w1ves@gmail.com", "username": "W1VES", "email_verified": false, "phone_verified": false}', 'email', '2025-04-26 23:10:02.557661+00', '2025-04-26 23:10:02.557684+00', '2025-04-26 23:10:02.557684+00', 'f4e7c5e2-2c27-4000-b1c9-be0fd4991157');
+	('d33faed5-7f82-4f58-a959-75db376239f6', 'd33faed5-7f82-4f58-a959-75db376239f6', '{"sub": "d33faed5-7f82-4f58-a959-75db376239f6", "email": "test+w1ves@user.com", "username": "W1VES", "email_verified": false, "phone_verified": false}', 'email', '2025-04-26 23:10:02.557661+00', '2025-04-26 23:10:02.557684+00', '2025-04-26 23:10:02.557684+00', 'f4e7c5e2-2c27-4000-b1c9-be0fd4991157');
 
 
 --
@@ -121,7 +124,8 @@ INSERT INTO "auth"."identities" ("provider_id", "user_id", "identity_data", "pro
 
 INSERT INTO "auth"."sessions" ("id", "user_id", "created_at", "updated_at", "factor_id", "aal", "not_after", "refreshed_at", "user_agent", "ip", "tag") VALUES
 	('5049cd54-ff53-42f2-8ef5-20db7f5d5cc2', 'd33faed5-7f82-4f58-a959-75db376239f6', '2025-04-26 23:10:02.563116+00', '2025-04-26 23:10:02.563116+00', NULL, 'aal1', NULL, NULL, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:137.0) Gecko/20100101 Firefox/137.0', '192.168.65.1', NULL),
-	('ed99d5f9-6262-40bb-8aa5-fe83042f1dfb', 'd33faed5-7f82-4f58-a959-75db376239f6', '2025-04-26 23:31:07.160826+00', '2025-04-27 01:21:41.585745+00', NULL, 'aal1', NULL, '2025-04-27 01:21:41.585654', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:137.0) Gecko/20100101 Firefox/137.0', '192.168.65.1', NULL);
+	('ed99d5f9-6262-40bb-8aa5-fe83042f1dfb', 'd33faed5-7f82-4f58-a959-75db376239f6', '2025-04-26 23:31:07.160826+00', '2025-04-27 01:21:41.585745+00', NULL, 'aal1', NULL, '2025-04-27 01:21:41.585654', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:137.0) Gecko/20100101 Firefox/137.0', '192.168.65.1', NULL),
+	('e8e4dc52-e9b7-4c74-bfd2-6c944dbca10f', 'd33faed5-7f82-4f58-a959-75db376239f6', '2025-04-28 09:04:38.667462+00', '2025-04-28 13:42:21.647598+00', NULL, 'aal1', NULL, '2025-04-28 13:42:21.64752', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:137.0) Gecko/20100101 Firefox/137.0', '192.168.65.1', NULL);
 
 
 --
@@ -130,7 +134,8 @@ INSERT INTO "auth"."sessions" ("id", "user_id", "created_at", "updated_at", "fac
 
 INSERT INTO "auth"."mfa_amr_claims" ("session_id", "created_at", "updated_at", "authentication_method", "id") VALUES
 	('5049cd54-ff53-42f2-8ef5-20db7f5d5cc2', '2025-04-26 23:10:02.564552+00', '2025-04-26 23:10:02.564552+00', 'password', '9a3f6069-7b2a-42ca-aa93-91500ac8a1a7'),
-	('ed99d5f9-6262-40bb-8aa5-fe83042f1dfb', '2025-04-26 23:31:07.162572+00', '2025-04-26 23:31:07.162572+00', 'password', '60f32120-8358-4aae-a7a5-0ae26e254be5');
+	('ed99d5f9-6262-40bb-8aa5-fe83042f1dfb', '2025-04-26 23:31:07.162572+00', '2025-04-26 23:31:07.162572+00', 'password', '60f32120-8358-4aae-a7a5-0ae26e254be5'),
+	('e8e4dc52-e9b7-4c74-bfd2-6c944dbca10f', '2025-04-28 09:04:38.669684+00', '2025-04-28 09:04:38.669684+00', 'password', 'd7b6a985-ff43-49d2-982d-598fbf225cd0');
 
 
 --
@@ -159,7 +164,9 @@ INSERT INTO "auth"."refresh_tokens" ("instance_id", "id", "token", "user_id", "r
 	('00000000-0000-0000-0000-000000000000', 26, '6yrf2wneccox', 'd33faed5-7f82-4f58-a959-75db376239f6', false, '2025-04-26 23:10:02.563637+00', '2025-04-26 23:10:02.563637+00', NULL, '5049cd54-ff53-42f2-8ef5-20db7f5d5cc2'),
 	('00000000-0000-0000-0000-000000000000', 27, 'zebv44eds5z6', 'd33faed5-7f82-4f58-a959-75db376239f6', true, '2025-04-26 23:31:07.161586+00', '2025-04-26 23:36:14.646228+00', NULL, 'ed99d5f9-6262-40bb-8aa5-fe83042f1dfb'),
 	('00000000-0000-0000-0000-000000000000', 28, 'isqdisffr2ci', 'd33faed5-7f82-4f58-a959-75db376239f6', true, '2025-04-26 23:36:14.647206+00', '2025-04-27 01:21:41.583603+00', 'zebv44eds5z6', 'ed99d5f9-6262-40bb-8aa5-fe83042f1dfb'),
-	('00000000-0000-0000-0000-000000000000', 29, '2zbmkj334fcz', 'd33faed5-7f82-4f58-a959-75db376239f6', false, '2025-04-27 01:21:41.583983+00', '2025-04-27 01:21:41.583983+00', 'isqdisffr2ci', 'ed99d5f9-6262-40bb-8aa5-fe83042f1dfb');
+	('00000000-0000-0000-0000-000000000000', 29, '2zbmkj334fcz', 'd33faed5-7f82-4f58-a959-75db376239f6', false, '2025-04-27 01:21:41.583983+00', '2025-04-27 01:21:41.583983+00', 'isqdisffr2ci', 'ed99d5f9-6262-40bb-8aa5-fe83042f1dfb'),
+	('00000000-0000-0000-0000-000000000000', 30, 'rsswjbps3yxy', 'd33faed5-7f82-4f58-a959-75db376239f6', true, '2025-04-28 09:04:38.668251+00', '2025-04-28 13:42:21.524332+00', NULL, 'e8e4dc52-e9b7-4c74-bfd2-6c944dbca10f'),
+	('00000000-0000-0000-0000-000000000000', 31, 'z4ssr2lfxy4d', 'd33faed5-7f82-4f58-a959-75db376239f6', false, '2025-04-28 13:42:21.528563+00', '2025-04-28 13:42:21.528563+00', 'rsswjbps3yxy', 'e8e4dc52-e9b7-4c74-bfd2-6c944dbca10f');
 
 
 --
@@ -242,8 +249,8 @@ INSERT INTO "public"."races" ("id", "created_by", "status", "mode", "char_sequen
 -- Data for Name: profiles; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO "public"."profiles" ("id", "username", "created_at", "updated_at") VALUES
-	('d33faed5-7f82-4f58-a959-75db376239f6', 'user_d33faed5', '2025-04-26 23:10:02.553035+00', '2025-04-26 23:10:02.553035+00');
+INSERT INTO "public"."profiles" ("id", "username", "created_at", "updated_at", "xp", "level") VALUES
+	('d33faed5-7f82-4f58-a959-75db376239f6', 'user_d33faed5', '2025-04-26 23:10:02.553035+00', '2025-04-28 09:36:03.917876+00', 2986, 8);
 
 
 --
@@ -316,7 +323,7 @@ INSERT INTO "public"."race_participants" ("id", "race_id", "user_id", "name", "p
 	('3c248eb5-31ac-433c-b4ff-f520955ba7a8', 'fbubj98x', 'c9801d1e-1490-40d3-ae57-b0fcb8d45a34', 'Anonymous-401', 20, true, 1745686629855, 1, 63.852, '2025-04-26 16:55:26.690613+00'),
 	('64b1d852-101b-43c0-a021-abd8c8d30210', 'fbubj98x', '8202244a-2521-4c98-850d-8ae966e6eae4', 'test@user.com', 20, true, 1745686643316, 1, 77.313, '2025-04-26 16:55:16.038914+00'),
 	('a74bcfe4-64d2-4eab-97e4-ef8ca06024d5', 'fbubj98x', '4e6a185b-f534-431f-b7e1-955b077e63a1', 'Anonymous-240', 0, false, NULL, 0, NULL, '2025-04-26 21:41:31.277316+00'),
-	('13b527fa-e59a-4624-9706-9594469a557a', '8chx3rio', 'd33faed5-7f82-4f58-a959-75db376239f6', 'dvnmss+w1ves@gmail.com', 0, false, NULL, 0, NULL, '2025-04-26 23:34:44.307701+00');
+	('13b527fa-e59a-4624-9706-9594469a557a', '8chx3rio', 'd33faed5-7f82-4f58-a959-75db376239f6', 'test+w1ves@user.com', 0, false, NULL, 0, NULL, '2025-04-26 23:34:44.307701+00');
 
 
 --
@@ -338,7 +345,41 @@ INSERT INTO "public"."training_results" ("id", "user_id", "mode", "level_id", "t
 	('92cec171-2099-4f47-92dc-3f0581bca6f6', '8202244a-2521-4c98-850d-8ae966e6eae4', 'send', 'level-2', 73.738, 0, '{"a": 1, "e": 1, "t": 2}', '2025-04-26 22:33:22.748149+00', '{"a": 2.8731999999999998, "e": 2.3584285714285715, "n": 2.2486, "t": 2.3718333333333335}'),
 	('1d1f1d39-29b0-40e5-9967-004ddfc265c1', '8202244a-2521-4c98-850d-8ae966e6eae4', 'copy', 'checkpoint-1', 27.282, 0, '{}', '2025-04-26 22:35:44.806786+00', '{"a": 0.5619999999999999, "e": 0.6529999999999999, "n": 0.48760000000000003, "t": 0.6875}'),
 	('b9859213-0063-4f8b-afc5-f4019d92c8ad', '8202244a-2521-4c98-850d-8ae966e6eae4', 'copy', 'checkpoint-1', 27.282, 0, '{}', '2025-04-26 22:35:44.806792+00', '{"a": 0.5619999999999999, "e": 0.6529999999999999, "n": 0.48760000000000003, "t": 0.6875}'),
-	('6007c070-1032-42be-a617-c0f34bc8fb11', '8202244a-2521-4c98-850d-8ae966e6eae4', 'send', 'checkpoint-1', 57.35, 0, '{"n": 1}', '2025-04-26 22:42:59.728855+00', '{"a": 1.9639999999999997, "e": 2.0545, "n": 3.4388000000000005, "t": 2.12325}');
+	('6007c070-1032-42be-a617-c0f34bc8fb11', '8202244a-2521-4c98-850d-8ae966e6eae4', 'send', 'checkpoint-1', 57.35, 0, '{"n": 1}', '2025-04-26 22:42:59.728855+00', '{"a": 1.9639999999999997, "e": 2.0545, "n": 3.4388000000000005, "t": 2.12325}'),
+	('f4e801b4-7978-438f-bade-f2050c383786', 'd33faed5-7f82-4f58-a959-75db376239f6', 'copy', 'level-1', 10.802, 0, '{"t": 1}', '2025-04-28 09:05:18.449558+00', '{"e": 0.26433333333333336, "t": 0.70925}'),
+	('5121b572-2766-4918-8c68-1051e24b9e24', 'd33faed5-7f82-4f58-a959-75db376239f6', 'copy', 'level-1', 10.802, 0, '{"t": 1}', '2025-04-28 09:05:18.449571+00', '{"e": 0.26433333333333336, "t": 0.70925}'),
+	('59ff891d-deed-485c-b7b6-cf1d46e54b60', 'd33faed5-7f82-4f58-a959-75db376239f6', 'copy', 'level-1', 10.802, 0, '{"t": 1}', '2025-04-28 09:05:18.503849+00', '{"e": 0.26433333333333336, "t": 0.70925}'),
+	('31feb7ac-1ef7-4e54-9ceb-e768a7caa4c8', 'd33faed5-7f82-4f58-a959-75db376239f6', 'copy', 'level-2', 27.133, 0, '{}', '2025-04-28 09:09:20.50943+00', '{"a": 0.4566666666666667, "e": 0.5910000000000001, "n": 0.8968, "t": 0.6857500000000001}'),
+	('9817d1e6-6c60-4088-a09a-1acd2ac03db3', 'd33faed5-7f82-4f58-a959-75db376239f6', 'copy', 'level-2', 27.133, 0, '{}', '2025-04-28 09:09:20.50944+00', '{"a": 0.4566666666666667, "e": 0.5910000000000001, "n": 0.8968, "t": 0.6857500000000001}'),
+	('59de93a9-328a-4ae7-89eb-ddd7684b48cd', 'd33faed5-7f82-4f58-a959-75db376239f6', 'copy', 'level-2', 27.133, 0, '{}', '2025-04-28 09:09:20.561019+00', '{"a": 0.4566666666666667, "e": 0.5910000000000001, "n": 0.8968, "t": 0.6857500000000001}'),
+	('940a041b-0a89-46cf-bee6-5fe3a9996461', 'd33faed5-7f82-4f58-a959-75db376239f6', 'copy', 'level-7', 147.634, 1, '{"n": 2}', '2025-04-28 09:34:37.789374+00', '{"a": 0.94025, "d": 1.713, "e": 1.9959999999999998, "i": 2.281285714285714, "m": 0.8507142857142858, "n": 1.5103999999999997, "o": 0.53225, "s": 1.6461666666666668, "t": 0.8098000000000001, "u": 0.844}'),
+	('f951b64c-652a-4858-ba69-cd5ea00ae6c3', 'd33faed5-7f82-4f58-a959-75db376239f6', 'copy', 'level-7', 147.634, 1, '{"n": 2}', '2025-04-28 09:34:37.789377+00', '{"a": 0.94025, "d": 1.713, "e": 1.9959999999999998, "i": 2.281285714285714, "m": 0.8507142857142858, "n": 1.5103999999999997, "o": 0.53225, "s": 1.6461666666666668, "t": 0.8098000000000001, "u": 0.844}'),
+	('0854de18-73d9-4354-b2ae-041a72591b33', 'd33faed5-7f82-4f58-a959-75db376239f6', 'copy', 'level-7', 147.634, 1, '{"n": 2}', '2025-04-28 09:34:37.826178+00', '{"a": 0.94025, "d": 1.713, "e": 1.9959999999999998, "i": 2.281285714285714, "m": 0.8507142857142858, "n": 1.5103999999999997, "o": 0.53225, "s": 1.6461666666666668, "t": 0.8098000000000001, "u": 0.844}'),
+	('9257a7b3-213d-433b-b4d1-c188f6357eee', 'd33faed5-7f82-4f58-a959-75db376239f6', 'send', 'level-1', 26.58, 0, '{"e": 1}', '2025-04-28 09:36:03.864478+00', '{"e": 1.8105714285714285, "t": 1.3824999999999998}'),
+	('10996ba5-c204-4d34-ad80-b79d98d984d9', 'd33faed5-7f82-4f58-a959-75db376239f6', 'send', 'level-1', 26.58, 0, '{"e": 1}', '2025-04-28 09:36:03.864531+00', '{"e": 1.8105714285714285, "t": 1.3824999999999998}'),
+	('3363f947-bf64-4886-a2e4-5d20b41a4a19', 'd33faed5-7f82-4f58-a959-75db376239f6', 'send', 'level-1', 26.58, 0, '{"e": 1}', '2025-04-28 09:36:03.905563+00', '{"e": 1.8105714285714285, "t": 1.3824999999999998}');
+
+
+--
+-- Data for Name: xp_history; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO "public"."xp_history" ("id", "user_id", "amount", "reason", "details", "created_at") VALUES
+	('0b4a62cc-5677-430a-bf41-8868df4fb7f5', 'd33faed5-7f82-4f58-a959-75db376239f6', 157, 'training', '{"mode": "copy", "level_id": "level-1", "completed": true}', '2025-04-28 09:05:18.481068+00'),
+	('443acd4f-9bed-4206-b854-a7d593290ea3', 'd33faed5-7f82-4f58-a959-75db376239f6', 157, 'training', '{"mode": "copy", "level_id": "level-1", "completed": true}', '2025-04-28 09:05:18.481068+00'),
+	('c10aaa14-9b84-4e98-8f0f-8629264e8a74', 'd33faed5-7f82-4f58-a959-75db376239f6', 157, 'training', '{"mode": "copy", "level_id": "level-1", "completed": true}', '2025-04-28 09:05:18.525345+00'),
+	('daf2a7e0-d1e7-4097-b943-9533e5de78dc', 'd33faed5-7f82-4f58-a959-75db376239f6', 284, 'training', '{"mode": "copy", "level_id": "level-2", "completed": true}', '2025-04-28 09:09:20.541706+00'),
+	('8fa52107-1573-4118-b8a6-af88a6ea8cfc', 'd33faed5-7f82-4f58-a959-75db376239f6', 284, 'training', '{"mode": "copy", "level_id": "level-2", "completed": true}', '2025-04-28 09:09:20.546092+00'),
+	('66482d58-882c-403e-b4ff-37bd805b5265', 'd33faed5-7f82-4f58-a959-75db376239f6', 284, 'training', '{"mode": "copy", "level_id": "level-2", "completed": true}', '2025-04-28 09:09:20.595093+00'),
+	('5416df02-07c4-4634-a2a9-804331e9ed89', 'd33faed5-7f82-4f58-a959-75db376239f6', 730, 'training', '{"mode": "copy", "level_id": "level-7", "completed": true}', '2025-04-28 09:34:37.810874+00'),
+	('4be5c7d7-2db7-4d77-9017-39b80239e922', 'd33faed5-7f82-4f58-a959-75db376239f6', 730, 'training', '{"mode": "copy", "level_id": "level-7", "completed": true}', '2025-04-28 09:34:37.811104+00'),
+	('0f07ed69-69f1-4e98-ad57-702da3e55b4d', 'd33faed5-7f82-4f58-a959-75db376239f6', 730, 'training', '{"mode": "copy", "level_id": "level-7", "completed": true}', '2025-04-28 09:34:37.837257+00'),
+	('4a2744b0-9d3a-456c-aa78-310e578d453d', 'd33faed5-7f82-4f58-a959-75db376239f6', 180, 'training', '{"mode": "send", "level_id": "level-1", "completed": true}', '2025-04-28 09:36:03.885963+00'),
+	('cc8461a8-f70c-403c-a86c-b41e8eec0d2d', 'd33faed5-7f82-4f58-a959-75db376239f6', 180, 'training', '{"mode": "send", "level_id": "level-1", "completed": true}', '2025-04-28 09:36:03.885702+00'),
+	('3a0d95f4-e4e0-49b4-9974-c09b87eca4ea', 'd33faed5-7f82-4f58-a959-75db376239f6', 180, 'training', '{"mode": "send", "level_id": "level-1", "completed": true}', '2025-04-28 09:36:03.917876+00');
+
+
+--
 
 
 --
@@ -387,7 +428,7 @@ INSERT INTO "public"."training_results" ("id", "user_id", "mode", "level_id", "t
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
 
-SELECT pg_catalog.setval('"auth"."refresh_tokens_id_seq"', 29, true);
+SELECT pg_catalog.setval('"auth"."refresh_tokens_id_seq"', 31, true);
 
 
 --

@@ -288,6 +288,7 @@ export async function awardXp(
   error?: any;
 }> {
   try {
+    console.log('awarding xp');
     // Match the parameter order from our SQL function
     const { data, error } = await supabase
       .rpc('award_xp', {

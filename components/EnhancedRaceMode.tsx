@@ -132,12 +132,11 @@ const EnhancedRaceMode: React.FC = () => {
   // Track when we last sent a database update to avoid too many requests
   const lastUpdateTimeRef = useRef<number>(0);
   const pendingUpdateRef = useRef<boolean>(false);
+  const anonUserIdMapRef = useRef<Record<string, string>>({});
+  const raceFinishedRef = useRef<boolean>(false);
   
   // First, add a state for the visual feedback
   const [showCorrectIndicator, setShowCorrectIndicator] = useState(false);
-  
-  // Add a reference to store the mapped anonymous user IDs
-  const anonUserIdMapRef = useRef<{[key: string]: string}>({});
   
   // For send mode with arrow keys (similar to SendingMode)
   const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
@@ -679,6 +678,13 @@ const EnhancedRaceMode: React.FC = () => {
   const finishRace = useCallback(async () => {
     const currentUser = getCurrentUser();
     if (!currentUser || !raceId || !startTime) return;
+    
+    // Prevent multiple executions
+    if (raceFinishedRef.current) {
+      console.log('Race already finished, preventing duplicate execution');
+      return;
+    }
+    raceFinishedRef.current = true;
     
     const endTime = Date.now();
     setFinishTime(endTime);

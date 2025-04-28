@@ -1,7 +1,6 @@
 race mode: 
     - refine the send mode races in the following ways:
         - fix bug where the sound for the first char is played
-    - refine the button where we select send or copy mode for the test, lets make it so selecting one of those just highlights it and sets it as the mode that will be created when the user presses 'create race'
 
     - lol, am i supposed to use the 'realtime' schema?
     - is the WPM calculation correct? Is it special for CW?
@@ -9,6 +8,13 @@ race mode:
 
 xp leveling improvements:
     - remove ui from level summary details and just show animation in navbar by level indicator showing +240 or however many points they got. That would be much cleaner
+    - make the level summary ui look the way it did before
+    - cleanup the race completion details. it is showing a really ugly total for their xp usage. again we want a nice clean subtle indicator that xp was gained.
+
+Auth panel updates:
+    - it should only show the username in the top right when logged in
+    - to the right of the username should be an icon to logout. clicking it brings up a little thing asking if they want to logout
+    - clicking the username brings them to their user stats page (currently called my progress)
 
 training mode:
     - instead of displaying "fast answer" or "lightning quick" use some animations to indicate visually that they were fast
@@ -18,11 +24,10 @@ login improvements:
     - app should log the user right in when creating their user. currently signing up doesn't login until after the email has been verified
 
 custom themes:
-    - template out a specific color for "correct" and "incorrect" items. this way we can use theme specific colors for these critical ui elements but still use a different color for other ui elements. An example is in catppuccin. it would be nice to change buttons and menu from green to like pink or purple but we still want green and red for times when the user gets it right or wrong. or strikes in the checkpoint levels should still be red. etc.
+    - research if there is like a standard for creating templates and if there is implement vars for each of those colors.
+    - ideally we can use opacity and drop shadows and stuff to avoid needing to find similar but slightly darker colors.
     - move theme switcher to its own spot
     - add several more popular themes
-    - catppuccin refinements:
-        - use a pink color instead of the green accent but make sure things that should be green (like feedback on correct items is green?)
 
 icons throughout the ui:
     - copy

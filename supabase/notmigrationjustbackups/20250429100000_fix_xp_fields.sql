@@ -43,22 +43,6 @@ DECLARE
   v_new_xp INTEGER;
   v_result JSONB;
 BEGIN
-  -- Ensure XP levels table has data
-  IF NOT EXISTS (SELECT 1 FROM xp_levels) THEN
-    INSERT INTO xp_levels (level, required_xp, title)
-    VALUES 
-      (1, 0, 'Beginner'),
-      (2, 100, 'Novice'),
-      (3, 300, 'Apprentice'), 
-      (4, 600, 'Journeyman'),
-      (5, 1000, 'Expert'),
-      (6, 1500, 'Master'),
-      (7, 2100, 'Grandmaster'),
-      (8, 2800, 'Legend'),
-      (9, 3600, 'Mythic'),
-      (10, 4500, 'Transcendent')
-    ON CONFLICT (level) DO NOTHING;
-  END IF;
 
   -- Check if profile exists
   SELECT EXISTS(SELECT 1 FROM profiles WHERE id = p_user_id) INTO v_profile_exists;
