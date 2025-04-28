@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styles from './AuthPanel.module.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
+import XpDisplay from '../XpDisplay/XpDisplay';
 
 const AuthPanel: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -61,6 +62,13 @@ const AuthPanel: React.FC = () => {
   
   return (
     <div className={styles.authWrapper}>
+      {/* XP Display (only shown when logged in) */}
+      {user && (
+        <div className={styles.xpDisplayWrapper}>
+          <XpDisplay compact={true} onClick={() => setIsFormVisible(true)} />
+        </div>
+      )}
+      
       {/* Toggle button to show/hide auth panel */}
       <a className={`${styles.authToggle} ${user ? styles.loggedIn : ''}`} onClick={handleToggleForm}>
         {user ? `Account (${user.user_metadata?.username || 'User'})` : 'Login / Sign Up'}
@@ -69,6 +77,13 @@ const AuthPanel: React.FC = () => {
       {/* User info and logout button */}
       {user && isFormVisible && (
         <div className={styles.authLoggedIn}>
+          {/* Show full XP display in the dropdown */}
+          {user && (
+            <div className={styles.fullXpDisplay}>
+              <XpDisplay compact={false} />
+            </div>
+          )}
+          
           <div className={styles.userInfo}>
             Logged in as <span>{user.user_metadata?.username || 'User'}</span>
           </div>

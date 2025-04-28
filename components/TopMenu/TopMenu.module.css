@@ -78,12 +78,6 @@
   position: relative;
 }
 
-.xpDisplayWrapper {
-  display: flex;
-  align-items: center;
-  margin: 0 0.5rem;
-}
-
 .levelDropdown, 
 .settingsDropdown {
   position: absolute;

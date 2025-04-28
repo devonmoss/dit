@@ -3,6 +3,9 @@
   top: 10px;
   right: 20px;
   z-index: 1010;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .authToggle {
@@ -97,4 +100,19 @@
 .userInfo span {
   font-weight: bold;
   color: var(--accent-color);
+}
+
+.xpDisplayWrapper {
+  cursor: pointer;
+  transition: transform 0.2s ease-out;
+}
+
+/* .xpDisplayWrapper:hover {
+  transform: translateY(-2px);
+} */
+
+.fullXpDisplay {
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
 } 
