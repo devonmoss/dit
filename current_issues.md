@@ -1,28 +1,36 @@
-LOOK INTO:
-    - does the debug thingy for mastery only show up when doing local dev?
-
-placeholders for other modes:
-    - time: Coming soon! Complete as many characters as possible in a set amount of time.
-    - words: Coming soon! Identify or send words of various sizes. 
-    - get rid of 'custom'
-
 race mode: 
+    - refine the send mode races in the following ways:
+        - fix bug where the sound for the first char is played
+    - refine the button where we select send or copy mode for the test, lets make it so selecting one of those just highlights it and sets it as the mode that will be created when the user presses 'create race'
+
     - lol, am i supposed to use the 'realtime' schema?
-    - implement send mode
     - is the WPM calculation correct? Is it special for CW?
     - allow the users to play again. incorporate some way for them to play again with different char set
 
-login should require username creation.
-    - the app should not use any tables that have the email address (except a user settings page)
-    - we always use either their username if logged in, never their email.
-    - hitting the login button should bring you to a dedicated /login page
+login improvements:
+    - app should log the user right in when creating their user. currently signing up doesn't login until after the email has been verified
 
-general app navigation
-    - clicking on training when on a race screen should bring you either to /training or /
-    - clicking words should bring you to /words
-    - clicking time should bring you to /time
-    - clicking on race or navigating back to /race should bring up the race creation page even if you were already in a race
+catppuccin refinements:
+    - use a pink color instead of the green accent but make sure things that should be green (like feedback on correct items is green?)
 
+icons throughout the ui:
+    - copy
+    - send
+    - time
+    - words
+    - training
+    - race - checkered flag pls
+    - login/log out
+    - settings
+
+implement vercel analytics and performance tracking
+
+play sounds for:
+    - level complete
+    - countdown including when the countdown begins
+    - when race is finished
+
+cleanup debug logging
 
 my progress:
     - might want to rename to something more like 'user stats' and make it reachable from clicking on the username
@@ -31,6 +39,3 @@ my progress:
 
 implement an xp and leveling system
     - you get points for doing trainings, tests, races. (maybe just points for every char identified or sent?)
-
-
-
