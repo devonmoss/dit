@@ -1463,9 +1463,9 @@ const EnhancedRaceMode: React.FC = () => {
             <div className={styles.currentCharContainer}>
               <div className={styles.currentCharPrompt}>Current character:</div>
               <div className={styles.currentChar}>
-                {raceMode === 'send' 
-                  ? (raceText[currentCharIndex] || '...') 
-                  : '...'  /* Hide character in copy mode */
+                {raceMode === 'send' && !showCorrectIndicator
+                  ? (raceText[currentCharIndex]?.toUpperCase() || '') 
+                  : ''  /* Hide character in copy mode or when showing correct indicator */
                 }
               </div>
               <div className={styles.typingInstructions}>
