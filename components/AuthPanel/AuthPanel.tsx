@@ -65,7 +65,7 @@ const AuthPanel: React.FC = () => {
       {/* XP Display (only shown when logged in) */}
       {user && (
         <div className={styles.xpDisplayWrapper}>
-          <XpDisplay compact={true} onClick={() => setIsFormVisible(true)} />
+          <XpDisplay compact={true} transparent={true} onClick={() => setIsFormVisible(true)} />
         </div>
       )}
       
@@ -80,7 +80,7 @@ const AuthPanel: React.FC = () => {
           {/* Show full XP display in the dropdown */}
           {user && (
             <div className={styles.fullXpDisplay}>
-              <XpDisplay compact={false} />
+              <XpDisplay compact={false} transparent={true} />
             </div>
           )}
           

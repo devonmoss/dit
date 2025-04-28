@@ -16,6 +16,28 @@
   --muted-text: #777;
   --box-shadow: 0 2px 5px rgba(0,0,0,0.5);
   
+  /* Level tier colors */
+  --tier-novice-bg: #6c757d;
+  --tier-apprentice-bg: #28a745;
+  --tier-operator-bg: #007bff;
+  --tier-expert-bg: #fd7e14; 
+  --tier-master-bg: #dc3545;
+  --tier-legend-bg: #9932cc;
+  
+  /* Level-up animation colors */
+  --level-up-color-1: #ffdd00;
+  --level-up-color-2: #ff9500;
+  --level-up-color-3: #ff5252;
+  
+  /* Badge colors */
+  --badge-novice-color: var(--tier-novice-bg);
+  --badge-apprentice-color: var(--tier-apprentice-bg);
+  --badge-operator-color: var(--tier-operator-bg);
+  --badge-expert-color: var(--tier-expert-bg);
+  --badge-master-color: var(--tier-master-bg);
+  --badge-legend-color: var(--tier-legend-bg);
+  --badge-leveled-up-color: var(--level-up-color-1);
+  
   /* Semi-transparent background overlays */
   --dark-overlay-bg: rgba(0, 0, 0, 0.2);
   --light-overlay-bg: rgba(255, 255, 255, 0.05);
@@ -44,11 +66,32 @@
   --error-color: #f38ba8; /* Red */
   --error-color-rgb: 243, 139, 168; /* Red */
   --error-bg-color: rgba(var(--error-color-rgb), 0.1); /* Red with opacity */
-  /* --error-bg-color: rgba(243, 139, 168, 0.2); Red with opacity */
   --warning-color: #fab387; /* Peach */
   --border-color: #45475a; /* Surface1 */
   --muted-text: #9399b2; /* Subtext0 */
   --box-shadow: 0 2px 5px rgba(17, 17, 27, 0.5); /* Adjusted for Mocha */
+
+  /* Level tier colors (Catppuccin palette) */
+  --tier-novice-bg: #9399b2; /* Subtext0 (gray) */
+  --tier-apprentice-bg: #a6e3a1; /* Green */
+  --tier-operator-bg: #89b4fa; /* Blue */
+  --tier-expert-bg: #fab387; /* Peach */
+  --tier-master-bg: #f38ba8; /* Red */
+  --tier-legend-bg: #cba6f7; /* Mauve (purple) */
+  
+  /* Level-up animation colors */
+  --level-up-color-1: #f9e2af; /* Yellow */
+  --level-up-color-2: #fab387; /* Peach */
+  --level-up-color-3: #f38ba8; /* Red */
+
+  /* Badge colors */
+  --badge-novice-color: var(--tier-novice-bg);
+  --badge-apprentice-color: var(--tier-apprentice-bg);
+  --badge-operator-color: var(--tier-operator-bg);
+  --badge-expert-color: var(--tier-expert-bg);
+  --badge-master-color: var(--tier-master-bg);
+  --badge-legend-color: var(--tier-legend-bg);
+  --badge-leveled-up-color: var(--level-up-color-1);
   
   /* Semi-transparent background overlays */
   --dark-overlay-bg: rgba(0, 0, 0, 0.2);
