@@ -17,6 +17,14 @@
   gap: 2rem;
 }
 
+.modeDescription {
+  font-size: 1.2rem;
+  color: var(--muted-text);
+  text-align: center;
+  max-width: 500px;
+  line-height: 1.5;
+}
+
 .startButton {
   background-color: var(--primary-color);
   color: white;

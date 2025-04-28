@@ -692,6 +692,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         </>
       ) : (
         <div className={styles.startContainer}>
+          <div className={styles.modeDescription}>
+            Use left and right arrow keys to mimic an iambic paddle and send morse code characters.
+          </div>
           <button 
             className={styles.startButton}
             onClick={startSendTest}
