@@ -1639,36 +1639,6 @@ const EnhancedRaceMode: React.FC = () => {
             </div>
           )}
           
-          {/* XP Earned Section */}
-          {user && xpEarned && xpEarned.total > 0 && (
-            <div className={`${styles.xpSection} ${showXpAnimation ? styles.animateXp : ''}`}>
-              <h3>Experience Earned</h3>
-              <div className={styles.xpTotal}>
-                <span className={styles.xpValue}>+{xpEarned.total} XP</span>
-              </div>
-              
-              {/* XP Breakdown */}
-              <ul className={styles.xpBreakdown}>
-                {Object.entries(xpEarned.breakdown).map(([source, amount]) => (
-                  <li key={source}>
-                    <span className={styles.xpSource}>
-                      {source.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())}:
-                    </span>
-                    <span className={styles.xpAmount}>+{amount} XP</span>
-                  </li>
-                ))}
-              </ul>
-              
-              {/* Level Up Message */}
-              {leveledUp && (
-                <div className={styles.levelUp}>
-                  <h4>Level Up!</h4>
-                  <p>You&apos;ve reached a new level of Morse code mastery!</p>
-                </div>
-              )}
-            </div>
-          )}
-          
           <h3>Final Rankings</h3>
           <RaceParticipants
             participants={participants.sort((a, b) => {

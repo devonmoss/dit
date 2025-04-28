@@ -102,7 +102,7 @@
 }
 
 .submitButton:hover {
-  background-color: #00c853;
+  background-color: var(--accent-color);
 }
 
 .submitButton:disabled {
