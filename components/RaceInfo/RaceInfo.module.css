@@ -56,6 +56,17 @@
   font-weight: bold;
 }
 
+.modeName {
+  color: var(--accent-color);
+  font-weight: bold;
+}
+
+.modeDescription {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+  font-style: italic;
+}
+
 .instruction {
   font-style: italic;
   color: var(--muted-text);

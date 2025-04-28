@@ -6,6 +6,7 @@ import { trainingLevels } from '../../utils/levels';
 
 interface RaceInfoProps {
   onCreateRace: () => void;
+  raceMode?: 'copy' | 'send';
 }
 
 // Create a client-only component for the character list
@@ -15,7 +16,7 @@ const CharacterList = dynamic(() => Promise.resolve(({ chars }: { chars: string[
   </span>
 )), { ssr: false });
 
-const RaceInfo: React.FC<RaceInfoProps> = ({ onCreateRace }) => {
+const RaceInfo: React.FC<RaceInfoProps> = ({ onCreateRace, raceMode = 'copy' }) => {
   const { state } = useAppState();
   const [hydrated, setHydrated] = useState(false);
   
@@ -47,6 +48,17 @@ const RaceInfo: React.FC<RaceInfoProps> = ({ onCreateRace }) => {
         <p>You are about to create a race with the following settings:</p>
         
         <ul className={styles.detailsList}>
+          <li>
+            <strong>Race Mode:</strong>{' '}
+            <span className={styles.modeName}>
+              {raceMode === 'copy' ? 'Copy Mode' : 'Send Mode'}
+            </span>
+            <span className={styles.modeDescription}>
+              {raceMode === 'copy' 
+                ? ' (listen to Morse code and type the character you hear)' 
+                : ' (see characters and send them using arrow keys)'}
+            </span>
+          </li>
           <li>
             <strong>Number of characters:</strong> 20
           </li>
