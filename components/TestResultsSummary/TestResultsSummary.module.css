@@ -24,7 +24,7 @@
 
 .time, .replays {
   padding: 0.5rem 1rem;
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: var(--dark-overlay-bg);
   border-radius: 4px;
 }
 
@@ -78,7 +78,7 @@
 }
 
 .timesTable th {
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: var(--dark-overlay-bg);
 }
 
 .timeBarContainer {

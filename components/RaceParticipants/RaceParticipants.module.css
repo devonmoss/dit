@@ -33,21 +33,21 @@
 .participant {
   padding: 0.75rem;
   border-radius: 4px;
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--light-overlay-bg);
   transition: background-color 0.2s;
 }
 
 .participant:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--light-overlay-hover-bg);
 }
 
 .currentUser {
-  background-color: var(--success-bg-color);
-  border: 1px solid var(--success-color);
+  background-color: var(--accent-active-bg);
+  border: 1px solid var(--accent-color);
 }
 
 .currentUser:hover {
-  background-color: var(--success-bg-color);
+  background-color: var(--accent-active-bg);
 }
 
 .nameRow {
@@ -143,7 +143,7 @@
 .raceTime {
   font-size: 0.8rem;
   padding: 0.25rem 0.5rem;
-  background-color: rgba(0, 96, 255, 0.1);
+  background-color: var(--blue-overlay-bg);
   color: var(--text-color);
   border-radius: 12px;
 }

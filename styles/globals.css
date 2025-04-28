@@ -14,6 +14,19 @@
   --border-color: #333;
   --muted-text: #777;
   --box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+  
+  /* Semi-transparent background overlays */
+  --dark-overlay-bg: rgba(0, 0, 0, 0.2);
+  --light-overlay-bg: rgba(255, 255, 255, 0.05);
+  --light-overlay-hover-bg: rgba(255, 255, 255, 0.1);
+  
+  /* Accent color with transparency */
+  --accent-hover-bg: rgba(0, 230, 118, 0.1);
+  --accent-active-bg: rgba(0, 230, 118, 0.15);
+  --accent-glow: 0 0 8px rgba(0, 230, 118, 0.3);
+  
+  /* Other colored overlays */
+  --blue-overlay-bg: rgba(0, 96, 255, 0.1);
 }
 
 /* Catppuccin Mocha Theme */
@@ -33,6 +46,19 @@
   --border-color: #45475a; /* Surface1 */
   --muted-text: #9399b2; /* Subtext0 */
   --box-shadow: 0 2px 5px rgba(17, 17, 27, 0.5); /* Adjusted for Mocha */
+  
+  /* Semi-transparent background overlays */
+  --dark-overlay-bg: rgba(0, 0, 0, 0.2);
+  --light-overlay-bg: rgba(255, 255, 255, 0.05);
+  --light-overlay-hover-bg: rgba(255, 255, 255, 0.1);
+  
+  /* Accent color with transparency */
+  --accent-hover-bg: rgba(137, 180, 250, 0.1); /* Blue with opacity */
+  --accent-active-bg: rgba(137, 180, 250, 0.15); /* Blue with opacity */
+  --accent-glow: 0 0 8px rgba(137, 180, 250, 0.3); /* Blue with opacity */
+  
+  /* Other colored overlays */
+  --blue-overlay-bg: rgba(137, 180, 250, 0.1); /* Blue with opacity */
 }
 
 * {
