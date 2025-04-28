@@ -571,7 +571,7 @@ const TrainingMode: React.FC = () => {
       ) : (
         <div className={styles.startContainer}>
           <button onClick={startTestAndRecordTime} className={styles.startButton}>
-            Start
+            Start Listening
           </button>
         </div>
       )}

@@ -696,7 +696,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
             className={styles.startButton}
             onClick={startSendTest}
           >
-            Start Sending Practice
+            Start Sending
           </button>
           
           {sendResults && (

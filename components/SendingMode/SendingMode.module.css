@@ -25,11 +25,11 @@
   padding: 1rem 3rem;
   font-size: 1.5rem;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .startButton:hover {
-  background-color: var(--secondary-bg);
+  background-color: var(--accent-color);
 }
 
 .sendCurrentMeta {
