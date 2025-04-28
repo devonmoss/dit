@@ -106,7 +106,7 @@ const EnhancedRaceMode: React.FC = () => {
   const [raceId, setRaceId] = useState<string | null>(null);
   const [raceStage, setRaceStage] = useState<RaceStage>(RaceStage.INFO);
   const [raceText, setRaceText] = useState('');
-  const [raceMode, setRaceMode] = useState<'copy' | 'send'>('copy');
+  const [raceMode, setRaceMode] = useState<'copy' | 'send'>(state.mode === 'copy' || state.mode === 'send' ? state.mode : 'copy');
   const [participants, setParticipants] = useState<RaceParticipant[]>([]);
   // Presence state for connected participants
   /* eslint-disable @typescript-eslint/no-explicit-any */
