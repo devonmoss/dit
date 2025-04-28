@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import styles from './XpDisplay.module.css';
 
@@ -9,6 +9,43 @@ interface XpDisplayProps {
 
 const XpDisplay: React.FC<XpDisplayProps> = ({ compact = false, onClick }) => {
   const { xpInfo, loadingXp } = useAuth();
+  const [earningsAnimation, setEarningsAnimation] = useState<{amount: number, active: boolean} | null>(null);
+  const [impactAnimation, setImpactAnimation] = useState(false);
+  const prevXp = useRef<number | null>(null);
+  
+  // Check for XP changes and trigger animation
+  useEffect(() => {
+    if (!xpInfo || !prevXp.current) {
+      // Initialize reference without animation
+      prevXp.current = xpInfo?.xp || 0;
+      return;
+    }
+    
+    // Check if XP has increased
+    if (xpInfo.xp > prevXp.current) {
+      const earned = xpInfo.xp - prevXp.current;
+      
+      // Trigger the earning animation
+      setEarningsAnimation({
+        amount: earned,
+        active: true
+      });
+      
+      // Trigger impact animation with a slight delay
+      setTimeout(() => {
+        setImpactAnimation(true);
+      }, 1200);
+      
+      // Reset animations after they complete
+      setTimeout(() => {
+        setEarningsAnimation(null);
+        setImpactAnimation(false);
+      }, 2500);
+    }
+    
+    // Update reference
+    prevXp.current = xpInfo.xp;
+  }, [xpInfo]);
   
   if (loadingXp) {
     return (
@@ -48,11 +85,18 @@ const XpDisplay: React.FC<XpDisplayProps> = ({ compact = false, onClick }) => {
   
   return (
     <div 
-      className={`${styles.xpDisplay} ${compact ? styles.compact : ''} ${tierColorClass}`}
+      className={`${styles.xpDisplay} ${compact ? styles.compact : ''} ${tierColorClass} ${impactAnimation ? styles.impactAnimation : ''}`}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
     >
+      {/* XP notification animation */}
+      {earningsAnimation && earningsAnimation.active && (
+        <div className={`${styles.xpNotification} ${styles.xpAnimating}`}>
+          +{earningsAnimation.amount}
+        </div>
+      )}
+      
       <div className={styles.levelBadge}>
         {xpInfo.level}
       </div>

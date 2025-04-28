@@ -165,147 +165,30 @@
   color: var(--text-muted);
 }
 
-/* XP Section Styles */
-.xpSection {
-  background-color: var(--bg-tertiary);
-  opacity: 1;
-  transform: translateY(0);
-  transition: all 0.3s ease;
-}
-
-.animateXp {
-  animation: xpPulse 2s ease;
-}
-
-@keyframes xpPulse {
-  0% {
-    background-color: var(--bg-tertiary);
-    transform: scale(1);
-  }
-  20% {
-    background-color: rgba(var(--accent-color-rgb), 0.2);
-    transform: scale(1.05);
-  }
-  100% {
-    background-color: var(--bg-tertiary);
-    transform: scale(1);
-  }
-}
-
-.xpSection h3 {
-  margin-top: 0;
-  color: var(--text-primary);
-  font-size: 1.2rem;
-}
-
-.xpTotal {
-  font-size: 1.5rem;
-  font-weight: bold;
-  /* margin: 10px 0; */
-  text-align: center;
-  position: relative;
-}
-
-.xpValue {
-  color: var(--warning-color);
-  animation: textPulse 2s infinite;
-  cursor: pointer;
-}
-
-.xpBreakdownContainer {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 175px;
-  max-width: 300px;
-  background-color: var(--bg-tertiary);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 10;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
-  margin-top: 10px;
-  padding: 10px;
-  border: 1px solid var(--border-color);
-}
-
-.xpBreakdownContainer:before {
-  content: '';
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  height: 100%;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-bottom: 8px solid var(--bg-tertiary);
-}
-
-.xpTotal:hover .xpBreakdownContainer {
-  opacity: 1;
-  visibility: visible;
-  z-index: 1010;
-}
-
-@keyframes textPulse {
-  0% { opacity: 0.8; }
-  50% { opacity: 1; }
-  100% { opacity: 0.8; }
-}
-
-.xpBreakdown {
-  list-style: none;
-  padding: 0;
-  margin: 15px 0;
-}
-
-.xpBreakdown li {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px 0;
-  font-size: 0.9rem;
-  border-bottom: 1px solid var(--border-muted);
-}
-
-.xpBreakdown li:last-child {
-  border-bottom: none;
-}
-
-.xpSource {
-  color: var(--text-secondary);
-}
-
-.xpAmount {
-  color: var(--warning-color);
-  font-weight: bold;
-}
-
+/* Keep only the Level Up message styles and remove all XP-related styles */
 .levelUp {
-  margin-top: 15px;
-  padding: 10px;
-  background-color: rgba(var(--accent-color-rgb), 0.1);
-  border-radius: 4px;
   text-align: center;
-  animation: levelUpPulse 3s infinite;
+  margin: 20px 0;
+  padding: 15px;
+  background-color: var(--accent-color-transparent);
+  border-radius: 8px;
+  animation: levelUpPulse 2s infinite;
 }
 
 @keyframes levelUpPulse {
-  0% { box-shadow: 0 0 0 0 rgba(var(--accent-color-rgb), 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(var(--accent-color-rgb), 0); }
-  100% { box-shadow: 0 0 0 0 rgba(var(--accent-color-rgb), 0); }
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
 }
 
 .levelUp h4 {
+  margin: 0 0 10px 0;
   color: var(--accent-color);
-  margin: 0 0 5px 0;
-  font-size: 1.2rem;
+  font-size: 1.4rem;
 }
 
 .levelUp p {
   margin: 0;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  font-size: 1rem;
 }
