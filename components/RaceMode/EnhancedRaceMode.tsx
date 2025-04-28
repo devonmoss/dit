@@ -136,11 +136,16 @@ const EnhancedRaceMode: React.FC = () => {
   const anonUserIdMapRef = useRef<{[key: string]: string}>({});
   
   // For send mode with arrow keys (similar to SendingMode)
-  const [keyState, setKeyState] = useState({ ArrowLeft: false, ArrowRight: false });
   const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
   const [keyerOutput, setKeyerOutput] = useState('');
-  const [codeBuffer, setCodeBuffer] = useState('');
   const sendQueueRef = useRef<string[]>([]);
+  
+  // Helper function to get display name for a user
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const getUserDisplayName = useCallback((user: any) => {
+    if (!user) return 'Anonymous';
+    return user.user_metadata?.username || user.user_metadata?.full_name || 'Anonymous';
+  }, []);
   
   // Throttled function to update the database - only sends updates every 500ms at most
   const updateProgressInDatabase = useCallback((progress: number, userId: string) => {
@@ -326,7 +331,7 @@ const EnhancedRaceMode: React.FC = () => {
       console.error('Error joining race:', err);
       alert('Could not join race. Please try again.');
     }
-  }, [getCurrentUser]);
+  }, [getCurrentUser, getUserDisplayName]);
   
   // Initialize race ID from URL if present
   useEffect(() => {
@@ -474,9 +479,8 @@ const EnhancedRaceMode: React.FC = () => {
       if (channel) {
         channel
           .on('presence', { event: 'sync' }, () => {
-            // Non-null assertion since we've checked above that channel is not null
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const state = channel!.presenceState();
+            if (!channel) return;
+            const state = channel.presenceState();
           // state values are arrays of metadata objects
           const users = Object.values(state).map((presences: Array<AnyRecord>) => presences[0]);
           setOnlineUsers(users);
@@ -521,7 +525,7 @@ const EnhancedRaceMode: React.FC = () => {
       }
       stopAudio();
     };
-  }, [raceId, getCurrentUser, playMorseCode, stopAudio]);
+  }, [raceId, getCurrentUser, playMorseCode, stopAudio, getUserDisplayName, playMorseChar]);
   
   // Create a new race
   const createRace = useCallback(async (options?: { mode: 'copy' | 'send' }) => {
@@ -613,7 +617,7 @@ const EnhancedRaceMode: React.FC = () => {
       console.error('Error creating race:', err);
       alert('Could not create race. Please try again.');
     }
-  }, [getCurrentUser, state.chars, state.selectedLevelId, router]);
+  }, [getCurrentUser, state.chars, state.selectedLevelId, router, getUserDisplayName]);
   
   // Start the race
   const startRace = useCallback(async () => {
@@ -894,7 +898,7 @@ const EnhancedRaceMode: React.FC = () => {
         
         // Clear keyer output and code buffer
         setKeyerOutput('');
-        setCodeBuffer('');
+        // Code buffer is now handled locally
         
         // Move to next character
         const nextCharIndex = currentCharIndex + 1;
@@ -933,7 +937,7 @@ const EnhancedRaceMode: React.FC = () => {
       
       // Clear keyer output and code buffer for next attempt
       setKeyerOutput('');
-      setCodeBuffer('');
+      // Code buffer is now handled locally
       
       if (audioContext) {
         audioContext.playErrorSound().catch(err => {
@@ -977,7 +981,7 @@ const EnhancedRaceMode: React.FC = () => {
           
           // Reset local code buffer
           localCodeBuffer = '';
-          setCodeBuffer('');
+          // Code buffer is now handled locally
           setKeyerOutput('');
           
           lastTime = now;
@@ -992,7 +996,7 @@ const EnhancedRaceMode: React.FC = () => {
           
           // Reset local code buffer
           localCodeBuffer = '';
-          setCodeBuffer('');
+          // Code buffer is now handled locally
           setKeyerOutput('');
           
           lastTime = now;
@@ -1026,7 +1030,7 @@ const EnhancedRaceMode: React.FC = () => {
           // play and display symbol
           await playSendSymbol(symbol);
           setKeyerOutput(prev => prev + symbol);
-          setCodeBuffer(prev => prev + symbol);
+          // Code buffer is now handled locally
           localCodeBuffer += symbol;
           lastSymbol = symbol;
           
@@ -1081,7 +1085,7 @@ const EnhancedRaceMode: React.FC = () => {
         keyStateRef.current.ArrowLeft = true;
         
         // Update React state for UI rendering
-        setKeyState(prev => ({ ...prev, ArrowLeft: true }));
+        // No need to update UI state as we're using refs for key state
         return;
       } 
       else if (e.key === 'ArrowRight') {
@@ -1098,7 +1102,7 @@ const EnhancedRaceMode: React.FC = () => {
         keyStateRef.current.ArrowRight = true;
         
         // Update React state for UI rendering
-        setKeyState(prev => ({ ...prev, ArrowRight: true }));
+        // No need to update UI state as we're using refs for key state
         return;
       }
       
@@ -1109,7 +1113,7 @@ const EnhancedRaceMode: React.FC = () => {
         // Clear send queue and state
         sendQueueRef.current = [];
         keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
-        setKeyState({ ArrowLeft: false, ArrowRight: false });
+        // No need to update UI state as we're using refs for key state
         return;
       }
       
@@ -1240,7 +1244,7 @@ const EnhancedRaceMode: React.FC = () => {
       keyStateRef.current[e.key as 'ArrowLeft' | 'ArrowRight'] = false;
       
       // Update React state for UI rendering
-      setKeyState(prev => ({ ...prev, [e.key]: false }));
+      // No need to update UI state as we're using refs for key state
     }
   }, [raceStage, raceMode]);
 
@@ -1349,13 +1353,16 @@ const EnhancedRaceMode: React.FC = () => {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
     
+    // Capture current values to prevent closure issues
+    const userIdMap = { ...anonUserIdMapRef.current };
+    
     // Set up an interval to check for pending updates
     const intervalId = setInterval(() => {
       if (pendingUpdateRef.current) {
         // Use the mapped ID for anonymous users
         let userId = currentUser.id;
-        if (currentUser.id.startsWith('anon-') && anonUserIdMapRef.current[currentUser.id]) {
-          userId = anonUserIdMapRef.current[currentUser.id];
+        if (currentUser.id.startsWith('anon-') && userIdMap[currentUser.id]) {
+          userId = userIdMap[currentUser.id];
         }
         
         updateProgressInDatabase(latestProgressRef.current, userId);
@@ -1367,10 +1374,10 @@ const EnhancedRaceMode: React.FC = () => {
       
       // Do a final update when unmounting if we have pending changes
       if (pendingUpdateRef.current) {
-        // Use the mapped ID for anonymous users
+        // Use the mapped ID for anonymous users - using the captured map
         let userId = currentUser.id;
-        if (currentUser.id.startsWith('anon-') && anonUserIdMapRef.current[currentUser.id]) {
-          userId = anonUserIdMapRef.current[currentUser.id];
+        if (currentUser.id.startsWith('anon-') && userIdMap[currentUser.id]) {
+          userId = userIdMap[currentUser.id];
         }
         
         updateProgressInDatabase(latestProgressRef.current, userId);
@@ -1386,12 +1393,6 @@ const EnhancedRaceMode: React.FC = () => {
     return userId;
   }, []);
   
-  // Helper function to get display name for a user
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const getUserDisplayName = useCallback((user: any) => {
-    if (!user) return 'Anonymous';
-    return user.user_metadata?.username || user.user_metadata?.full_name || 'Anonymous';
-  }, []);
   /* eslint-enable @typescript-eslint/no-explicit-any */
   
   // Render appropriate stage of race

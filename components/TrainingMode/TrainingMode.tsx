@@ -49,6 +49,9 @@ const TrainingMode: React.FC = () => {
     startTime: number | null;
   } | null>(null);
   
+  // Track test start time
+  const [testStartTime, setTestStartTime] = useState<number | null>(null);
+  
   // Get current level
   const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
   const isCheckpoint = currentLevel?.type === 'checkpoint';
@@ -140,13 +143,33 @@ const TrainingMode: React.FC = () => {
       // Tab to replay, Escape to end test
       if (e.key === 'Tab') {
         e.preventDefault();
-        replayCurrent();
+        if (currentChar && audioContextInstance) {
+          setReplayCount(prev => prev + 1);
+          setWaitingForInput(false);
+          
+          audioContextInstance.playMorse(currentChar)
+            .then(() => {
+              setWaitingForInput(true);
+            });
+        }
         return;
       }
       
       if (e.key === 'Escape') {
         e.preventDefault();
-        endTest(false);
+        if (testStartTime) {
+          const endTime = Date.now();
+          const elapsedSec = (endTime - testStartTime) / 1000;
+          
+          endTest(false);
+          setTestResults({
+            completed: false,
+            elapsedTime: elapsedSec,
+            startTime: testStartTime
+          });
+        } else {
+          endTest(false);
+        }
         return;
       }
       
@@ -246,7 +269,7 @@ const TrainingMode: React.FC = () => {
       }
     },
     [waitingForInput, currentChar, questionStartTime, currentMistakes, state.charPoints, 
-     state.chars, strikeLimit, strikeCount, endTest, updateCharPoints, nextQuestion, audioContextInstance, isCheckpoint]
+     state.chars, strikeLimit, strikeCount, endTest, updateCharPoints, nextQuestion, audioContextInstance, isCheckpoint, setReplayCount, setWaitingForInput, testStartTime, setTestResults]
   );
   
   // Replay current character
@@ -320,9 +343,6 @@ const TrainingMode: React.FC = () => {
   // Calculate progress - mastered characters
   const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
   const progress = state.chars.length > 0 ? `Mastered: ${masteredCount}/${state.chars.length}` : '';
-  
-  // Track test start time
-  const [testStartTime, setTestStartTime] = useState<number | null>(null);
   
   // Start the test and record start time
   const startTestAndRecordTime = useCallback(() => {
