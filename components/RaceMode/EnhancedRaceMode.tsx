@@ -61,24 +61,25 @@ interface AnonymousUser {
 // Race mode selector component
 const RaceModeSelector: React.FC<{
   onSelectMode: (mode: 'copy' | 'send') => void;
-}> = ({ onSelectMode }) => {
+  selectedMode: 'copy' | 'send';
+}> = ({ onSelectMode, selectedMode }) => {
   return (
     <div className={styles.raceModeSelector}>
       <h3>Select Race Mode</h3>
       <div className={styles.modeButtonsContainer}>
         <button 
-          className={styles.modeButton}
+          className={`${styles.modeButton} ${selectedMode === 'copy' ? styles.selectedMode : ''}`}
           onClick={() => onSelectMode('copy')}
         >
           <h4>Copy Mode</h4>
           <p>Listen to Morse code and type the character you hear</p>
         </button>
         <button 
-          className={styles.modeButton}
+          className={`${styles.modeButton} ${selectedMode === 'send' ? styles.selectedMode : ''}`}
           onClick={() => onSelectMode('send')}
         >
           <h4>Send Mode</h4>
-          <p>See characters and type them as Morse code is played</p>
+          <p>See characters and type them as Morse code</p>
         </button>
       </div>
     </div>
@@ -1398,8 +1399,14 @@ const EnhancedRaceMode: React.FC = () => {
     <div className={styles.container}>
       {raceStage === RaceStage.INFO && (
         <>
-          <RaceModeSelector onSelectMode={(mode) => createRace({ mode })} />
-          <RaceInfo onCreateRace={() => createRace({ mode: raceMode })} />
+          <RaceModeSelector 
+            onSelectMode={(mode) => setRaceMode(mode)} 
+            selectedMode={raceMode} 
+          />
+          <RaceInfo 
+            onCreateRace={() => createRace({ mode: raceMode })} 
+            raceMode={raceMode}
+          />
         </>
       )}
       

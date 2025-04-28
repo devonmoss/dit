@@ -363,6 +363,12 @@
   background-color: rgba(0, 200, 83, 0.1);
 }
 
+.selectedMode {
+  border-color: var(--accent-color);
+  background-color: rgba(0, 200, 83, 0.15);
+  box-shadow: 0 0 8px rgba(0, 200, 83, 0.3);
+}
+
 .modeButton h4 {
   margin-top: 0;
   color: var(--accent-color);
