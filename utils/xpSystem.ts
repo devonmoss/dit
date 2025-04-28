@@ -6,7 +6,7 @@ export interface XpInfo {
   level: number;
   nextLevelXp: number;
   progress: number;
-  tier: string;
+  tier: string;  // Added to address type error
 }
 
 export interface XpTransaction {
@@ -330,40 +330,19 @@ export async function getUserXpInfo(userId: string): Promise<{
   error?: any;
 }> {
   try {
-    // Get the user's profile with XP and level
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('xp, level')
-      .eq('id', userId)
-      .single();
+    // Use our new database function that handles profile creation
+    const { data, error } = await supabase
+      .rpc('get_user_xp_info', { user_id: userId });
     
-    if (profileError) {
-      throw profileError;
-    }
-    
-    if (!profile) {
-      return {
-        success: false,
-        error: 'Profile not found'
-      };
-    }
-    
-    // Get the current level's required XP
-    const { data: currentLevel, error: currentLevelError } = await supabase
-      .from('xp_levels')
-      .select('required_xp, tier')
-      .eq('level', profile.level)
-      .single();
-    
-    if (currentLevelError) {
-      throw currentLevelError;
+    if (error) {
+      throw error;
     }
     
     // Get the next level's required XP
     const { data: nextLevels, error: nextLevelError } = await supabase
       .from('xp_levels')
       .select('required_xp')
-      .eq('level', profile.level + 1)
+      .eq('level', data.level + 1)
       .single();
     
     if (nextLevelError && nextLevelError.code !== 'PGRST116') {
@@ -371,8 +350,19 @@ export async function getUserXpInfo(userId: string): Promise<{
       throw nextLevelError;
     }
     
+    // Get the current level's required XP
+    const { data: currentLevel, error: currentLevelError } = await supabase
+      .from('xp_levels')
+      .select('required_xp')
+      .eq('level', data.level)
+      .single();
+    
+    if (currentLevelError) {
+      throw currentLevelError;
+    }
+    
     // Calculate progress percentage to next level
-    const currentXp = profile.xp;
+    const currentXp = data.xp;
     const currentLevelXp = currentLevel.required_xp;
     const nextLevelXp = nextLevels?.required_xp || Infinity;
     const xpForNextLevel = nextLevelXp - currentLevelXp;
@@ -385,10 +375,10 @@ export async function getUserXpInfo(userId: string): Promise<{
     return {
       success: true,
       xp: currentXp,
-      level: profile.level,
+      level: data.level,
       nextLevelXp,
       progress: progressPercentage,
-      tier: currentLevel.tier || 'Unknown' // Use tier if available, fallback to 'Unknown'
+      tier: data.title || 'Beginner'  // Use title from the function result
     };
   } catch (error) {
     console.error('Error getting user XP info:', error);

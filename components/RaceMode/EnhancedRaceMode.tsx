@@ -144,9 +144,18 @@ const EnhancedRaceMode: React.FC = () => {
   const [keyerOutput, setKeyerOutput] = useState('');
   const sendQueueRef = useRef<string[]>([]);
   
+  // Define a proper type for user to avoid type errors
+  type User = {
+    id: string;
+    user_metadata?: {
+      username?: string;
+      full_name?: string;
+    };
+  };
+  
   // Helper function to get display name for a user
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  const getUserDisplayName = useCallback((user: any) => {
+  const getUserDisplayName = useCallback((user: User | any) => {
     if (!user) return 'Anonymous';
     return user.user_metadata?.username || user.user_metadata?.full_name || 'Anonymous';
   }, []);
@@ -485,18 +494,32 @@ const EnhancedRaceMode: React.FC = () => {
           .on('presence', { event: 'sync' }, () => {
             if (!channel) return;
             const state = channel.presenceState();
-          // state values are arrays of metadata objects
-          const users = Object.values(state).map((presences: Array<AnyRecord>) => presences[0]);
-          setOnlineUsers(users);
-        })
-        .on('presence', { event: 'join' }, ({ newPresences }: { newPresences: Array<AnyRecord> }) => {
-          // newPresences is an array of metadata objects
-          setOnlineUsers(prev => [...prev, ...newPresences]);
-        })
-        .on('presence', { event: 'leave' }, ({ leftPresences }: { leftPresences: Array<AnyRecord> }) => {
-          // leftPresences is an array of metadata objects
-          setOnlineUsers(prev => prev.filter(u => !leftPresences.some((l: AnyRecord) => l.user_id === u.user_id)));
-        });
+            
+            // state values are arrays of metadata objects
+            // Safely type and process the presence state
+            type PresenceState = Record<string, any[]>;
+            const typedState = state as PresenceState;
+            
+            const users: AnyRecord[] = [];
+            
+            // Loop through the state keys and values to extract users
+            Object.keys(typedState).forEach(key => {
+              const presences = typedState[key];
+              if (Array.isArray(presences) && presences.length > 0) {
+                users.push(presences[0]);
+              }
+            });
+            
+            setOnlineUsers(users);
+          })
+          .on('presence', { event: 'join' }, ({ newPresences }: { newPresences: Array<AnyRecord> }) => {
+            // newPresences is an array of metadata objects
+            setOnlineUsers((prev: AnyRecord[]) => [...prev, ...newPresences]);
+          })
+          .on('presence', { event: 'leave' }, ({ leftPresences }: { leftPresences: Array<AnyRecord> }) => {
+            // leftPresences is an array of metadata objects
+            setOnlineUsers((prev: AnyRecord[]) => prev.filter(u => !leftPresences.some((l: AnyRecord) => l.user_id === u.user_id)));
+          });
       }
 
       // Subscribe to presence and then announce ourselves once joined
