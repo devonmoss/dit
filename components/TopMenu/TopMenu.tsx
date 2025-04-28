@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAppState } from '../../contexts/AppStateContext';
 import { trainingLevels } from '../../utils/levels';
 import ProgressDashboard from '../ProgressDashboard/ProgressDashboard';
-import XpDisplay from '../XpDisplay/XpDisplay';
 import styles from './TopMenu.module.css';
 import { useRouter } from 'next/router';
 import useAuth from '../../hooks/useAuth';
@@ -154,7 +153,7 @@ const TopMenu: React.FC = () => {
           </button>
         </div>
         
-        {/* Right section - Levels, XP and Settings */}
+        {/* Right section - Levels and Settings */}
         <div className={styles.menuSection}>
           {/* Level selector */}
           <div className={styles.levelSelector}>
@@ -179,19 +178,6 @@ const TopMenu: React.FC = () => {
               </ul>
             )}
           </div>
-          
-          {/* XP Display (only shown when logged in) */}
-          {user && (
-            <div className={styles.xpDisplayWrapper}>
-              <XpDisplay 
-                compact={true} 
-                onClick={() => {
-                  setShowSettings(false);
-                  setShowProgress(true);
-                }}
-              />
-            </div>
-          )}
           
           {/* Settings gear icon */}
           <button 
