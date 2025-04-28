@@ -943,13 +943,14 @@ const EnhancedRaceMode: React.FC = () => {
   }, [raceStage, getCurrentUser, decodeMorseCode, raceText, currentCharIndex, userInput, raceId, 
       channelRef, anonUserIdMapRef, updateProgressInDatabase, finishRace, stopAudio, audioContext]);
 
-  // Key processing interval for send mode
+  // Key processing interval for send mode - properly implementing iambic keyer behavior
   useEffect(() => {
     if (raceStage !== RaceStage.RACING || raceMode !== 'send') return;
     
     let lastTime = Date.now();
     let timeoutId: NodeJS.Timeout | null = null;
     let active = true;
+    let lastSymbol: string | null = null;
     
     // Track the local code buffer for closure
     let localCodeBuffer = '';
@@ -968,6 +969,21 @@ const EnhancedRaceMode: React.FC = () => {
         const gap = now - lastTime;
         const sendUnit = 1200 / state.sendWpm;
         
+        // Word gap detection: >=7 units and we have code to process
+        if (gap >= sendUnit * 7 && localCodeBuffer) {
+          // Process the code
+          handleMorseComplete(localCodeBuffer);
+          
+          // Reset local code buffer
+          localCodeBuffer = '';
+          setCodeBuffer('');
+          setKeyerOutput('');
+          
+          lastTime = now;
+          await wait(10);
+          continue;
+        }
+        
         // Letter gap detection: >=3 units and we have code to process
         if (gap >= sendUnit * 3 && localCodeBuffer) {
           // Process the code
@@ -981,28 +997,42 @@ const EnhancedRaceMode: React.FC = () => {
           lastTime = now;
         }
         
-        // Process any queued symbols from arrow key presses
+        // determine next symbol - exactly like the original SendingMode component
         let symbol: string | undefined;
         
-        // Check the queue first (dots/dashes from arrow keys)
+        // Exactly match original implementation using shift() to remove and return the first element
         if (sendQueueRef.current.length > 0) {
           symbol = sendQueueRef.current.shift();
+        } else {
+          // Use the ref for immediate access to current key state
+          const left = keyStateRef.current.ArrowLeft;
+          const right = keyStateRef.current.ArrowRight;
           
-          if (symbol) {
-            // Play the symbol sound
-            await playSendSymbol(symbol);
-            
-            // Update the display
-            setKeyerOutput(prev => prev + symbol);
-            setCodeBuffer(prev => prev + symbol);
-            localCodeBuffer += symbol;
-            
-            // Update last time
-            lastTime = Date.now();
+          if (!left && !right) {
+            await wait(10);
+            continue;
+          } else if (left && right) {
+            // Iambic keying - alternate between dot and dash exactly like the original
+            symbol = lastSymbol === "." ? "-" : ".";
+          } else if (left) {
+            symbol = ".";
+          } else {
+            symbol = "-";
           }
         }
         
-        await wait(10);
+        if (symbol) {
+          // play and display symbol
+          await playSendSymbol(symbol);
+          setKeyerOutput(prev => prev + symbol);
+          setCodeBuffer(prev => prev + symbol);
+          localCodeBuffer += symbol;
+          lastSymbol = symbol;
+          
+          // inter-element gap
+          await wait(sendUnit);
+          lastTime = Date.now();
+        }
       }
     };
     
@@ -1038,9 +1068,11 @@ const EnhancedRaceMode: React.FC = () => {
       // Handle paddle key presses for send mode
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
+        console.log(`ArrowLeft DOWN (ref state: ${JSON.stringify(keyStateRef.current)})`);
         
         // Only queue a dot if key wasn't already pressed
         if (!keyStateRef.current.ArrowLeft) {
+          console.log('Queueing a DOT');
           sendQueueRef.current.push('.');
         }
         
@@ -1053,9 +1085,11 @@ const EnhancedRaceMode: React.FC = () => {
       } 
       else if (e.key === 'ArrowRight') {
         e.preventDefault();
+        console.log(`ArrowRight DOWN (ref state: ${JSON.stringify(keyStateRef.current)})`);
         
         // Only queue a dash if key wasn't already pressed
         if (!keyStateRef.current.ArrowRight) {
+          console.log('Queueing a DASH');
           sendQueueRef.current.push('-');
         }
         
@@ -1199,6 +1233,7 @@ const EnhancedRaceMode: React.FC = () => {
     
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault();
+      console.log(`${e.key} UP (ref state: ${JSON.stringify(keyStateRef.current)})`);
       
       // Update ref state immediately
       keyStateRef.current[e.key as 'ArrowLeft' | 'ArrowRight'] = false;
