@@ -570,6 +570,9 @@ const TrainingMode: React.FC = () => {
         </>
       ) : (
         <div className={styles.startContainer}>
+          <div className={styles.modeDescription}>
+            Listen to morse code characters and identify them by typing on your keyboard.
+          </div>
           <button onClick={startTestAndRecordTime} className={styles.startButton}>
             Start Listening
           </button>
