@@ -20,7 +20,8 @@ const TopMenu: React.FC = () => {
     setWpm, 
     setVolume, 
     setSendWpm,
-    setTheme
+    setTheme,
+    endTest
   } = useAppState();
   
   const router = useRouter();
@@ -56,6 +57,11 @@ const TopMenu: React.FC = () => {
   };
   
   const handleLevelClick = (id: string) => {
+    // End test if active - this will reset to the start screen
+    if (state.testActive) {
+      endTest(false);
+    }
+    
     selectLevel(id);
     setShowLevels(false);
   };
