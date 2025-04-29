@@ -389,16 +389,17 @@ const TrainingMode: React.FC = () => {
     }
   }, [state.testActive, handleKeydown, finishTest]);
   
-  const [isClient, setIsClient] = useState(false);
-  const [isDevelopment, setIsDevelopment] = useState(false);
+  // Use refs instead of state for client/dev detection to avoid hydration mismatches
+  const isClientRef = useRef(false);
+  const isDevelopmentRef = useRef(false);
   
   // Only render debug elements on client-side and in development environment
   useEffect(() => {
-    setIsClient(true);
+    isClientRef.current = true;
     
     // Check if we're in a development environment (localhost or 127.0.0.1)
     if (isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      setIsDevelopment(true);
+      isDevelopmentRef.current = true;
     }
   }, []);
   
@@ -433,7 +434,7 @@ const TrainingMode: React.FC = () => {
   
   // Add our check function to the debug panel only in development
   useEffect(() => {
-    if (isClient && isDevelopment) {
+    if (isClientRef.current && isDevelopmentRef.current && typeof window !== 'undefined') {
       // Add a global function to check level chars
       /* eslint-disable @typescript-eslint/no-explicit-any */
       (window as any).checkLevelChars = checkLevelChars;
@@ -444,12 +445,12 @@ const TrainingMode: React.FC = () => {
         /* eslint-enable @typescript-eslint/no-explicit-any */
       };
     }
-  }, [isClient, isDevelopment, checkLevelChars]);
+  }, [checkLevelChars]);
   
   return (
     <div className={styles.trainingContainer}>
       {/* Debug state information - only visible on client in development */}
-      {isClient && isDevelopment && (
+      {false && (
         <div style={{ 
           position: 'fixed', 
           bottom: '10px', 
@@ -572,7 +573,7 @@ const TrainingMode: React.FC = () => {
             Listen to morse code characters and identify them by typing on your keyboard.
           </div>
           <button onClick={startTestAndRecordTime} className="shared-start-button">
-            Start {currentLevel ? currentLevel.name.split(':')[0] : 'Test'}
+            Start Test
           </button>
         </div>
       )}
