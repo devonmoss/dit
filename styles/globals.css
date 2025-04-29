@@ -15,6 +15,7 @@
   --border-color: #333;
   --muted-text: #777;
   --box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+  --menu-bg: var(--primary-bg)
   
   /* Level tier colors */
   --tier-novice-bg: #6c757d;
@@ -70,6 +71,7 @@
   --border-color: #45475a; /* Surface1 */
   --muted-text: #9399b2; /* Subtext0 */
   --box-shadow: 0 2px 5px rgba(17, 17, 27, 0.5); /* Adjusted for Mocha */
+  --menu-bg: #181825; /* Mantle */
 
   /* Level tier colors (Catppuccin palette) */
   --tier-novice-bg: #9399b2; /* Subtext0 (gray) */
