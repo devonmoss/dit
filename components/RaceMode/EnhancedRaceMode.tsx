@@ -119,8 +119,11 @@ const EnhancedRaceMode: React.FC = () => {
   const [countdownSeconds, setCountdownSeconds] = useState(5);
   const [userInput, setUserInput] = useState('');
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [xpEarned, setXpEarned] = useState<{ total: number, breakdown: Record<string, number> } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showXpAnimation, setShowXpAnimation] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [leveledUp, setLeveledUp] = useState(false);
   
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);

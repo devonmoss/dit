@@ -51,6 +51,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   /* eslint-enable @typescript-eslint/no-unused-vars */
   const resultsSaved = useRef(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [earnedXp, setEarnedXp] = useState<{ total: number, breakdown: Record<string, number> } | null>(null);
   const [levelUpEarned, setLevelUpEarned] = useState(false);
   
