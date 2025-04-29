@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './TrainingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
 import { createAudioContext, morseMap, isBrowser } from '../../utils/morse';
@@ -393,6 +393,8 @@ const TrainingMode: React.FC = () => {
   const isClientRef = useRef(false);
   const isDevelopmentRef = useRef(false);
   
+  // Using useRef for client detection to avoid hydration mismatches
+  
   // Only render debug elements on client-side and in development environment
   useEffect(() => {
     isClientRef.current = true;
@@ -573,7 +575,10 @@ const TrainingMode: React.FC = () => {
             Listen to morse code characters and identify them by typing on your keyboard.
           </div>
           <button onClick={startTestAndRecordTime} className="shared-start-button">
-            Start Test
+            Start
+            {isBrowser && currentLevel && (
+              <span className={styles.levelName}> {currentLevel.name.split(':')[0]}</span>
+            )}
           </button>
         </div>
       )}
