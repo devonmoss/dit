@@ -15,7 +15,6 @@
   --border-color: #333;
   --muted-text: #777;
   --box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-  --menu-bg: var(--primary-bg)
   
   /* Level tier colors */
   --tier-novice-bg: #6c757d;
@@ -51,6 +50,13 @@
   
   /* Other colored overlays */
   --blue-overlay-bg: rgba(0, 96, 255, 0.1);
+
+  /* Logo colors */
+  --logo-color: var(--accent-color);
+  --logo-emblem-color: var(--logo-color);
+  --logo-text-color: var(--logo-color);
+  --logo-c-color: var(--logo-color);
+  --logo-w-color: var(--logo-color);
 }
 
 /* Catppuccin Mocha Theme */
@@ -107,6 +113,13 @@
   
   /* Other colored overlays */
   --blue-overlay-bg: rgba(137, 180, 250, 0.1); /* Blue with opacity */
+
+  /* Logo colors */
+  --logo-color: var(--accent-color);
+  --logo-emblem-color: #cba6f7;
+  --logo-text-color: var(--logo-color);
+  --logo-c-color: #fab387;
+  --logo-w-color: #fab387;
 }
 
 * {

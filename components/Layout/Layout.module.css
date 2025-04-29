@@ -57,11 +57,19 @@
 }
 
 .logoName {
-  color: var(--accent-color, #00ff00);
+  color: var(--logo-text-color);
 }
 
 .accentColoredLogo {
-  color: var(--accent-color, #00ff00);
+  color: var(--logo-emblem-color);
+}
+
+.accentLetterC {
+  color: var(--logo-c-color);
+}
+
+.accentLetterW {
+  color: var(--logo-w-color);
 }
 
 .accentColoredLogo img {
