@@ -3,18 +3,6 @@ import { type AnalyticsProps } from '@vercel/analytics/react';
 // Re-export Vercel Analytics track function type for convenience
 export type TrackEventProps = NonNullable<AnalyticsProps['beforeSend']>;
 
-// Define the window.va global interface
-declare global {
-  interface Window {
-    va?: {
-      track: (
-        eventName: string, 
-        properties?: Record<string, string | number | boolean | null>
-      ) => void;
-    };
-  }
-}
-
 // Create custom event categories
 export enum EventCategory {
   Training = 'training',
@@ -28,19 +16,19 @@ export enum EventCategory {
 export function trackEvent(
   eventName: string,
   category: EventCategory,
-  properties?: Record<string, string | number | boolean | null>
+  properties?: Record<string, any>
 ) {
   // Only run on client-side
   if (typeof window === 'undefined') return;
 
-  // Vercel analytics injects this into window
+  // @ts-ignore - Vercel analytics injects this into window
   if (typeof window.va?.track !== 'function') {
     console.warn('Vercel Analytics not available');
     return;
   }
 
   try {
-    // Use the injected va.track function
+    // @ts-ignore - Use the injected va.track function
     window.va.track(eventName, {
       category,
       ...properties,
