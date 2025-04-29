@@ -273,6 +273,7 @@ const TrainingMode: React.FC = () => {
   );
   
   // Replay current character
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const replayCurrent = useCallback(() => {
     if (!currentChar || !audioContextInstance) return;
     

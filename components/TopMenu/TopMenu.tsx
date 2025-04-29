@@ -25,6 +25,7 @@ const TopMenu: React.FC = () => {
   } = useAppState();
   
   const router = useRouter();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { user } = useAuth();
   
   const [showLevels, setShowLevels] = useState(false);
@@ -37,6 +38,7 @@ const TopMenu: React.FC = () => {
     setMounted(true);
   }, []);
   
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleModeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setMode(event.target.value as 'copy' | 'send');
   };
