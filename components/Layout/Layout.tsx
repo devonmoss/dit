@@ -30,7 +30,7 @@ const Layout: React.FC<LayoutProps> = ({
 
       <main className={styles.main}>
         {isClient && (
-          <div className={styles.logoContainer}>
+          <div className={styles.headerContainer}>
             <div className={styles.logoWrapper}>
               {/* CW Emblem */}
               <svg 
@@ -91,9 +91,10 @@ const Layout: React.FC<LayoutProps> = ({
                 <path fill="currentColor" d="M 1346.49 170.676 C 1338.18 160.06 1341.56 146.791 1353.22 143.02 C 1360.41 140.695 1367.91 143.451 1371.89 149.878 C 1375.8 156.184 1374.98 164.946 1370 170.308 C 1365.05 175.621 1356.57 176.945 1350.18 173.338 C 1348.97 172.652 1347.89 171.725 1346.49 170.676 Z" />
               </svg>
             </div>
+            <AuthPanel />
           </div>
         )}
-        <AuthPanel />
+        <TopMenu />
         <TopMenu />
         <div className={styles.content}>
           {children}
