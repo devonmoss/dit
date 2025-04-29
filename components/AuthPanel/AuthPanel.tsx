@@ -62,17 +62,16 @@ const AuthPanel: React.FC = () => {
   
   return (
     <div className={styles.authWrapper}>
-      {/* XP Display (only shown when logged in) */}
+      {/* Toggle button to show/hide auth panel */}
+      <a className={`${styles.authToggle} ${user ? styles.loggedIn : ''}`} onClick={handleToggleForm}>
+        {user ? `${user.user_metadata?.username || 'User'}` : 'Login / Sign Up'}
+      </a>
+      {/* XP Display (only shown when logged in), moved to right of username */}
       {user && (
         <div className={styles.xpDisplayWrapper}>
           <XpDisplay compact={true} transparent={true} onClick={() => setIsFormVisible(true)} />
         </div>
       )}
-      
-      {/* Toggle button to show/hide auth panel */}
-      <a className={`${styles.authToggle} ${user ? styles.loggedIn : ''}`} onClick={handleToggleForm}>
-        {user ? `${user.user_metadata?.username || 'User'}` : 'Login / Sign Up'}
-      </a>
       
       {/* User info and logout button */}
       {user && isFormVisible && (
