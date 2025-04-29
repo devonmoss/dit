@@ -3,8 +3,17 @@ import { type AnalyticsProps } from '@vercel/analytics/react';
 // Re-export Vercel Analytics track function type for convenience
 export type TrackEventProps = NonNullable<AnalyticsProps['beforeSend']>;
 
-// Don't modify the global Window interface
-// Vercel's analytics package already extends it
+// Define the window.va global interface
+declare global {
+  interface Window {
+    va?: {
+      track: (
+        eventName: string, 
+        properties?: Record<string, string | number | boolean | null>
+      ) => void;
+    };
+  }
+}
 
 // Create custom event categories
 export enum EventCategory {
@@ -15,34 +24,24 @@ export enum EventCategory {
   Error = 'error',
 }
 
-// Define a type for valid analytics property values
-type AnalyticsPropertyValue = 
-  | string 
-  | number 
-  | boolean 
-  | null 
-  | Array<string | number | boolean | null>
-  | Record<string, string | number | boolean | null>;
-
 // Helper function to track events with structured data
 export function trackEvent(
   eventName: string,
   category: EventCategory,
-  properties?: Record<string, AnalyticsPropertyValue>
+  properties?: Record<string, string | number | boolean | null>
 ) {
   // Only run on client-side
   if (typeof window === 'undefined') return;
 
-  // Check if Vercel analytics is available
-  const va = (window as any).va;
-  if (typeof va?.track !== 'function') {
+  // Vercel analytics injects this into window
+  if (typeof window.va?.track !== 'function') {
     console.warn('Vercel Analytics not available');
     return;
   }
 
   try {
-    // Use the va.track function
-    va.track(eventName, {
+    // Use the injected va.track function
+    window.va.track(eventName, {
       category,
       ...properties,
     });
@@ -65,10 +64,7 @@ export const TrainingEvents = {
     }),
   
   levelFailed: (levelId: string, reason?: string) => 
-    trackEvent('level_failed', EventCategory.Training, { 
-      levelId, 
-      reason: reason || null 
-    }),
+    trackEvent('level_failed', EventCategory.Training, { levelId, reason }),
 };
 
 export const RaceEvents = {
@@ -100,7 +96,7 @@ export const UserEvents = {
     trackEvent('logout', EventCategory.User),
   
   profileUpdate: (fields: string[]) => 
-    trackEvent('profile_update', EventCategory.User, { fields: fields || [] }),
+    trackEvent('profile_update', EventCategory.User, { fields }),
   
   earnedXP: (amount: number, source: string) => 
     trackEvent('earned_xp', EventCategory.User, { amount, source }),

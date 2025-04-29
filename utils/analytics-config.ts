@@ -1,7 +1,7 @@
-import type { AnalyticsProps } from '@vercel/analytics/react';
+import type { VercelAnalyticsConfig } from '@vercel/analytics/react';
 
 // Configure analytics defaults
-export const analyticsConfig: AnalyticsProps = {
+export const analyticsConfig: VercelAnalyticsConfig = {
   // Controls whether to collect and send page views automatically
   // You can still track page views manually using Analytics.Navigation.pageView()
   debug: process.env.NODE_ENV === 'development',
