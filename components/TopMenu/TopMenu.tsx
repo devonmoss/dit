@@ -231,13 +231,13 @@ const TopMenu: React.FC = () => {
                     className={`${styles.themeButton} ${state.theme === 'default' ? styles.activeTheme : ''}`}
                     onClick={() => handleThemeChange('default')}
                   >
-                    Default
+                    default
                   </button>
                   <button 
                     className={`${styles.themeButton} ${state.theme === 'catppuccin-mocha' ? styles.activeTheme : ''}`}
                     onClick={() => handleThemeChange('catppuccin-mocha')}
                   >
-                    Catppuccin Mocha
+                    catppuccin 
                   </button>
                 </div>
               </li>
