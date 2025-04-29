@@ -696,10 +696,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
             Use left and right arrow keys to mimic an iambic paddle and send morse code characters.
           </div>
           <button 
-            className={styles.startButton}
+            className="shared-start-button"
             onClick={startSendTest}
           >
-            Start Sending
+            Start {currentLevel ? currentLevel.name.split(':')[0] : 'Test'}
           </button>
           
           {sendResults && (

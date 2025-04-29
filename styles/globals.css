@@ -225,6 +225,22 @@ progress::-moz-progress-bar {
   background-color: var(--secondary-bg);
 }
 
+/* Shared styling for start buttons across components */
+.shared-start-button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 1rem 3rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shared-start-button:hover {
+  background-color: var(--accent-color);
+}
+
 #send-current-char {
   font-size: 64px;
   font-weight: bold;

@@ -25,21 +25,6 @@
   line-height: 1.5;
 }
 
-.startButton {
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: var(--border-radius);
-  padding: 1rem 3rem;
-  font-size: 1.5rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.startButton:hover {
-  background-color: var(--accent-color);
-}
-
 .progressInfo {
   font-size: 1.2rem;
   margin-bottom: 1rem;
@@ -79,6 +64,30 @@
 
 .button:hover {
   background-color: #e0e0e0;
+}
+
+.hintButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--primary-bg);
+  color: #666;
+  border: 2px solid #666;
+  font-size: 1.3rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.hintButton:hover {
+  background-color: #666;
+  color: var(--primary-bg);
+  transform: scale(1.05);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
 }
 
 .hint {
