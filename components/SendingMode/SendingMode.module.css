@@ -25,20 +25,7 @@
   line-height: 1.5;
 }
 
-.startButton {
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: var(--border-radius);
-  padding: 1rem 3rem;
-  font-size: 1.5rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.startButton:hover {
-  background-color: var(--accent-color);
-}
+/* startButton styles removed in favor of shared-start-button in globals.css */
 
 .sendCurrentMeta {
   text-align: center;

@@ -554,18 +554,15 @@ const TrainingMode: React.FC = () => {
           </div>
           
           <div className={styles.controls}>
-            <button onClick={replayCurrent} className={styles.button}>
-              Replay
-            </button>
-            <button onClick={showHint} className={styles.button}>
-              Hint
+            <button onClick={showHint} className={styles.hintButton}>
+              ?
             </button>
           </div>
           
           {hintText && <div className={styles.hint}>{hintText}</div>}
           
           <div className={styles.actionHints}>
-            Tab: Replay, Esc: End Test
+            Tab: Replay Sound, Esc: End Test
           </div>
         </>
       ) : (
@@ -573,8 +570,8 @@ const TrainingMode: React.FC = () => {
           <div className={styles.modeDescription}>
             Listen to morse code characters and identify them by typing on your keyboard.
           </div>
-          <button onClick={startTestAndRecordTime} className={styles.startButton}>
-            Start Listening
+          <button onClick={startTestAndRecordTime} className="shared-start-button">
+            Start {currentLevel ? currentLevel.name.split(':')[0] : 'Test'}
           </button>
         </div>
       )}
