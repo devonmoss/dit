@@ -11,13 +11,13 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ 
   children, 
-  title = 'Continuous Wave' 
+  title = 'Morse Code Trainer' 
 }) => {
   return (
     <div className={styles.container}>
       <Head>
         <title>{title}</title>
-        <meta name="description" content="The best way to learn Morse code" />
+        <meta name="description" content="Learn Morse code effectively with interactive exercises" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>

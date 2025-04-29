@@ -609,7 +609,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       sendQueueRef.current = [];
       keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
     }
-  }, [state.selectedLevelId, sendingActive]);
+  }, [state.selectedLevelId]);
   
   // Monitor global testActive state
   useEffect(() => {
