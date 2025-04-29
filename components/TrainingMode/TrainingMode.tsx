@@ -21,11 +21,13 @@ interface LevelWithStrikeLimit {
 const TrainingMode: React.FC = () => {
   const { state, startTest, endTest, updateCharPoints, selectLevel, startTestWithLevelId } = useAppState();
   const [audioContextInstance, setAudioContextInstance] = useState<ReturnType<typeof createAudioContext> | null>(null);
+  const [isClient, setIsClient] = useState(false);
   
   // Initialize audio context in useEffect
   useEffect(() => {
     if (isBrowser) {
       setAudioContextInstance(createAudioContext());
+      setIsClient(true);
     }
   }, []);
   
@@ -576,7 +578,7 @@ const TrainingMode: React.FC = () => {
           </div>
           <button onClick={startTestAndRecordTime} className="shared-start-button">
             Start
-            {isBrowser && currentLevel && (
+            {isClient && currentLevel && (
               <span className={styles.levelName}> {currentLevel.name.split(':')[0]}</span>
             )}
           </button>
