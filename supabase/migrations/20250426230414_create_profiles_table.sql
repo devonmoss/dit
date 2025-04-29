@@ -36,7 +36,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Set up a trigger on user creation
-CREATE TRIGGER on_auth_user_created
+CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
@@ -50,6 +50,6 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Set up a trigger for automatic updated_at
-CREATE TRIGGER update_profiles_modtime
+CREATE OR REPLACE TRIGGER update_profiles_modtime
   BEFORE UPDATE ON profiles
   FOR EACH ROW EXECUTE FUNCTION update_modified_column(); 
