@@ -11,7 +11,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({
   children,
-  title = 'Continuous Wave'
+  title = 'Continuous Wave | Learn Morse Code and prove it to your nerd friends'
 }) => {
   const [isClient, setIsClient] = useState(false);
   

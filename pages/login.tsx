@@ -103,7 +103,7 @@ const LoginPage: React.FC = () => {
   return (
     <>
       <Head>
-        <title>{isSignUp ? 'Sign Up' : 'Log In'} | Morse Trainer</title>
+        <title>{isSignUp ? 'Sign Up' : 'Log In'} | Continuous Wave</title>
       </Head>
       
       <div className={styles.container}>

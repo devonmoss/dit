@@ -22,7 +22,7 @@ export default function RacePage() {
   }, []);
   
   return (
-    <Layout title="Morse Code Race">
+    <Layout title="Continuous Wave | Challenge your nerd friends">
       <RaceMode />
     </Layout>
   );
