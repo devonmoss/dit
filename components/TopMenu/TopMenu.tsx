@@ -25,7 +25,7 @@ const TopMenu: React.FC = () => {
   } = useAppState();
   
   const router = useRouter();
-  const { } = useAuth();
+  const { user } = useAuth();
   
   const [showLevels, setShowLevels] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -37,9 +37,9 @@ const TopMenu: React.FC = () => {
     setMounted(true);
   }, []);
   
-  // const handleModeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-  //   setMode(event.target.value as 'copy' | 'send');
-  // };
+  const handleModeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setMode(event.target.value as 'copy' | 'send');
+  };
   
   const handleTestTypeClick = (testType: TestType) => {
     setTestType(testType);
