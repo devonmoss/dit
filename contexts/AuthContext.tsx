@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import supabase from '../utils/supabase';
+import { UserEvents, ErrorEvents } from '../utils/analytics';
 
 // XP information type
 interface XpInfo {
@@ -150,9 +151,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signIn = async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (!error) {
+        // Track successful login
+        UserEvents.login('email');
+      } else {
+        // Track login error
+        ErrorEvents.supabBaseError('login', error.message);
+      }
+      
       return { error };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing in:', error);
+      ErrorEvents.supabBaseError('login', error?.message || 'Unknown error');
       return { error };
     }
   };
@@ -169,6 +180,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (lookupError && lookupError.code !== 'PGRST116') {
         // An error occurred (not the "no rows returned" error)
+        ErrorEvents.supabBaseError('signUp-usernameCheck', lookupError.message);
         return { error: lookupError, user: null };
       }
       
@@ -202,13 +214,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           
         if (profileError) {
           console.error('Error creating profile:', profileError);
+          ErrorEvents.supabBaseError('signUp-createProfile', profileError.message);
           return { error: profileError, user: data.user };
         }
+        
+        // Track successful signup
+        UserEvents.signup('email');
+      } else if (error) {
+        ErrorEvents.supabBaseError('signUp', error.message);
       }
       
       return { error, user: data.user };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing up:', error);
+      ErrorEvents.supabBaseError('signUp', error?.message || 'Unknown error');
       return { error, user: null };
     }
   };
@@ -263,9 +282,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Sign out
   const signOut = async () => {
     try {
+      // Track logout before actual sign-out
+      UserEvents.logout();
       await supabase.auth.signOut();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing out:', error);
+      ErrorEvents.supabBaseError('signOut', error?.message || 'Unknown error');
     }
   };
 
@@ -278,8 +300,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
         },
       });
-    } catch (error) {
+      // Track GitHub sign in attempt
+      // The actual successful login will be tracked in the onAuthStateChange handler
+      UserEvents.login('github');
+    } catch (error: any) {
       console.error('Error signing in with GitHub:', error);
+      ErrorEvents.supabBaseError('signInWithGithub', error?.message || 'Unknown error');
     }
   };
 
@@ -295,18 +321,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { success, xp, level, nextLevelXp, progress, tier, error } = await getUserXpInfo(user.id);
       
       if (success && xp !== undefined) {
-        setXpInfo({
+        const newXpInfo = {
           xp,
           level: level || 1,
           nextLevelXp: nextLevelXp || 100,
           progress: progress || 0,
           tier: tier || 'Novice'
-        });
+        };
+        
+        // Check if user leveled up by comparing with previous level
+        if (xpInfo && newXpInfo.level > xpInfo.level) {
+          // Track level up event
+          UserEvents.levelUp(newXpInfo.level);
+        }
+        
+        setXpInfo(newXpInfo);
       } else if (error) {
         console.error('Error fetching XP info:', error);
+        ErrorEvents.supabBaseError('getUserXpInfo', error);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in refreshXpInfo:', error);
+      ErrorEvents.supabBaseError('refreshXpInfo', error?.message || 'Unknown error');
     } finally {
       setLoadingXp(false);
     }

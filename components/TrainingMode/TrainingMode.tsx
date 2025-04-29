@@ -5,6 +5,7 @@ import { createAudioContext, morseMap, isBrowser } from '../../utils/morse';
 import { trainingLevels } from '../../utils/levels';
 import MasteryDisplay from '../MasteryDisplay/MasteryDisplay';
 import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
+import { TrainingEvents, ErrorEvents } from '../../utils/analytics';
 
 // Constants
 const TARGET_POINTS = 3;
@@ -76,12 +77,30 @@ const TrainingMode: React.FC = () => {
     const endTime = Date.now();
     const elapsedSec = testStartTime ? (endTime - testStartTime) / 1000 : 0;
     
+    // Calculate total mistakes
+    const totalMistakes = Object.values(mistakesMap).reduce((sum, count) => sum + count, 0);
+    
+    // Track level completion/failure
+    if (completed) {
+      TrainingEvents.levelCompleted(
+        state.selectedLevelId, 
+        state.mode, 
+        elapsedSec, 
+        totalMistakes
+      );
+    } else {
+      TrainingEvents.levelFailed(
+        state.selectedLevelId, 
+        strikeCount >= (strikeLimit || 0) ? 'strikes_exceeded' : 'user_cancelled'
+      );
+    }
+    
     setTestResults({
       completed,
       elapsedTime: elapsedSec,
       startTime: testStartTime
     });
-  }, [endTest, testStartTime]);
+  }, [endTest, testStartTime, state.selectedLevelId, state.mode, mistakesMap, strikeCount, strikeLimit]);
   
   // Ensure level characters are correctly loaded on mount
   useEffect(() => {
@@ -174,6 +193,9 @@ const TrainingMode: React.FC = () => {
     setMistakesMap({});
     setTestResults(null);
     
+    // Track level started
+    TrainingEvents.levelStarted(state.selectedLevelId, state.mode);
+    
     // Start the test
     startTest();
     
@@ -181,7 +203,7 @@ const TrainingMode: React.FC = () => {
     setTimeout(() => {
       nextQuestion();
     }, 100);
-  }, [startTest, nextQuestion]);
+  }, [startTest, nextQuestion, state.selectedLevelId, state.mode]);
   
   // Start the test and record start time
   const startTestAndRecordTime = useCallback(() => {
