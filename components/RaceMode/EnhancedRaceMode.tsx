@@ -119,9 +119,9 @@ const EnhancedRaceMode: React.FC = () => {
   const [countdownSeconds, setCountdownSeconds] = useState(5);
   const [userInput, setUserInput] = useState('');
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
-  const [xpEarned, setXpEarned] = useState<{ total: number, breakdown: Record<string, number> } | null>(null);
-  const [showXpAnimation, setShowXpAnimation] = useState(false);
-  const [leveledUp, setLeveledUp] = useState(false);
+  const [, setXpEarned] = useState<{ total: number, breakdown: Record<string, number> } | null>(null);
+  const [, setShowXpAnimation] = useState(false);
+  const [, setLeveledUp] = useState(false);
   
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   

@@ -22,10 +22,22 @@ const TrainingMode: React.FC = () => {
   const { state, startTest, endTest, updateCharPoints, selectLevel, startTestWithLevelId } = useAppState();
   const [audioContextInstance, setAudioContextInstance] = useState<ReturnType<typeof createAudioContext> | null>(null);
   
+  // Client-side detection
+  const [isClient, setIsClient] = useState(false);
+  const [isDevelopment, setIsDevelopment] = useState(false);
+  
   // Initialize audio context in useEffect
   useEffect(() => {
     if (isBrowser) {
       setAudioContextInstance(createAudioContext());
+    }
+    
+    // Set client detection flags
+    setIsClient(true);
+    
+    // Check if we're in a development environment (localhost or 127.0.0.1)
+    if (isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      setIsDevelopment(true);
     }
   }, []);
   
@@ -56,6 +68,20 @@ const TrainingMode: React.FC = () => {
   const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
   const isCheckpoint = currentLevel?.type === 'checkpoint';
   const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
+
+  // Handle test completion
+  const finishTest = useCallback((completed = true) => {
+    endTest(completed);
+    
+    const endTime = Date.now();
+    const elapsedSec = testStartTime ? (endTime - testStartTime) / 1000 : 0;
+    
+    setTestResults({
+      completed,
+      elapsedTime: elapsedSec,
+      startTime: testStartTime
+    });
+  }, [endTest, testStartTime]);
   
   // Ensure level characters are correctly loaded on mount
   useEffect(() => {
@@ -131,6 +157,67 @@ const TrainingMode: React.FC = () => {
       console.error('Error playing morse:', error);
     }
   }, [pickNextChar, audioContextInstance]);
+  
+  // Initialize the test
+  const handleStartTest = useCallback(() => {
+    // Reset test state
+    setCurrentChar('');
+    setStatus('');
+    setWaitingForInput(false);
+    setCurrentMistakes(0);
+    setHintText('');
+    setStrikeCount(0);
+    setReplayCount(0);
+    setQuestionStartTime(null);
+    setResponseTimes([]);
+    setFirstTryCount(0);
+    setMistakesMap({});
+    setTestResults(null);
+    
+    // Start the test
+    startTest();
+    
+    // Need a slight delay to ensure state is updated
+    setTimeout(() => {
+      nextQuestion();
+    }, 100);
+  }, [startTest, nextQuestion]);
+  
+  // Start the test and record start time
+  const startTestAndRecordTime = useCallback(() => {
+    setTestStartTime(Date.now());
+    handleStartTest();
+  }, [handleStartTest]);
+  
+  // Show hint for current character
+  const showHint = useCallback(() => {
+    if (!currentChar) return;
+    
+    const symbols = morseMap[currentChar];
+    if (!symbols) return;
+    
+    const visual = symbols
+      .split('')
+      .map(s => (s === '.' ? '·' : '–'))
+      .join(' ');
+      
+    setHintText(visual);
+  }, [currentChar]);
+  
+  // Replay current character functionality - not used directly but kept for future use
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  const replayCurrent = useCallback(() => {
+    if (!currentChar || !audioContextInstance) return;
+    
+    setReplayCount(prev => prev + 1);
+    setWaitingForInput(false);
+    
+    audioContextInstance.playMorse(currentChar)
+      .then(() => {
+        setWaitingForInput(true);
+      });
+  }, [currentChar, audioContextInstance]);
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   
   // Handle keyboard input
   const handleKeydown = useCallback(
@@ -269,61 +356,8 @@ const TrainingMode: React.FC = () => {
       }
     },
     [waitingForInput, currentChar, questionStartTime, currentMistakes, state.charPoints, 
-     state.chars, strikeLimit, strikeCount, endTest, updateCharPoints, nextQuestion, audioContextInstance, isCheckpoint, setReplayCount, setWaitingForInput, testStartTime, setTestResults]
+     state.chars, strikeLimit, strikeCount, endTest, updateCharPoints, nextQuestion, audioContextInstance, isCheckpoint, setReplayCount, setWaitingForInput, testStartTime, setTestResults, finishTest]
   );
-  
-  // Replay current character
-  const replayCurrent = useCallback(() => {
-    if (!currentChar || !audioContextInstance) return;
-    
-    setReplayCount(prev => prev + 1);
-    setWaitingForInput(false);
-    
-    audioContextInstance.playMorse(currentChar)
-      .then(() => {
-        setWaitingForInput(true);
-      });
-  }, [currentChar, audioContextInstance]);
-  
-  // Show hint for current character
-  const showHint = useCallback(() => {
-    if (!currentChar) return;
-    
-    const symbols = morseMap[currentChar];
-    if (!symbols) return;
-    
-    const visual = symbols
-      .split('')
-      .map(s => (s === '.' ? '·' : '–'))
-      .join(' ');
-      
-    setHintText(visual);
-  }, [currentChar]);
-  
-  // Initialize the test
-  const handleStartTest = useCallback(() => {
-    // Reset test state
-    setCurrentChar('');
-    setStatus('');
-    setWaitingForInput(false);
-    setCurrentMistakes(0);
-    setHintText('');
-    setStrikeCount(0);
-    setReplayCount(0);
-    setQuestionStartTime(null);
-    setResponseTimes([]);
-    setFirstTryCount(0);
-    setMistakesMap({});
-    setTestResults(null);
-    
-    // Start the test
-    startTest();
-    
-    // Need a slight delay to ensure state is updated
-    setTimeout(() => {
-      nextQuestion();
-    }, 100);
-  }, [startTest, nextQuestion]);
   
   // Set up keyboard listeners
   useEffect(() => {
@@ -339,30 +373,6 @@ const TrainingMode: React.FC = () => {
       document.removeEventListener('keydown', handleKeydown);
     };
   }, [state.testActive, state.volume, state.wpm, handleKeydown, audioContextInstance]);
-  
-  // Calculate progress - mastered characters
-  const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
-  const progress = state.chars.length > 0 ? `Mastered: ${masteredCount}/${state.chars.length}` : '';
-  
-  // Start the test and record start time
-  const startTestAndRecordTime = useCallback(() => {
-    setTestStartTime(Date.now());
-    handleStartTest();
-  }, [handleStartTest]);
-  
-  // Handle test completion
-  const finishTest = useCallback((completed = true) => {
-    endTest(completed);
-    
-    const endTime = Date.now();
-    const elapsedSec = testStartTime ? (endTime - testStartTime) / 1000 : 0;
-    
-    setTestResults({
-      completed,
-      elapsedTime: elapsedSec,
-      startTime: testStartTime
-    });
-  }, [endTest, testStartTime]);
   
   // Replace endTest calls with finishTest
   useEffect(() => {
@@ -387,19 +397,6 @@ const TrainingMode: React.FC = () => {
       };
     }
   }, [state.testActive, handleKeydown, finishTest]);
-  
-  const [isClient, setIsClient] = useState(false);
-  const [isDevelopment, setIsDevelopment] = useState(false);
-  
-  // Only render debug elements on client-side and in development environment
-  useEffect(() => {
-    setIsClient(true);
-    
-    // Check if we're in a development environment (localhost or 127.0.0.1)
-    if (isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      setIsDevelopment(true);
-    }
-  }, []);
   
   // Helper to check if we have all the right characters for the level
   const checkLevelChars = useCallback(() => {
@@ -445,6 +442,15 @@ const TrainingMode: React.FC = () => {
     }
   }, [isClient, isDevelopment, checkLevelChars]);
   
+  // Calculate progress - mastered characters
+  const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
+  const progress = state.chars.length > 0 ? `Mastered: ${masteredCount}/${state.chars.length}` : '';
+  
+  // The key line that's causing hydration mismatch issues is likely where we use currentLevel.name
+  // Handle this safely for server-side rendering
+  const levelName = isClient && currentLevel ? currentLevel.name.split(':')[0] : 'Test';
+  
+  // Server-side safe rendering
   return (
     <div className={styles.trainingContainer}>
       {/* Debug state information - only visible on client in development */}
@@ -536,7 +542,7 @@ const TrainingMode: React.FC = () => {
           
           <MasteryDisplay targetPoints={TARGET_POINTS} />
           
-          {isCheckpoint && strikeLimit && (
+          {isClient && isCheckpoint && strikeLimit && (
             <div className={styles.strikes}>
               {Array.from({ length: strikeLimit }).map((_, i) => (
                 <span 
@@ -571,7 +577,7 @@ const TrainingMode: React.FC = () => {
             Listen to morse code characters and identify them by typing on your keyboard.
           </div>
           <button onClick={startTestAndRecordTime} className="shared-start-button">
-            Start {currentLevel ? currentLevel.name.split(':')[0] : 'Test'}
+            Start {levelName}
           </button>
         </div>
       )}

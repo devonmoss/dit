@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './RaceShareUI.module.css';
 
 interface RaceShareUIProps {
@@ -8,10 +8,14 @@ interface RaceShareUIProps {
 
 const RaceShareUI: React.FC<RaceShareUIProps> = ({ raceId, onStartRace }) => {
   const [copySuccess, setCopySuccess] = useState(false);
+  const [raceUrl, setRaceUrl] = useState('');
   
-  const raceUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}/race?id=${raceId}`
-    : '';
+  // Move URL generation to useEffect to avoid hydration mismatch
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setRaceUrl(`${window.location.origin}/race?id=${raceId}`);
+    }
+  }, [raceId]);
   
   const copyToClipboard = async () => {
     try {
