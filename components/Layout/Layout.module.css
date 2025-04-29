@@ -31,6 +31,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* match spacing below: equal to gap between header and top menu */
+  margin-top: 0.875rem;
   width: 100%;
   max-width: 1500px;
   padding: 0.5rem 1rem;

@@ -1,6 +1,6 @@
 .authWrapper {
-  /* Position statically within header container */
-  position: static;
+  /* Anchor dropdown relative to this container */
+  position: relative;
   margin-left: auto;
   z-index: 1010;
   display: flex;
