@@ -30,7 +30,7 @@ const XpDisplay: React.FC<XpDisplayProps> = ({ compact = false, onClick, transpa
     if (xpInfo) {
       setBadgeProgress(xpInfo.progress);
     }
-  }, [xpInfo?.progress]);
+  }, [xpInfo]);
   
   // Check for XP changes and trigger animation
   useEffect(() => {
