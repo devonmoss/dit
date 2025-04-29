@@ -5,7 +5,7 @@ import { createAudioContext, morseMap, isBrowser } from '../../utils/morse';
 import { trainingLevels } from '../../utils/levels';
 import MasteryDisplay from '../MasteryDisplay/MasteryDisplay';
 import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
-import { TrainingEvents, ErrorEvents } from '../../utils/analytics';
+import { TrainingEvents } from '../../utils/analytics';
 
 // Constants
 const TARGET_POINTS = 3;

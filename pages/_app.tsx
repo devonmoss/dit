@@ -18,8 +18,10 @@ export default function App({ Component, pageProps }: AppProps) {
       NavigationEvents.pageView(url);
     };
 
-    // Track initial page load
-    NavigationEvents.pageView(window.location.pathname);
+    // Track initial page load (only runs client-side)
+    if (typeof window !== 'undefined') {
+      NavigationEvents.pageView(window.location.pathname);
+    }
 
     // Track route changes
     router.events.on('routeChangeComplete', handleRouteChange);
