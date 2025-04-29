@@ -1,7 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { trainingLevels, TrainingLevel } from '../utils/levels';
 import { defaultChars } from '../utils/morse';
-import { NavigationEvents } from '../utils/analytics';
 
 // Define types for our app state
 interface CharPoints {
@@ -301,9 +300,6 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Mode and test type
   const setMode = (mode: Mode) => {
-    // Track mode change for analytics
-    NavigationEvents.modeChange(state.mode, mode);
-    
     setState(prev => ({
       ...prev,
       mode,
@@ -311,9 +307,6 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
   
   const setTestType = (testType: TestType) => {
-    // Track test type change for analytics
-    NavigationEvents.tabChange(state.testType, testType);
-    
     setState(prev => ({
       ...prev,
       testType,
