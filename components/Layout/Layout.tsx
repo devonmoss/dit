@@ -9,15 +9,15 @@ interface LayoutProps {
   title?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ 
-  children, 
-  title = 'Morse Code Trainer' 
+const Layout: React.FC<LayoutProps> = ({
+  children,
+  title = 'Continuous Wave'
 }) => {
   return (
     <div className={styles.container}>
       <Head>
         <title>{title}</title>
-        <meta name="description" content="Learn Morse code effectively with interactive exercises" />
+        <meta name="description" content="The dopest way to learn Morse code" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
