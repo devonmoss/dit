@@ -94,7 +94,7 @@ const Layout: React.FC<LayoutProps> = ({
             <AuthPanel />
           </div>
         )}
-        <TopMenu />
+        {/* Main navigation menu */}
         <TopMenu />
         <div className={styles.content}>
           {children}

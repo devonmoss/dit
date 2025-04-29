@@ -86,6 +86,16 @@ const AuthPanel: React.FC = () => {
           <div className={styles.userInfo}>
             Logged in as <span>{user.user_metadata?.username || 'User'}</span>
           </div>
+          {/* Link to user stats page */}
+          <button
+            className={styles.button}
+            onClick={() => {
+              router.push('/stats');
+              setIsFormVisible(false);
+            }}
+          >
+            User Stats
+          </button>
           <button
             className={styles.button}
             onClick={handleLogout}

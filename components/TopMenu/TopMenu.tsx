@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '../../contexts/AppStateContext';
 import { trainingLevels } from '../../utils/levels';
-import ProgressDashboard from '../ProgressDashboard/ProgressDashboard';
+// import ProgressDashboard removed; stats moved to dedicated page
 import styles from './TopMenu.module.css';
 import { useRouter } from 'next/router';
 import useAuth from '../../hooks/useAuth';
@@ -30,7 +30,7 @@ const TopMenu: React.FC = () => {
   
   const [showLevels, setShowLevels] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showProgress, setShowProgress] = useState(false);
+  // const [showProgress, setShowProgress] = useState(false); // removed; stats available under user panel
   const [mounted, setMounted] = useState(false);
   
   // Only run client-side code after mount
@@ -241,23 +241,13 @@ const TopMenu: React.FC = () => {
                   </button>
                 </div>
               </li>
-              <li>
-                <button 
-                  className={styles.settingsItem}
-                  onClick={() => {
-                    setShowSettings(false);
-                    setShowProgress(true);
-                  }}
-                >
-                  My Progress
-                </button>
-              </li>
+              {/* 'My Progress' removed from settings; use User Stats under profile menu */}
             </ul>
           )}
         </div>
       </div>
     </nav>
-      {showProgress && <ProgressDashboard onClose={() => setShowProgress(false)} />}
+      {/* Progress modal removed; stats now on dedicated /stats page */}
     </>
   );
 };

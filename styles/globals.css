@@ -50,6 +50,9 @@
   
   /* Other colored overlays */
   --blue-overlay-bg: rgba(0, 96, 255, 0.1);
+  /* Character mastery heatmap colors */
+  --heatmap-accent-hue: 120; /* green */
+  --heatmap-error-hue: 0;    /* red */
 
   /* Logo colors */
   --logo-color: var(--accent-color);
@@ -114,6 +117,9 @@
   /* Other colored overlays */
   --blue-overlay-bg: rgba(137, 180, 250, 0.1); /* Blue with opacity */
 
+  /* Character mastery heatmap override for Catppuccin */
+  --heatmap-accent-hue: 220; /* cat blue */
+  --heatmap-error-hue: 336; /* cat red */
   /* Logo colors */
   --logo-color: var(--accent-color);
   --logo-emblem-color: #cba6f7;
