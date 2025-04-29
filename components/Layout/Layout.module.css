@@ -41,15 +41,17 @@
   align-items: center;
 }
 
+/* Container for both logos */
 .logoWrapper {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  /* Enforce consistent logo height */
-  svg {
-    height: 75px;
-    width: auto;
-  }
+}
+
+/* Enforce consistent logo height */
+.logoWrapper svg {
+  height: 50px;
+  width: auto;
 }
 
 .logoName {
