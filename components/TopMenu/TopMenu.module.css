@@ -67,7 +67,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: var(--primary-bg, #1f1f1f);
+  background-color: var(--menu-bg, #1f1f1f);
   color: var(--muted-text, #777);
   border-radius: 4px;
   padding: 0 16px;
