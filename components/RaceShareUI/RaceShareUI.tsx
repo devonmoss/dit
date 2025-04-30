@@ -5,9 +5,17 @@ interface RaceShareUIProps {
   raceId: string;
   onStartRace: () => void;
   raceStatus?: string;
+  isHost?: boolean;
+  hostName?: string;
 }
 
-const RaceShareUI: React.FC<RaceShareUIProps> = ({ raceId, onStartRace, raceStatus = 'created' }) => {
+const RaceShareUI: React.FC<RaceShareUIProps> = ({ 
+  raceId, 
+  onStartRace, 
+  raceStatus = 'created',
+  isHost = true,
+  hostName = 'the host'
+}) => {
   const [copySuccess, setCopySuccess] = useState(false);
   
   const raceUrl = typeof window !== 'undefined' 
@@ -26,8 +34,21 @@ const RaceShareUI: React.FC<RaceShareUIProps> = ({ raceId, onStartRace, raceStat
     }
   };
   
-  // Determine if the user can start the race based on race status
-  const canStartRace = raceStatus === 'created';
+  // Determine if the user can start the race based on race status and if they're the host
+  const canStartRace = raceStatus === 'created' && isHost;
+  
+  // Get the appropriate waiting message
+  const getWaitingMessage = () => {
+    if (raceStatus !== 'created') {
+      return 'This race has already started';
+    }
+    
+    if (isHost) {
+      return 'Waiting for participants to join...';
+    } else {
+      return `Waiting for ${hostName} to start the race...`;
+    }
+  };
   
   return (
     <div className={styles.raceShareContainer}>
@@ -50,9 +71,7 @@ const RaceShareUI: React.FC<RaceShareUIProps> = ({ raceId, onStartRace, raceStat
       </div>
       
       <p className={styles.waitingText}>
-        {canStartRace 
-          ? 'Waiting for participants to join...' 
-          : 'This race has already started'}
+        {getWaitingMessage()}
       </p>
       
       {canStartRace && (
