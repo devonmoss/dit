@@ -4,9 +4,10 @@ import styles from './RaceShareUI.module.css';
 interface RaceShareUIProps {
   raceId: string;
   onStartRace: () => void;
+  raceStatus?: string;
 }
 
-const RaceShareUI: React.FC<RaceShareUIProps> = ({ raceId, onStartRace }) => {
+const RaceShareUI: React.FC<RaceShareUIProps> = ({ raceId, onStartRace, raceStatus = 'created' }) => {
   const [copySuccess, setCopySuccess] = useState(false);
   
   const raceUrl = typeof window !== 'undefined' 
@@ -24,6 +25,9 @@ const RaceShareUI: React.FC<RaceShareUIProps> = ({ raceId, onStartRace }) => {
       console.error('Failed to copy: ', err);
     }
   };
+  
+  // Determine if the user can start the race based on race status
+  const canStartRace = raceStatus === 'created';
   
   return (
     <div className={styles.raceShareContainer}>
@@ -45,16 +49,22 @@ const RaceShareUI: React.FC<RaceShareUIProps> = ({ raceId, onStartRace }) => {
         </button>
       </div>
       
-      <p className={styles.waitingText}>Waiting for participants to join...</p>
+      <p className={styles.waitingText}>
+        {canStartRace 
+          ? 'Waiting for participants to join...' 
+          : 'This race has already started'}
+      </p>
       
-      <div className={styles.startContainer}>
-        <button 
-          onClick={onStartRace}
-          className={styles.startButton}
-        >
-          Start Race
-        </button>
-      </div>
+      {canStartRace && (
+        <div className={styles.startContainer}>
+          <button 
+            onClick={onStartRace}
+            className={styles.startButton}
+          >
+            Start Race
+          </button>
+        </div>
+      )}
     </div>
   );
 };
