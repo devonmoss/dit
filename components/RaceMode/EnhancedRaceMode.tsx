@@ -860,34 +860,41 @@ const EnhancedRaceMode: React.FC = () => {
           
           // Award XP
           if (xpResult.total > 0) {
-            const result = await xpService.awardXp(
-              user.id,
-              xpResult.total,
-              XpSource.RACE,
-              {
-                race_id: raceId,
-                position: userPosition,
-                total_participants: raceParticipants.length,
-                mode: raceMode,
-                chars_completed: raceText.length,
-                mistakes: errorCount,
-                race_time: raceDuration,
-                xp_breakdown: xpResult.breakdown
-              }
-            );
-            
-            // If refreshXpInfo is available (should be passed from useAuth), use it
-            if (refreshXpInfo) {
-              await refreshXpInfo();
+            try {
+              const result = await xpService.awardXp(
+                user.id,
+                xpResult.total,
+                XpSource.RACE,
+                {
+                  race_id: raceId,
+                  position: userPosition,
+                  total_participants: raceParticipants.length,
+                  mode: raceMode,
+                  chars_completed: raceText.length,
+                  mistakes: errorCount,
+                  race_time: raceDuration,
+                  xp_breakdown: xpResult.breakdown
+                }
+              );
               
-              // Show XP animation
+              // If refreshXpInfo is available (should be passed from useAuth), use it
+              if (refreshXpInfo) {
+                await refreshXpInfo();
+                
+                // Show XP animation
+                setShowXpAnimation(true);
+                setTimeout(() => setShowXpAnimation(false), 3000);
+                
+                // Check if user leveled up
+                if (result?.leveledUp) {
+                  setLeveledUp(true);
+                }
+              }
+            } catch (xpError) {
+              console.error('Error awarding XP:', xpError);
+              // Still show XP animation even if there was an error with the API
               setShowXpAnimation(true);
               setTimeout(() => setShowXpAnimation(false), 3000);
-              
-              // Check if user leveled up
-              if (result.leveledUp) {
-                setLeveledUp(true);
-              }
             }
           }
         }
