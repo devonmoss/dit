@@ -1482,8 +1482,20 @@ const EnhancedRaceMode: React.FC = () => {
         
         // Only reset progress if user hasn't made progress already
         if (latestProgressRef.current === 0) {
+          // Get proper user ID - for anonymous users, use the mapped UUID
+          let dbUserId = currentUser.id;
+          if (currentUser.id.startsWith('anon-') && anonUserIdMapRef.current[currentUser.id]) {
+            dbUserId = anonUserIdMapRef.current[currentUser.id];
+            console.log('Using mapped UUID for anonymous user:', { 
+              anonId: currentUser.id, 
+              mappedId: dbUserId 
+            });
+          } else if (currentUser.id.startsWith('anon-')) {
+            console.error('No mapped UUID found for anonymous user. This will cause errors:', currentUser.id);
+          }
+          
           // Reset progress through API
-          raceService.updateProgress(raceId, currentUser.id, 0, 0)
+          raceService.updateProgress(raceId, dbUserId, 0, 0)
             .then(() => {
               console.log('Initial state set in database - progress reset to 0');
             })
