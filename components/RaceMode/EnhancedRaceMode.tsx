@@ -270,6 +270,9 @@ const EnhancedRaceMode: React.FC = () => {
     }
   }, [user, getCurrentUser]);
   
+  // Add a state to track race creator
+  const [raceCreator, setRaceCreator] = useState<string | null>(null);
+  
   // Modify the joinRace function to handle anonymous user persistence
   const joinRace = useCallback(async (raceId: string) => {
     const currentUser = getCurrentUser();
@@ -317,6 +320,11 @@ const EnhancedRaceMode: React.FC = () => {
       // Get race details from API
       const race = await raceService.getRaceDetails(raceId);
       console.log('Race data retrieved:', race);
+      
+      // Store the race creator
+      if (race.created_by) {
+        setRaceCreator(race.created_by);
+      }
       
       // Set race text and mode
       setRaceText(race.text || '');
@@ -409,13 +417,26 @@ const EnhancedRaceMode: React.FC = () => {
   // Initialize race ID from URL if present
   useEffect(() => {
     if (queryId && typeof queryId === 'string' && !raceId) {
+      // Set race ID and join the race
       setRaceId(queryId);
       joinRace(queryId);
       setRaceStage(RaceStage.SHARE);
     }
-  // Only re-run when queryId or raceId change; joinRace is stable enough
+  // Only depend on queryId to prevent re-joining when raceId changes for other reasons
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryId, raceId]);
+  }, [queryId]);
+
+  // Add separate effect to clear query parameter when going to INFO stage
+  useEffect(() => {
+    if (raceStage === RaceStage.INFO && router.query.id) {
+      // Remove race ID from URL without full navigation
+      const newUrl = window.location.pathname;
+      window.history.pushState({ path: newUrl }, '', newUrl);
+      
+      // Also clear the router's query object
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [raceStage, router]);
   
   // Set up and clean up the channel subscription
   useEffect(() => {
@@ -680,6 +701,9 @@ const EnhancedRaceMode: React.FC = () => {
       // If it's an anonymous user, generate a UUID instead of using their anon-ID
       const createdById = currentUser.id.startsWith('anon-') ? uuidv4() : currentUser.id;
       
+      // Set the race creator
+      setRaceCreator(createdById);
+      
       // Create race through API
       const race = await raceService.createRace({
         created_by: createdById,
@@ -701,6 +725,7 @@ const EnhancedRaceMode: React.FC = () => {
       // Update local state
       setRaceId(race.id);
       setRaceText(text);
+      setRaceStatus('created'); // Make sure status is set to created
       setParticipants([{
         id: participantUserId,
         name: getUserDisplayName(currentUser),
@@ -1621,7 +1646,49 @@ const EnhancedRaceMode: React.FC = () => {
     };
   }, [raceStatus, endInactiveRace]);
   
+  // Helper function to determine if the current user is the race creator
+  const isRaceCreator = useCallback(() => {
+    const currentUser = getCurrentUser();
+    if (!currentUser || !raceCreator) return false;
+    
+    // For anonymous users, check their mapped UUID
+    if (currentUser.id.startsWith('anon-')) {
+      const mappedId = anonUserIdMapRef.current[currentUser.id];
+      return mappedId === raceCreator;
+    }
+    
+    return currentUser.id === raceCreator;
+  }, [getCurrentUser, raceCreator]);
+  
+  // Get creator display name
+  const getCreatorDisplayName = useCallback(() => {
+    // Find the creator in the participants list
+    const creator = participants.find(p => p.id === raceCreator);
+    return creator?.name || 'the host';
+  }, [participants, raceCreator]);
+  
   /* eslint-enable @typescript-eslint/no-explicit-any */
+  
+  // Fix the Create New Race button to properly reset state
+  const handleCreateNewRace = useCallback(() => {
+    setRaceStage(RaceStage.INFO);
+    setRaceStatus('created'); // Reset race status
+    setRaceId(null); // Reset race ID
+    stopAudio();
+    // Reset other state
+    setUserProgress(0);
+    setCurrentCharIndex(0);
+    setErrorCount(0);
+    setStartTime(null);
+    setFinishTime(null);
+    raceFinishedRef.current = false;
+    
+    // Remove race ID from URL without triggering navigation events
+    if (typeof window !== 'undefined') {
+      const newUrl = window.location.pathname;
+      window.history.pushState({ path: newUrl }, '', newUrl);
+    }
+  }, [stopAudio]);
   
   // Render appropriate stage of race
   return (
@@ -1645,6 +1712,8 @@ const EnhancedRaceMode: React.FC = () => {
             raceId={raceId || ''}
             onStartRace={startRace}
             raceStatus={raceStatus}
+            isHost={isRaceCreator()}
+            hostName={getCreatorDisplayName()}
           />
           <RaceParticipants
             participants={participants}
@@ -1789,13 +1858,7 @@ const EnhancedRaceMode: React.FC = () => {
           <div className={styles.actions}>
             <button
               className={styles.newRaceButton}
-              onClick={() => {
-                setRaceStage(RaceStage.INFO);
-                stopAudio();
-                // Remove race ID from URL
-                const newUrl = window.location.pathname;
-                window.history.pushState({ path: newUrl }, '', newUrl);
-              }}
+              onClick={handleCreateNewRace}
             >
               Create New Race
             </button>
