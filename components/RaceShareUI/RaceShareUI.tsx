@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './RaceShareUI.module.css';
+import { useAppState } from '../../contexts/AppStateContext';
+import { trainingLevels } from '../../utils/levels';
 
 interface RaceShareUIProps {
   raceId: string;
@@ -7,6 +9,10 @@ interface RaceShareUIProps {
   raceStatus?: string;
   isHost?: boolean;
   hostName?: string;
+  raceMode?: 'copy' | 'send';
+  raceLength?: number;
+  levelId?: string;
+  chars?: string[];
 }
 
 const RaceShareUI: React.FC<RaceShareUIProps> = ({ 
@@ -14,9 +20,35 @@ const RaceShareUI: React.FC<RaceShareUIProps> = ({
   onStartRace, 
   raceStatus = 'created',
   isHost = true,
-  hostName = 'the host'
+  hostName = 'the host',
+  raceMode = 'copy',
+  raceLength = 20,
+  levelId,
+  chars = []
 }) => {
   const [copySuccess, setCopySuccess] = useState(false);
+  const { state } = useAppState();
+  const [levelInfo, setLevelInfo] = useState({
+    name: 'Default',
+    chars: [] as string[]
+  });
+  
+  // Find the current level data
+  useEffect(() => {
+    const currentLevelId = levelId || state.selectedLevelId;
+    const currentLevel = trainingLevels.find(level => level.id === currentLevelId);
+    if (currentLevel) {
+      setLevelInfo({
+        name: currentLevel.name,
+        chars: [...currentLevel.chars]
+      });
+    } else if (chars && chars.length > 0) {
+      setLevelInfo({
+        name: 'Custom',
+        chars: chars
+      });
+    }
+  }, [levelId, state.selectedLevelId, chars]);
   
   const raceUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/race?id=${raceId}`
@@ -52,7 +84,35 @@ const RaceShareUI: React.FC<RaceShareUIProps> = ({
   
   return (
     <div className={styles.raceShareContainer}>
-      <h2>Race Created!</h2>
+      <h2>Get Ready to Race!</h2>
+      
+      <div className={styles.raceDetails}>
+        <h3>Race Details</h3>
+        <ul className={styles.detailsList}>
+          <li>
+            <strong>Race Mode:</strong>{' '}
+            <span className={styles.modeName}>
+              {raceMode === 'copy' ? 'Copy Mode' : 'Send Mode'}
+            </span>
+          </li>
+          <li>
+            <strong>Number of characters:</strong> {raceLength}
+          </li>
+          <li>
+            <strong>Characters:</strong>{' '}
+            <span className={styles.charsList}>
+              {levelInfo.chars.map(c => c.toUpperCase()).join(', ')}
+            </span>
+          </li>
+          <li>
+            <strong>Level:</strong>{' '}
+            <span className={styles.levelName}>
+              {levelInfo.name}
+            </span>
+          </li>
+        </ul>
+      </div>
+      
       <p>Share this link with your friends so they can join your race:</p>
       
       <div className={styles.linkContainer}>

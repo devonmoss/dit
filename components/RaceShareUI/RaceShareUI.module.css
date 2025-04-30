@@ -1,82 +1,124 @@
 .raceShareContainer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 1.5rem;
   background-color: var(--primary-bg);
   border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  width: 100%;
-  max-width: 600px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .raceShareContainer h2 {
-  color: var(--accent-color);
   margin-top: 0;
   margin-bottom: 1rem;
+  text-align: center;
+  color: var(--accent-color);
+}
+
+.raceDetails {
+  margin: 1rem 0;
+  padding: 1rem;
+  background-color: var(--light-overlay-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.raceDetails h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+  color: var(--text-color);
+}
+
+.detailsList {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.detailsList li {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.modeName {
+  font-weight: bold;
+  color: var(--accent-color);
+}
+
+.charsList {
+  font-family: monospace;
+  letter-spacing: 1px;
+  color: var(--text-color);
+  word-break: break-all;
+}
+
+.levelName {
+  font-weight: bold;
+  color: var(--accent-color);
 }
 
 .linkContainer {
   display: flex;
-  width: 100%;
-  margin: 1.5rem 0;
+  margin: 1rem 0;
+  background-color: var(--light-overlay-bg);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
 }
 
 .shareInput {
   flex: 1;
-  padding: 0.75rem 1rem;
-  font-family: var(--font-family);
-  font-size: 1rem;
-  background-color: var(--background-color);
+  padding: 0.5rem 1rem;
+  border: none;
+  font-family: monospace;
   color: var(--text-color);
-  border: 1px solid var(--border-color);
-  border-right: none;
-  border-top-left-radius: 4px;
-  border-bottom-left-radius: 4px;
+  background-color: transparent;
+}
+
+.shareInput:focus {
+  outline: none;
 }
 
 .copyButton {
-  padding: 0.75rem 1.25rem;
+  padding: 0.5rem 1rem;
   background-color: var(--accent-color);
-  color: #121212;
+  color: var(--button-text);
   border: none;
-  font-weight: bold;
   cursor: pointer;
+  font-weight: bold;
   transition: background-color 0.2s;
-  border-top-right-radius: 4px;
-  border-bottom-right-radius: 4px;
 }
 
 .copyButton:hover {
-  background-color: #00c853;
+  background-color: var(--accent-hover-color);
 }
 
 .waitingText {
   margin: 1rem 0;
+  text-align: center;
   font-style: italic;
   color: var(--muted-text);
 }
 
 .startContainer {
-  margin-top: 1.5rem;
-  width: 100%;
   display: flex;
   justify-content: center;
+  margin-top: 2rem;
 }
 
 .startButton {
   padding: 0.75rem 2rem;
-  background-color: var(--primary-bg);
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
+  background-color: var(--accent-color);
+  color: var(--button-text);
+  border: none;
   border-radius: 4px;
   font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s;
 }
 
 .startButton:hover {
-  background-color: var(--secondary-bg);
+  background-color: var(--accent-hover-color);
 }

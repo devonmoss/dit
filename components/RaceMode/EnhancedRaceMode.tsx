@@ -1754,12 +1754,17 @@ const EnhancedRaceMode: React.FC = () => {
             raceStatus={raceStatus}
             isHost={isRaceCreator()}
             hostName={getCreatorDisplayName()}
+            raceMode={raceMode}
+            raceLength={raceText.length}
+            chars={raceText.split('')}
+            levelId={state.selectedLevelId}
           />
           <RaceParticipants
             participants={participants}
             currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
             raceLength={raceText.length}
             onlineUserIds={onlineUsers.map(user => user.user_id)}
+            showPlacement={true}
           />
         </>
       )}
