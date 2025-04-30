@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import styles from './RaceMode.module.css';
 import { createAudioContext, isBrowser } from '../../utils/morse';
-import supabase from '../../utils/supabase';
+import supabase from '../../utils/supabase'; // Still needed for realtime channels
 import { useMorseAudio } from '../../hooks/useMorseAudio';
 import { useAppState } from '../../contexts/AppStateContext';
 import useAuth from '../../hooks/useAuth';
@@ -12,7 +12,9 @@ import RaceParticipants from '../RaceParticipants/RaceParticipants';
 import CountdownTimer from '../CountdownTimer/CountdownTimer';
 import { trainingLevels } from '../../utils/levels';
 import { v4 as uuidv4 } from 'uuid';
-import { awardXp, calculateRaceXp, XpSource } from '../../utils/xpSystem';
+import { calculateRaceXp, XpSource } from '../../utils/xpSystem';
+import * as raceService from '../../services/raceService';
+import * as xpService from '../../services/xpService';
 
 // Utility type for suppressing eslint errors
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -107,6 +109,7 @@ const EnhancedRaceMode: React.FC = () => {
   const [raceStage, setRaceStage] = useState<RaceStage>(RaceStage.INFO);
   const [raceText, setRaceText] = useState('');
   const [raceMode, setRaceMode] = useState<'copy' | 'send'>(state.mode === 'copy' || state.mode === 'send' ? state.mode : 'copy');
+  const [raceStatus, setRaceStatus] = useState<string>('created');
   const [participants, setParticipants] = useState<RaceParticipant[]>([]);
   // Presence state for connected participants
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -142,6 +145,9 @@ const EnhancedRaceMode: React.FC = () => {
   
   // Add a reference to store the mapped anonymous user IDs
   const anonUserIdMapRef = useRef<{[key: string]: string}>({});
+  
+  // Add a reference to store the updateProgress function
+  const updateProgressRef = useRef<((progress: number) => void) | null>(null);
   
   // For send mode with arrow keys (similar to SendingMode)
   const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
@@ -179,19 +185,10 @@ const EnhancedRaceMode: React.FC = () => {
     if (now - lastUpdateTimeRef.current > 500) {
       console.log('Sending throttled database update, progress:', progress, 'errors:', errorCount);
       
-      // Update the database with both progress and error count
-      supabase
-        .from('race_participants')
-        .update({ 
-          progress,
-          error_count: errorCount 
-        })
-        .eq('race_id', raceId)
-        .eq('user_id', dbUserId)
-        .then(({ error }) => {
-          if (error) {
-            console.error('Error updating progress:', error);
-          }
+      // Call API endpoint to update progress
+      raceService.updateProgress(raceId, dbUserId, progress, errorCount)
+        .catch(error => {
+          console.error('Error updating progress:', error);
         });
         
       // Update the last update timestamp
@@ -203,7 +200,22 @@ const EnhancedRaceMode: React.FC = () => {
     }
   }, [raceId, errorCount]);
   
-  // Get the current user (either authenticated or anonymous)
+  // Initialize anonymous user mapping from localStorage
+  useEffect(() => {
+    if (isBrowser) {
+      // Check for stored UUID mapping
+      const storedMapping = localStorage.getItem('morse_anon_user_uuid_map');
+      if (storedMapping) {
+        try {
+          anonUserIdMapRef.current = JSON.parse(storedMapping);
+        } catch (e) {
+          console.error('Error parsing stored anonymous user mapping:', e);
+        }
+      }
+    }
+  }, []);
+  
+  // Modify the anonymous user handling
   const getCurrentUser = useCallback(() => {
     if (user) return user;
     
@@ -252,7 +264,7 @@ const EnhancedRaceMode: React.FC = () => {
     }
   }, [user, getCurrentUser]);
   
-  // Join an existing race - moved up before it's used
+  // Modify the joinRace function to handle anonymous user persistence
   const joinRace = useCallback(async (raceId: string) => {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
@@ -260,81 +272,101 @@ const EnhancedRaceMode: React.FC = () => {
     try {
       console.log('Joining race:', raceId, 'as user:', currentUser.id);
       
-      // Get race data
-      const { data: race, error } = await supabase
-        .from('races')
-        .select('*')
-        .eq('id', raceId)
-        .single();
-        
-      if (error) throw error;
-      
-      console.log('Race data retrieved:', race);
-      
-      // Set race text
-      setRaceText(race.text || '');
-      // Set race mode
-      setRaceMode(race.mode || 'copy');
-      
       // For anonymous users, generate a consistent UUID
       let participantUserId = currentUser.id;
       if (currentUser.id.startsWith('anon-')) {
-        // Check if we already have a UUID for this anonymous user
-        if (!anonUserIdMapRef.current[currentUser.id]) {
-          // Generate a new UUID and store it
-          anonUserIdMapRef.current[currentUser.id] = uuidv4();
+        // Check for stored UUID for this race in localStorage first
+        const raceParticipantKey = `morse_race_${raceId}_participant_${currentUser.id}`;
+        let storedUuid = '';
+        
+        if (isBrowser) {
+          storedUuid = localStorage.getItem(raceParticipantKey) || '';
         }
-        participantUserId = anonUserIdMapRef.current[currentUser.id];
-      }
-      
-      // Check if user is already a participant
-      const { data: existingParticipant, error: participantError } = await supabase
-        .from('race_participants')
-        .select('*')
-        .eq('race_id', raceId)
-        .eq('user_id', participantUserId)
-        .single();
         
-      if (participantError && participantError.code !== 'PGRST116') { // Code for no rows returned
-        console.error('Error checking participant:', participantError);
-      }
-        
-      // Add user as participant if not already present
-      if (!existingParticipant) {
-        console.log('Adding as new participant');
-        const { data: newParticipant, error: insertError } = await supabase
-          .from('race_participants')
-          .insert([{
-            race_id: raceId,
-            user_id: participantUserId,
-            name: getUserDisplayName(currentUser),
-            progress: 0,
-            finished: false
-          }])
-          .select();
-          
-        if (insertError) {
-          console.error('Error adding participant:', insertError);
+        if (storedUuid) {
+          // Use the stored UUID
+          console.log('Using stored UUID for anonymous user:', storedUuid);
+          participantUserId = storedUuid;
+          // Update the ref map
+          anonUserIdMapRef.current[currentUser.id] = storedUuid;
         } else {
-          console.log('Participant added successfully:', newParticipant);
+          // Check if we already have a UUID for this anonymous user
+          if (!anonUserIdMapRef.current[currentUser.id]) {
+            // Generate a new UUID and store it
+            const newUuid = uuidv4();
+            anonUserIdMapRef.current[currentUser.id] = newUuid;
+            
+            // Store in localStorage for persistence
+            if (isBrowser) {
+              localStorage.setItem(raceParticipantKey, newUuid);
+              // Also update the overall mapping
+              localStorage.setItem('morse_anon_user_uuid_map', 
+                JSON.stringify(anonUserIdMapRef.current));
+            }
+          }
+          participantUserId = anonUserIdMapRef.current[currentUser.id];
         }
-      } else {
-        console.log('Already a participant:', existingParticipant);
       }
       
-      // Get all participants
-      const { data: participants, error: participantsError } = await supabase
-        .from('race_participants')
-        .select('*')
-        .eq('race_id', raceId);
+      // Get race details from API
+      const race = await raceService.getRaceDetails(raceId);
+      console.log('Race data retrieved:', race);
+      
+      // Set race text and mode
+      setRaceText(race.text || '');
+      setRaceMode(race.mode || 'copy');
+      
+      // Set race status
+      setRaceStatus(race.status || 'created');
+      
+      // Join the race through API
+      const joinResult = await raceService.joinRace(raceId, {
+        user_id: participantUserId,
+        name: getUserDisplayName(currentUser)
+      });
+      
+      if (joinResult.participants) {
+        console.log('All participants:', joinResult.participants);
         
-      if (participantsError) {
-        console.error('Error fetching participants:', participantsError);
-      }
+        // Find this user's participant data
+        const userParticipant = joinResult.participants.find(
+          (p: { user_id: string; progress?: number; finished?: boolean; finish_time?: number; error_count?: number; race_time?: number }) => 
+            p.user_id === participantUserId
+        );
         
-      if (participants) {
-        console.log('All participants:', participants);
-        setParticipants(participants.map(p => ({
+        // If this user already participated and has progress or is finished
+        if (userParticipant) {
+          if (userParticipant.finished) {
+            console.log('User already finished the race - showing results');
+            // Set user progress and mark as finished
+            setUserProgress(100);
+            raceFinishedRef.current = true;
+            setFinishTime(userParticipant.finish_time);
+            setStartTime(race.start_time);
+            setErrorCount(userParticipant.error_count || 0);
+            // Set character index to the end
+            setCurrentCharIndex(race.text?.length || 0);
+          } else if (userParticipant.progress > 0) {
+            console.log('User has existing progress:', userParticipant.progress);
+            // Restore user progress
+            const progressPercent = Math.round((userParticipant.progress / (race.text?.length || 1)) * 100);
+            setUserProgress(progressPercent);
+            latestProgressRef.current = userParticipant.progress;
+            // Set character index to their progress
+            setCurrentCharIndex(userParticipant.progress);
+            setErrorCount(userParticipant.error_count || 0);
+          }
+        }
+        
+        setParticipants(joinResult.participants.map((p: { 
+          user_id: string; 
+          name?: string; 
+          progress?: number; 
+          finished?: boolean; 
+          finish_time?: number; 
+          error_count?: number; 
+          race_time?: number 
+        }) => ({
           id: p.user_id,
           name: p.name || 'Anonymous',
           progress: p.progress || 0,
@@ -344,11 +376,29 @@ const EnhancedRaceMode: React.FC = () => {
           raceTime: p.race_time
         })));
       }
+      
+      // Check race status and update the UI stage accordingly
+      if (race.status === 'countdown') {
+        setRaceStage(RaceStage.COUNTDOWN);
+        setRaceStatus('countdown');
+      } else if (race.status === 'racing') {
+        setRaceStage(RaceStage.RACING);
+        setRaceStatus('racing');
+        setStartTime(race.start_time);
+      } else if (race.status === 'finished') {
+        setRaceStage(RaceStage.RESULTS);
+        setRaceStatus('finished');
+        stopAudio();
+      } else {
+        // Default to share stage if status is not set or in 'created' state
+        setRaceStage(RaceStage.SHARE);
+      }
+      
     } catch (err) {
       console.error('Error joining race:', err);
       alert('Could not join race. Please try again.');
     }
-  }, [getCurrentUser, getUserDisplayName]);
+  }, [getCurrentUser, getUserDisplayName, stopAudio]);
   
   // Initialize race ID from URL if present
   useEffect(() => {
@@ -383,7 +433,38 @@ const EnhancedRaceMode: React.FC = () => {
       
       // Open a realtime channel with presence enabled
       channel = supabase.channel(`race_${raceId}`, {
-        config: { presence: { key: presenceUserId } }
+        config: { 
+          broadcast: { self: true },
+          presence: { key: presenceUserId }
+        }
+      });
+      
+      // Send progress updates via broadcast
+      const updateProgress = (progress: number) => {
+        if (channel) {
+          channel.send({
+            type: 'broadcast',
+            event: 'progress_update',
+            payload: {
+              user_id: currentUser.id,
+              progress,
+              errorCount
+            }
+          });
+        }
+      };
+      
+      // Store the function in a ref for access elsewhere
+      updateProgressRef.current = updateProgress;
+      
+      // Listen for broadcast events
+      channel.on('broadcast', { event: 'progress_update' }, (payload) => {
+        const { user_id, progress, errorCount } = payload;
+        
+        // Update local participant state without database calls
+        setParticipants(prev => 
+          prev.map(p => p.id === user_id ? { ...p, progress, errorCount } : p)
+        );
       });
       
       // Listen for race status changes
@@ -403,18 +484,14 @@ const EnhancedRaceMode: React.FC = () => {
           // Update UI immediately based on race status
           if (race.status === 'countdown') {
             setRaceStage(RaceStage.COUNTDOWN);
+            setRaceStatus('countdown');
           } else if (race.status === 'racing') {
             setRaceStage(RaceStage.RACING);
+            setRaceStatus('racing');
             setStartTime(race.start_time);
-            
-            // Play just the first character
-            // if (race.text && race.text.length > 0) {
-            //   setCurrentCharIndex(0);
-            //   console.log('Playing first character: ', race.text[0]);
-            //   playMorseChar(race.text[0]);
-            // }
           } else if (race.status === 'finished') {
             setRaceStage(RaceStage.RESULTS);
+            setRaceStatus('finished');
             stopAudio();
           }
         })
@@ -476,15 +553,10 @@ const EnhancedRaceMode: React.FC = () => {
               
               if (allFinished) {
                 console.log('All participants finished! Updating race status.');
-                // Update race status without waiting for response
-                supabase
-                  .from('races')
-                  .update({ status: 'finished' })
-                  .eq('id', raceId)
-                  .then(({ error }) => {
-                    if (error) {
-                      console.error('Error updating race status to finished:', error);
-                    }
+                // Update race status using API
+                raceService.updateRaceStatus(raceId, 'finished')
+                  .catch(error => {
+                    console.error('Error updating race status to finished:', error);
                   });
               }
             }
@@ -587,49 +659,29 @@ const EnhancedRaceMode: React.FC = () => {
     }
     
     try {
-      // Generate a simple ID for the race
-      const generateSimpleId = () => {
-        return Math.random().toString(36).substring(2, 10);
-      };
-      const newRaceId = generateSimpleId();
-      
       // For the created_by field, ensure we use a valid UUID
       // If it's an anonymous user, generate a UUID instead of using their anon-ID
       const createdById = currentUser.id.startsWith('anon-') ? uuidv4() : currentUser.id;
       
-      // Create race in database
-      const { data: race, error } = await supabase
-        .from('races')
-        .insert([{
-          id: newRaceId,
-          created_by: createdById,
-          mode: mode,
-          status: 'waiting',
-          char_sequence: text.split(''),
-          text: text,
-          level_id: state.selectedLevelId
-        }])
-        .select()
-        .single();
-        
-      if (error) throw error;
+      // Create race through API
+      const race = await raceService.createRace({
+        created_by: createdById,
+        mode: mode,
+        char_sequence: text.split(''),
+        text: text,
+        level_id: state.selectedLevelId
+      });
       
       // For the user_id in race_participants, also use UUID for anonymous users
       const participantUserId = currentUser.id.startsWith('anon-') ? createdById : currentUser.id;
       
-      // Add creator as first participant
-      await supabase
-        .from('race_participants')
-        .insert([{
-          race_id: race.id,
-          user_id: participantUserId,
-          name: getUserDisplayName(currentUser),
-          progress: 0,
-          finished: false
-        }])
-        .select();
-        
-      // Update local state - make sure to use the same ID here
+      // Join race automatically through API
+      const joinResult = await raceService.joinRace(race.id, {
+        user_id: participantUserId,
+        name: getUserDisplayName(currentUser)
+      });
+      
+      // Update local state
       setRaceId(race.id);
       setRaceText(text);
       setParticipants([{
@@ -642,7 +694,7 @@ const EnhancedRaceMode: React.FC = () => {
       // Move to share stage
       setRaceStage(RaceStage.SHARE);
       
-      // Navigate to /race?id=race.id instead of using pushState
+      // Navigate to /race?id=race.id
       router.push(`/race?id=${race.id}`);
       
     } catch (err) {
@@ -656,15 +708,11 @@ const EnhancedRaceMode: React.FC = () => {
     if (!raceId) return;
     
     try {
-      // Update race status to countdown
-      await supabase
-        .from('races')
-        .update({
-          status: 'countdown'
-        })
-        .eq('id', raceId);
-        
+      // Update race status to countdown through API
+      await raceService.startRaceCountdown(raceId);
+      
       setRaceStage(RaceStage.COUNTDOWN);
+      setRaceStatus('countdown');
       setCountdownSeconds(5);
       
     } catch (err) {
@@ -679,16 +727,11 @@ const EnhancedRaceMode: React.FC = () => {
     try {
       const startTime = Date.now();
       
-      // Update race status to racing with start time
-      await supabase
-        .from('races')
-        .update({
-          status: 'racing',
-          start_time: startTime
-        })
-        .eq('id', raceId);
-        
+      // Begin racing through API
+      await raceService.beginRacing(raceId);
+      
       setRaceStage(RaceStage.RACING);
+      setRaceStatus('racing');
       setStartTime(startTime);
       setUserInput('');
       
@@ -731,38 +774,31 @@ const EnhancedRaceMode: React.FC = () => {
     try {
       console.log('User finished race - updating final state');
       
-      // For race completion, we want an immediate database update - this is important state
-      await supabase
-        .from('race_participants')
-        .update({
-          finished: true,
-          finish_time: endTime,
-          progress: raceText.length,
-          error_count: errorCount,
-          race_time: raceDuration
-        })
-        .eq('race_id', raceId)
-        .eq('user_id', dbUserId);
+      // Finish race through API
+      await raceService.finishRace(raceId, dbUserId, {
+        finish_time: endTime,
+        error_count: errorCount,
+        race_time: raceDuration
+      });
       
       console.log('Race finish state persisted to database');
       
       // Award XP for race completion (only for authenticated users)
       if (user && !currentUser.id.startsWith('anon-')) {
-        // Get the list of all participants to determine position
-        const { data: raceParticipants } = await supabase
-          .from('race_participants')
-          .select('*')
-          .eq('race_id', raceId)
-          .order('race_time', { ascending: true });
+        // Get list of participants to determine position
+        const raceParticipants = await raceService.getRaceParticipants(raceId);
         
-        if (raceParticipants) {
-          // Find user's position
-          const userPosition = raceParticipants.findIndex(p => p.user_id === user.id) + 1;
+        if (raceParticipants && raceParticipants.length > 0) {
+          // Find user's position (sort by race_time ascending)
+          const sortedParticipants = [...raceParticipants].sort((a, b) => 
+            (a.race_time || Infinity) - (b.race_time || Infinity)
+          );
+          const userPosition = sortedParticipants.findIndex(p => p.user_id === user.id) + 1;
           
           // Check if this is a personal best
           const isPersonalBest = false; // TODO: Implement personal best detection
           
-          // Calculate XP using the new function
+          // Calculate XP using the function
           const xpResult = calculateRaceXp(
             raceText.length,  // Correct chars
             errorCount,       // Mistake count
@@ -777,7 +813,7 @@ const EnhancedRaceMode: React.FC = () => {
           
           // Award XP
           if (xpResult.total > 0) {
-            const result = await awardXp(
+            const result = await xpService.awardXp(
               user.id,
               xpResult.total,
               XpSource.RACE,
@@ -871,6 +907,9 @@ const EnhancedRaceMode: React.FC = () => {
           
           // Try to update, but the throttle mechanism will decide if it happens now or later
           updateProgressInDatabase(correctCount, userId);
+          
+          // Also broadcast for immediate UI updates
+          if (updateProgressRef.current) updateProgressRef.current(correctCount);
         }
         
         if (nextCharIndex < raceText.length) {
@@ -1026,6 +1065,9 @@ const EnhancedRaceMode: React.FC = () => {
             
             // Try to update, but the throttle mechanism will decide if it happens now or later
             updateProgressInDatabase(currentCharIndex + 1, userId);
+            
+            // Also broadcast for immediate UI updates
+            if (updateProgressRef.current) updateProgressRef.current(currentCharIndex + 1);
           }
           
           // Check if user has completed the race
@@ -1050,7 +1092,7 @@ const EnhancedRaceMode: React.FC = () => {
       }
     }
   }, [raceStage, getCurrentUser, decodeMorseCode, raceText, currentCharIndex, userInput, raceId, 
-      channelRef, anonUserIdMapRef, updateProgressInDatabase, finishRace, stopAudio, audioContext]);
+      channelRef, anonUserIdMapRef, updateProgressInDatabase, finishRace, stopAudio, audioContext, updateProgressRef]);
 
   // Key processing interval for send mode - properly implementing iambic keyer behavior
   useEffect(() => {
@@ -1275,6 +1317,9 @@ const EnhancedRaceMode: React.FC = () => {
             
             // Try to update, but the throttle mechanism will decide if it happens now or later
             updateProgressInDatabase(currentCharIndex + 1, userId);
+            
+            // Also broadcast for immediate UI updates
+            if (updateProgressRef.current) updateProgressRef.current(currentCharIndex + 1);
           }
           
           // Check if user has completed the race
@@ -1318,7 +1363,7 @@ const EnhancedRaceMode: React.FC = () => {
       }
     }
   }, [raceStage, raceText, raceId, getCurrentUser, finishRace, stopAudio, currentCharIndex, 
-      playMorseChar, audioContext, userInput, updateProgressInDatabase, raceMode, replayCurrent]);
+      playMorseChar, audioContext, userInput, updateProgressInDatabase, raceMode, replayCurrent, updateProgressRef]);
   
   // Calculate race statistics for results view - use useMemo directly
   const stats = React.useMemo(() => {
@@ -1378,30 +1423,32 @@ const EnhancedRaceMode: React.FC = () => {
     if (raceStage === RaceStage.RACING && raceText && raceText.length > 0 && currentCharIndex === 0) {
       const currentUser = getCurrentUser();
       
-      // Make sure our progress is set to 0 in the database when race starts
-      // This is one of the few times we directly update the database
-      if (currentUser && raceId) {
-        console.log('Race starting: Initializing progress in database');
-        supabase
-          .from('race_participants')
-          .update({ 
-            progress: 0,
-            finished: false,
-            finish_time: null
-          })
-          .eq('race_id', raceId)
-          .eq('user_id', currentUser.id)
-          .then(({ error }) => {
-            if (error) {
-              console.error('Error initializing progress in database:', error);
-            } else {
-              console.log('Initial state set in database - progress reset to 0');
-            }
-          });
+      // Check if user has already finished - don't play or reset progress
+      if (raceFinishedRef.current) {
+        console.log('User already finished this race - skipping sound and progress reset');
+        return;
       }
       
-      // Only play the sound in copy mode, not in send mode
-      if (raceMode === 'copy') {
+      // Make sure our progress is set to 0 in the database when race starts
+      if (currentUser && raceId) {
+        console.log('Race starting: Initializing progress in database');
+        
+        // Only reset progress if user hasn't made progress already
+        if (latestProgressRef.current === 0) {
+          // Reset progress through API
+          raceService.updateProgress(raceId, currentUser.id, 0, 0)
+            .then(() => {
+              console.log('Initial state set in database - progress reset to 0');
+            })
+            .catch(error => {
+              console.error('Error initializing progress in database:', error);
+            });
+        }
+      }
+      
+      // Only play the sound in copy mode, not in send mode,
+      // and only if the user hasn't already made progress
+      if (raceMode === 'copy' && latestProgressRef.current === 0) {
         // Slight delay to make sure UI is ready
         setTimeout(() => {
           console.log('Playing first character: ', raceText[0]);
@@ -1429,12 +1476,14 @@ const EnhancedRaceMode: React.FC = () => {
             dbUserId = anonUserIdMapRef.current[currentUser.id];
           }
           
-          // For best-effort final save, use sendBeacon
+          // For best-effort final save, use sendBeacon to our API
           if (navigator.sendBeacon) {
             const formData = new FormData();
+            formData.append('user_id', dbUserId);
             formData.append('progress', latestProgressRef.current.toString());
+            formData.append('error_count', errorCount.toString());
             navigator.sendBeacon(
-              `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/race_participants?race_id=eq.${raceId}&user_id=eq.${dbUserId}`,
+              `/api/races/${raceId}/progress-beacon`,
               formData
             );
             console.log('Final progress sent via beacon before page unload');
@@ -1471,6 +1520,9 @@ const EnhancedRaceMode: React.FC = () => {
         }
         
         updateProgressInDatabase(latestProgressRef.current, userId);
+        
+        // Also broadcast for immediate UI updates
+        if (updateProgressRef.current) updateProgressRef.current(latestProgressRef.current);
       }
     }, 500);
     
@@ -1486,9 +1538,12 @@ const EnhancedRaceMode: React.FC = () => {
         }
         
         updateProgressInDatabase(latestProgressRef.current, userId);
+        
+        // Also broadcast for immediate UI updates
+        if (updateProgressRef.current) updateProgressRef.current(latestProgressRef.current);
       }
     };
-  }, [raceStage, updateProgressInDatabase, getCurrentUser]);
+  }, [raceStage, updateProgressInDatabase, getCurrentUser, updateProgressRef]);
   
   // Helper function to get the user ID to display (either mapped UUID or regular ID)
   const getUserIdForDisplay = useCallback((userId: string) => {
@@ -1521,6 +1576,7 @@ const EnhancedRaceMode: React.FC = () => {
           <RaceShareUI
             raceId={raceId || ''}
             onStartRace={startRace}
+            raceStatus={raceStatus}
           />
           <RaceParticipants
             participants={participants}
