@@ -43,6 +43,22 @@ const RaceParticipants: React.FC<RaceParticipantsProps> = ({
       return b.progress - a.progress;
     });
 
+  // Get medal for placement
+  const getMedalBadge = (placement: number, finished: boolean | undefined) => {
+    if (!finished) return null;
+    
+    switch (placement) {
+      case 1:
+        return <span className={`${styles.medalBadge} ${styles.gold}`}>🥇</span>;
+      case 2:
+        return <span className={`${styles.medalBadge} ${styles.silver}`}>🥈</span>;
+      case 3:
+        return <span className={`${styles.medalBadge} ${styles.bronze}`}>🥉</span>;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className={styles.participantsContainer}>
       <h3>Participants</h3>
@@ -59,6 +75,7 @@ const RaceParticipants: React.FC<RaceParticipantsProps> = ({
             const isOnline = onlineUserIds.includes(participant.id);
             const placement = index + 1;
             const placementSuffix = getOrdinalSuffix(placement);
+            const medalBadge = getMedalBadge(placement, participant.finished);
             
             return (
               <div 
@@ -76,8 +93,11 @@ const RaceParticipants: React.FC<RaceParticipantsProps> = ({
                     </span>
                   </div>
                   <div className={styles.participantInfo}>
-                    {showPlacement && participant.finished && (
-                      <span className={styles.placementBadge}>{placement}{placementSuffix}</span>
+                    {participant.finished && (
+                      <>
+                        {medalBadge}
+                        <span className={styles.placementBadge}>{placement}{placementSuffix}</span>
+                      </>
                     )}
                     {participant.finished && (
                       <span className={styles.finishedBadge}>Finished!</span>

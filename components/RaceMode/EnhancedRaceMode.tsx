@@ -1849,6 +1849,7 @@ const EnhancedRaceMode: React.FC = () => {
             currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
             raceLength={raceText.length}
             onlineUserIds={onlineUsers.map(user => user.user_id)}
+            showPlacement={true}
           />
           
           <div className={`${styles.correctIndicator} ${showCorrectIndicator ? styles.visible : ''}`}>✓</div>
