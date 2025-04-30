@@ -11,9 +11,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // GET - Get user XP information
   if (req.method === 'GET') {
     try {
-      // Call the get_user_xp stored function
-      const { data, error } = await supabaseAdmin.rpc('get_user_xp', {
-        p_user_id: id
+      // Call the get_user_xp_info stored function
+      const { data, error } = await supabaseAdmin.rpc('get_user_xp_info', {
+        user_id: id
       });
       
       if (error) throw error;

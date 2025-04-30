@@ -15,15 +15,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { data, error } = await supabaseAdmin.rpc('award_xp', {
         p_user_id: user_id,
         p_amount: amount,
-        p_source: source,
-        p_metadata: metadata || {}
+        p_reason: source,
+        p_details: metadata || {}
       });
       
       if (error) throw error;
       
       // Get updated XP info
-      const { data: xpInfo, error: xpError } = await supabaseAdmin.rpc('get_user_xp', {
-        p_user_id: user_id
+      const { data: xpInfo, error: xpError } = await supabaseAdmin.rpc('get_user_xp_info', {
+        user_id: user_id
       });
       
       if (xpError) throw xpError;
