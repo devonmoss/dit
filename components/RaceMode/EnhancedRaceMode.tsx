@@ -408,10 +408,11 @@ const EnhancedRaceMode: React.FC = () => {
             setStartTime(race.start_time);
             
             // Play just the first character
-            if (race.text && race.text.length > 0) {
-              setCurrentCharIndex(0);
-              playMorseChar(race.text[0]);
-            }
+            // if (race.text && race.text.length > 0) {
+            //   setCurrentCharIndex(0);
+            //   console.log('Playing first character: ', race.text[0]);
+            //   playMorseChar(race.text[0]);
+            // }
           } else if (race.status === 'finished') {
             setRaceStage(RaceStage.RESULTS);
             stopAudio();
@@ -692,10 +693,11 @@ const EnhancedRaceMode: React.FC = () => {
       setUserInput('');
       
       // Start playing just the first character
-      setCurrentCharIndex(0);
-      if (raceText && raceText.length > 0) {
-        playMorseChar(raceText[0]);
-      }
+      // setCurrentCharIndex(0);
+      // if (raceText && raceText.length > 0) {
+      //   console.log('Playing first character: ', raceText[0]);
+      //   playMorseChar(raceText[0]);
+      // }
       
     } catch (err) {
       console.error('Error starting race:', err);
@@ -1402,6 +1404,7 @@ const EnhancedRaceMode: React.FC = () => {
       if (raceMode === 'copy') {
         // Slight delay to make sure UI is ready
         setTimeout(() => {
+          console.log('Playing first character: ', raceText[0]);
           playMorseChar(raceText[0])
             .catch(err => {
               console.error("Error playing first character:", err);
