@@ -149,6 +149,12 @@ const EnhancedRaceMode: React.FC = () => {
   // Add a reference to store the updateProgress function
   const updateProgressRef = useRef<((progress: number) => void) | null>(null);
   
+  // Add a reference to track the last activity time
+  const lastActivityTimeRef = useRef<number>(0);
+  
+  // Add a reference to track the inactivity check interval
+  const inactivityIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   // For send mode with arrow keys (similar to SendingMode)
   const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
   const [keyerOutput, setKeyerOutput] = useState('');
@@ -461,6 +467,9 @@ const EnhancedRaceMode: React.FC = () => {
       channel.on('broadcast', { event: 'progress_update' }, (payload) => {
         const { user_id, progress, errorCount } = payload;
         
+        // Update last activity time when progress is received
+        lastActivityTimeRef.current = Date.now();
+        
         // Update local participant state without database calls
         setParticipants(prev => 
           prev.map(p => p.id === user_id ? { ...p, progress, errorCount } : p)
@@ -489,6 +498,9 @@ const EnhancedRaceMode: React.FC = () => {
             setRaceStage(RaceStage.RACING);
             setRaceStatus('racing');
             setStartTime(race.start_time);
+            
+            // Reset last activity time when race starts
+            lastActivityTimeRef.current = Date.now();
           } else if (race.status === 'finished') {
             setRaceStage(RaceStage.RESULTS);
             setRaceStatus('finished');
@@ -513,6 +525,11 @@ const EnhancedRaceMode: React.FC = () => {
           setParticipants(prev => {
             // Check if this participant already exists in our state
             const participantExists = prev.some(p => p.id === changedParticipant.user_id);
+            
+            // Update last activity time when participant data changes
+            if (changedParticipant.progress > 0) {
+              lastActivityTimeRef.current = Date.now();
+            }
             
             let updatedParticipants;
             
@@ -1552,6 +1569,57 @@ const EnhancedRaceMode: React.FC = () => {
     }
     return userId;
   }, []);
+  
+  // Function to end an inactive race
+  const endInactiveRace = useCallback(() => {
+    if (!raceId || raceStatus !== 'racing') return;
+    
+    const now = Date.now();
+    const inactiveTime = now - lastActivityTimeRef.current;
+    const inactivityThreshold = 10000; // 10 seconds
+    
+    console.log(`Checking race activity: ${inactiveTime}ms since last activity`);
+    
+    if (inactiveTime > inactivityThreshold) {
+      console.log('Race inactive for more than 10 seconds - ending race');
+      raceService.updateRaceStatus(raceId, 'finished')
+        .then(() => {
+          console.log('Race ended due to inactivity');
+          setRaceStage(RaceStage.RESULTS);
+          setRaceStatus('finished');
+          stopAudio();
+        })
+        .catch(error => {
+          console.error('Error ending inactive race:', error);
+        });
+    }
+  }, [raceId, raceStatus, stopAudio]);
+  
+  // Effect to track activity and end inactive races
+  useEffect(() => {
+    // Only monitor activity during racing state
+    if (raceStatus !== 'racing') {
+      // Clear any existing interval when not racing
+      if (inactivityIntervalRef.current) {
+        clearInterval(inactivityIntervalRef.current);
+        inactivityIntervalRef.current = null;
+      }
+      return;
+    }
+    
+    // Initialize the last activity time when race starts
+    lastActivityTimeRef.current = Date.now();
+    
+    // Set up interval to check for inactivity
+    inactivityIntervalRef.current = setInterval(endInactiveRace, 5000); // Check every 5 seconds
+    
+    return () => {
+      if (inactivityIntervalRef.current) {
+        clearInterval(inactivityIntervalRef.current);
+        inactivityIntervalRef.current = null;
+      }
+    };
+  }, [raceStatus, endInactiveRace]);
   
   /* eslint-enable @typescript-eslint/no-explicit-any */
   
