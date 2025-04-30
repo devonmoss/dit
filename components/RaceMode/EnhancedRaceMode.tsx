@@ -1718,6 +1718,87 @@ const EnhancedRaceMode: React.FC = () => {
     }
   }, [stopAudio]);
   
+  // Handle the "Race Again" button click
+  const handleRaceAgain = useCallback(async () => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      alert('Error creating race');
+      return;
+    }
+    
+    try {
+      // Reset state for a new race
+      stopAudio();
+      setUserProgress(0);
+      setCurrentCharIndex(0);
+      setErrorCount(0);
+      setStartTime(null);
+      setFinishTime(null);
+      raceFinishedRef.current = false;
+      
+      // Generate new race text with the same parameters
+      const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
+      const levelChars = currentLevel && currentLevel.chars.length > 0 ? 
+        [...currentLevel.chars] : 
+        state.chars.length > 0 ? [...state.chars] : 
+        'abcdefghijklmnopqrstuvwxyz'.split('');
+      
+      const raceLength = 20;
+      let text = '';
+      
+      for (let i = 0; i < raceLength; i++) {
+        const randomIndex = Math.floor(Math.random() * levelChars.length);
+        text += levelChars[randomIndex];
+      }
+      
+      // For the created_by field, ensure we use a valid UUID
+      // If it's an anonymous user, generate a UUID instead of using their anon-ID
+      const createdById = currentUser.id.startsWith('anon-') ? uuidv4() : currentUser.id;
+      
+      // Create race through API with the same parameters
+      const race = await raceService.createRace({
+        created_by: createdById,
+        mode: raceMode,
+        char_sequence: text.split(''),
+        text: text,
+        level_id: state.selectedLevelId
+      });
+      
+      // For the user_id in race_participants, also use UUID for anonymous users
+      const participantUserId = currentUser.id.startsWith('anon-') ? createdById : currentUser.id;
+      
+      // Join race automatically through API
+      await raceService.joinRace(race.id, {
+        user_id: participantUserId,
+        name: getUserDisplayName(currentUser)
+      });
+      
+      // Set the race creator
+      setRaceCreator(createdById);
+      
+      // Update local state
+      setRaceId(race.id);
+      setRaceText(text);
+      setRaceStatus('created');
+      setParticipants([{
+        id: participantUserId,
+        name: getUserDisplayName(currentUser),
+        progress: 0,
+        finished: false
+      }]);
+      
+      // Move to share stage
+      setRaceStage(RaceStage.SHARE);
+      
+      // Navigate to /race?id=race.id
+      router.push(`/race?id=${race.id}`);
+      
+    } catch (err) {
+      console.error('Error creating race:', err);
+      alert('Could not create race. Please try again.');
+    }
+  }, [getCurrentUser, getUserDisplayName, raceMode, router, state.chars, state.selectedLevelId, stopAudio]);
+  
   // Debugging to ensure host detection is working
   useEffect(() => {
     if (raceStage === RaceStage.SHARE) {
@@ -1857,7 +1938,20 @@ const EnhancedRaceMode: React.FC = () => {
             showPlacement={true}
           />
           
-          <div className={`${styles.correctIndicator} ${showCorrectIndicator ? styles.visible : ''}`}>✓</div>
+          <div className={styles.actions}>
+            <button
+              className={styles.newRaceButton}
+              onClick={handleCreateNewRace}
+            >
+              Create New Race
+            </button>
+            <button
+              className={styles.raceAgainButton}
+              onClick={handleRaceAgain}
+            >
+              Race Again
+            </button>
+          </div>
         </div>
       )}
       
@@ -1907,6 +2001,12 @@ const EnhancedRaceMode: React.FC = () => {
               onClick={handleCreateNewRace}
             >
               Create New Race
+            </button>
+            <button
+              className={styles.raceAgainButton}
+              onClick={handleRaceAgain}
+            >
+              Race Again
             </button>
           </div>
         </div>

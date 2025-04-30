@@ -211,6 +211,7 @@
   display: flex;
   justify-content: center;
   margin-top: 2rem;
+  gap: 1rem;
 }
 
 .newRaceButton {
@@ -227,6 +228,22 @@
 
 .newRaceButton:hover {
   background-color: var(--button-hover);
+}
+
+.raceAgainButton {
+  padding: 0.75rem 1.5rem;
+  background-color: var(--success-color);
+  color: #121212;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.raceAgainButton:hover {
+  background-color: var(--success-hover-color);
 }
 
 .progressInfo {
