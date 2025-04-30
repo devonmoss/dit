@@ -330,8 +330,13 @@ const EnhancedRaceMode: React.FC = () => {
       setRaceText(race.text || '');
       setRaceMode(race.mode || 'copy');
       
-      // Set race status
-      setRaceStatus(race.status || 'created');
+      // Set race status - ENSURE we set to 'created' if the race hasn't actually started
+      if (race.status === 'countdown' || race.status === 'racing' || race.status === 'finished') {
+        setRaceStatus(race.status);
+      } else {
+        // Default to 'created' for any other status or if status is not set
+        setRaceStatus('created');
+      }
       
       // Join the race through API
       const joinResult = await raceService.joinRace(raceId, {
@@ -1654,10 +1659,14 @@ const EnhancedRaceMode: React.FC = () => {
     // For anonymous users, check their mapped UUID
     if (currentUser.id.startsWith('anon-')) {
       const mappedId = anonUserIdMapRef.current[currentUser.id];
-      return mappedId === raceCreator;
+      const isCreator = mappedId === raceCreator;
+      console.log('Anonymous user host check:', { mappedId, raceCreator, isCreator });
+      return isCreator;
     }
     
-    return currentUser.id === raceCreator;
+    const isCreator = currentUser.id === raceCreator;
+    console.log('Host check:', { currentUserId: currentUser.id, raceCreator, isCreator });
+    return isCreator;
   }, [getCurrentUser, raceCreator]);
   
   // Get creator display name
@@ -1689,6 +1698,18 @@ const EnhancedRaceMode: React.FC = () => {
       window.history.pushState({ path: newUrl }, '', newUrl);
     }
   }, [stopAudio]);
+  
+  // Debugging to ensure host detection is working
+  useEffect(() => {
+    if (raceStage === RaceStage.SHARE) {
+      console.log('Race Share Stage: Host check', {
+        isHost: isRaceCreator(),
+        raceCreator,
+        currentUser: getCurrentUser()?.id,
+        mappedId: getCurrentUser()?.id.startsWith('anon-') ? anonUserIdMapRef.current[getCurrentUser()?.id] : null
+      });
+    }
+  }, [raceStage, isRaceCreator, raceCreator, getCurrentUser]);
   
   // Render appropriate stage of race
   return (
