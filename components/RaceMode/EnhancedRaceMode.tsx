@@ -9,7 +9,6 @@ import useAuth from '../../hooks/useAuth';
 import RaceInfo from '../RaceInfo/RaceInfo';
 import RaceShareUI from '../RaceShareUI/RaceShareUI';
 import RaceParticipants from '../RaceParticipants/RaceParticipants';
-import CountdownTimer from '../CountdownTimer/CountdownTimer';
 import { trainingLevels } from '../../utils/levels';
 import { v4 as uuidv4 } from 'uuid';
 import { calculateRaceXp, XpSource } from '../../utils/xpSystem';
@@ -18,6 +17,11 @@ import * as xpService from '../../services/xpService';
 import { calculateRaceStats } from '../../utils/raceUtils';
 import RaceInviteModal from './RaceInviteModal';
 import RaceModeSelector from './RaceModeSelector';
+import InfoStage from './stages/InfoStage';
+import ShareStage from './stages/ShareStage';
+import CountdownStage from './stages/CountdownStage';
+import ResultsStage from './stages/ResultsStage';
+import RacingStage from './stages/RacingStage';
 import { 
   AnyRecord,
   RaceParticipant,
@@ -1822,189 +1826,69 @@ const EnhancedRaceMode: React.FC = () => {
   return (
     <div className={styles.container}>
       {raceStage === RaceStage.INFO && (
-        <RaceInfo 
-          onCreateRace={() => createRace({ mode: raceMode })} 
+        <InfoStage
           raceMode={raceMode}
-          modeSelector={
-            <RaceModeSelector 
-              onSelectMode={(mode) => setRaceMode(mode)} 
-              selectedMode={raceMode} 
-            />
-          }
+          onModeChange={setRaceMode}
+          onCreateRace={() => createRace({ mode: raceMode })}
         />
       )}
       
       {raceStage === RaceStage.SHARE && (
-        <>
-          <RaceShareUI
-            raceId={raceId || ''}
-            onStartRace={startRace}
-            raceStatus={raceStatus}
-            isHost={isRaceCreator()}
-            hostName={getCreatorDisplayName()}
-            raceMode={raceMode}
-            raceLength={raceText.length}
-            chars={raceText.split('')}
-            levelId={state.selectedLevelId}
-          />
-          <RaceParticipants
-            participants={participants}
-            currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
-            raceLength={raceText.length}
-            onlineUserIds={onlineUsers.map(user => user.user_id)}
-            showPlacement={true}
-          />
-        </>
+        <ShareStage
+          raceId={raceId || ''}
+          raceMode={raceMode}
+          raceStatus={raceStatus}
+          raceLength={raceText.length}
+          chars={raceText.split('')}
+          levelId={state.selectedLevelId}
+          isHost={isRaceCreator()}
+          hostName={getCreatorDisplayName()}
+          participants={participants}
+          currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
+          onlineUserIds={onlineUsers.map(user => user.user_id)}
+          onStartRace={startRace}
+        />
       )}
       
       {raceStage === RaceStage.COUNTDOWN && (
-        <>
-          <CountdownTimer
-            seconds={countdownSeconds}
-            onComplete={startRacing}
-          />
-          <RaceParticipants
-            participants={participants}
-            currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
-            raceLength={raceText.length}
-            onlineUserIds={onlineUsers.map(user => user.user_id)}
-          />
-        </>
-      )}
-      
-      {raceStage === RaceStage.RACING && (
-        <div className={styles.raceContainer}>
-          <div className={styles.morseText}>
-            <div className={styles.textDisplay}>
-              <h3>{raceMode === 'copy' 
-                ? 'Type the characters as you hear them:' 
-                : 'Send the characters you see using Morse code:'}</h3>
-              <div className={styles.textContainer}>
-                {/* Display progress but not the actual characters */}
-                <div className={styles.progressBar}>
-                  <div 
-                    className={styles.progressFill} 
-                    style={{ width: `${userProgress}%` }}
-                  />
-                </div>
-                <div className={styles.characterCount}>
-                  {Math.floor((userProgress / 100) * raceText.length)} / {raceText.length} characters
-                </div>
-              </div>
-            </div>
-            
-            {/* Character display depends on mode */}
-            <div className={styles.currentCharContainer}>
-              <div className={styles.currentCharPrompt}>Current character:</div>
-              <div className={styles.currentChar}>
-                {raceMode === 'send' && !showCorrectIndicator
-                  ? (raceText[currentCharIndex]?.toUpperCase() || '') 
-                  : ''  /* Hide character in copy mode or when showing correct indicator */
-                }
-              </div>
-              <div className={styles.typingInstructions}>
-                {raceMode === 'copy'
-                  ? 'Listen for the Morse code and type the character you hear'
-                  : 'Use ← key for · and → key for – to send the character displayed'
-                }
-              </div>
-            </div>
-            
-            <div className={styles.raceControls}>
-              {raceMode === 'copy' ? (
-                <>
-                  <button 
-                    onClick={replayCurrent}
-                    className={styles.replayButton}
-                    title="Replay current character"
-                  >
-                    Replay Sound
-                  </button>
-                  <div className={styles.hint}>
-                    Press Tab to replay the current character sound
-                  </div>
-                </>
-              ) : (
-                <div className={styles.morseControls}>
-                  <div className={styles.keyerDisplay}>
-                    <div className={styles.keyerOutput}>{keyerOutput}</div>
-                  </div>
-                  <div className={styles.hint}>
-                    Use ← key for · and → key for –
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <RaceParticipants
-            participants={participants}
-            currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
-            raceLength={raceText.length}
-            onlineUserIds={onlineUsers.map(user => user.user_id)}
-            showPlacement={true}
-          />
-          
-          <div className={`${styles.correctIndicator} ${showCorrectIndicator ? styles.visible : ''}`}>✓</div>
-        </div>
+        <CountdownStage
+          seconds={countdownSeconds}
+          participants={participants}
+          currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
+          raceLength={raceText.length}
+          onlineUserIds={onlineUsers.map(user => user.user_id)}
+          onComplete={startRacing}
+        />
       )}
       
       {raceStage === RaceStage.RESULTS && (
-        <div className={styles.resultsContainer}>
-          <h2>Race Complete!</h2>
-          
-          {stats && (
-            <div className={styles.stats}>
-              <div className={styles.statItem}>
-                <span className={styles.statLabel}>Your Speed:</span>
-                <span className={styles.statValue}>{stats.wpm} WPM</span>
-              </div>
-              <div className={styles.statItem}>
-                <span className={styles.statLabel}>Time:</span>
-                <span className={styles.statValue}>
-                  {stats.time.toFixed(2)}s
-                </span>
-              </div>
-              <div className={styles.statItem}>
-                <span className={styles.statLabel}>Errors:</span>
-                <span className={styles.statValue}>{errorCount}</span>
-              </div>
-            </div>
-          )}
-          
-          <h3>Final Rankings</h3>
-          <RaceParticipants
-            participants={participants.sort((a, b) => {
-              if (a.finished === b.finished) {
-                if (a.finishTime && b.finishTime) {
-                  return a.finishTime - b.finishTime;
-                }
-                return b.progress - a.progress;
-              }
-              return a.finished ? -1 : 1;
-            })}
-            currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
-            raceLength={raceText.length}
-            onlineUserIds={onlineUsers.map(user => user.user_id)}
-            showPlacement={true}
-          />
-          
-          <div className={styles.actions}>
-            <button
-              className={styles.newRaceButton}
-              onClick={handleNavigateHome}
-            >
-              Create New Race
-            </button>
-            <button
-              className={styles.raceAgainButton}
-              onClick={handleRaceAgain}
-              disabled={isCreatingRace}
-            >
-              {isCreatingRace ? 'Creating...' : 'Race Again'}
-            </button>
-          </div>
-        </div>
+        <ResultsStage
+          stats={stats}
+          errorCount={errorCount}
+          participants={participants}
+          currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
+          raceLength={raceText.length}
+          onlineUserIds={onlineUsers.map(user => user.user_id)}
+          isCreatingRace={isCreatingRace}
+          onNavigateHome={handleNavigateHome}
+          onRaceAgain={handleRaceAgain}
+        />
+      )}
+      
+      {raceStage === RaceStage.RACING && (
+        <RacingStage
+          raceMode={raceMode}
+          raceText={raceText}
+          userProgress={userProgress}
+          currentCharIndex={currentCharIndex}
+          participants={participants}
+          currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
+          raceLength={raceText.length}
+          onlineUserIds={onlineUsers.map(user => user.user_id)}
+          keyerOutput={keyerOutput}
+          showCorrectIndicator={showCorrectIndicator}
+          onReplayCurrent={replayCurrent}
+        />
       )}
       
       {/* Race invitation modal */}
