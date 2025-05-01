@@ -84,8 +84,27 @@ export const useAnonymousUser = (authenticatedUser: User | null) => {
       return userId;
     }
     
-    // For anonymous users, check if we have a mapping
+    // For race-specific lookups
+    if (raceId && isBrowser) {
+      // Check for an existing race-specific mapping in localStorage
+      const raceParticipantKey = `morse_race_${raceId}_participant_${userId}`;
+      const existingRaceMapping = localStorage.getItem(raceParticipantKey);
+      
+      if (existingRaceMapping) {
+        // Use the race-specific ID and ensure it's in the global map too
+        anonUserIdMapRef.current[userId] = existingRaceMapping;
+        return existingRaceMapping;
+      }
+    }
+    
+    // For anonymous users, check if we have a mapping in memory
     if (anonUserIdMapRef.current[userId]) {
+      // If we're in a race, store this mapping as race-specific
+      if (raceId && isBrowser) {
+        const raceParticipantKey = `morse_race_${raceId}_participant_${userId}`;
+        localStorage.setItem(raceParticipantKey, anonUserIdMapRef.current[userId]);
+      }
+      
       return anonUserIdMapRef.current[userId];
     }
     

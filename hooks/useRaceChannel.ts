@@ -168,7 +168,10 @@ export const useRaceChannel = (
           ];
         }
         
-        return updatedParticipants;
+        // One final deduplication step to ensure no duplicates
+        return Array.from(
+          new Map(updatedParticipants.map(p => [p.id, p])).values()
+        ) as RaceParticipant[];
       });
     });
     
