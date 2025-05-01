@@ -1,6 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import supabaseAdmin from '../../../../lib/supabaseAdmin';
 
+interface UpdateData {
+  progress: number;
+  error_count?: number;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
   
@@ -17,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'User ID and progress are required' });
       }
       
-      const updateData: any = { progress: parseInt(progress, 10) };
+      const updateData: UpdateData = { progress: parseInt(progress, 10) };
       if (error_count !== undefined) {
         updateData.error_count = parseInt(error_count, 10);
       }
@@ -29,9 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .eq('user_id', user_id);
         
       return res.status(200).end();
-    } catch (error: any) {
-      console.error('Error updating progress:', error.message);
-      return res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Error updating progress:', errorMessage);
+      return res.status(500).json({ error: errorMessage });
     }
   }
   

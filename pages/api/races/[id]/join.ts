@@ -79,9 +79,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         participant: participantData,
         participants: participants || []
       });
-    } catch (error: any) {
-      console.error('Error joining race:', error.message);
-      return res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Error joining race:', errorMessage);
+      return res.status(500).json({ error: errorMessage });
     }
   }
   

@@ -58,9 +58,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         participant: data,
         all_finished: allFinished
       });
-    } catch (error: any) {
-      console.error('Error finishing race:', error.message);
-      return res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Error finishing race:', errorMessage);
+      return res.status(500).json({ error: errorMessage });
     }
   }
   
