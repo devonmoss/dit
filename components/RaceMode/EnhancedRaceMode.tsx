@@ -15,6 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { calculateRaceXp, XpSource } from '../../utils/xpSystem';
 import * as raceService from '../../services/raceService';
 import * as xpService from '../../services/xpService';
+import RaceInviteModal from './RaceInviteModal';
 
 // Utility type for suppressing eslint errors
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -519,18 +520,12 @@ const EnhancedRaceMode: React.FC = () => {
         
         console.log(`Received redirect to new race: ${new_race_id} from ${initiator_name}`);
         
-        // Show a notification briefly before redirecting
-        const confirmRedirect = window.confirm(
-          `${initiator_name} started a new race. Join now?`
-        );
-        
-        if (confirmRedirect) {
-          console.log(`User confirmed redirect to race: ${new_race_id}`);
-          // Use window.location for a full page reload instead of router.push
-          window.location.href = `/race?id=${new_race_id}`;
-        } else {
-          console.log('User declined redirect');
-        }
+        // Show our custom invitation modal
+        setInvitationDetails({
+          raceId: new_race_id,
+          initiatorName: initiator_name
+        });
+        setInviteModalOpen(true);
       });
       
       // Listen for race status changes
@@ -1902,6 +1897,13 @@ const EnhancedRaceMode: React.FC = () => {
     router.push('/');
   }, [router]);
   
+  // Add state for the invitation modal in the EnhancedRaceMode component
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [invitationDetails, setInvitationDetails] = useState<{ 
+    raceId: string, 
+    initiatorName: string 
+  } | null>(null);
+  
   // Render appropriate stage of race
   return (
     <div className={styles.container}>
@@ -2090,6 +2092,24 @@ const EnhancedRaceMode: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Race invitation modal */}
+      <RaceInviteModal
+        isOpen={inviteModalOpen}
+        inviterName={invitationDetails?.initiatorName || 'Someone'}
+        onAccept={() => {
+          setInviteModalOpen(false);
+          if (invitationDetails?.raceId) {
+            console.log(`User accepted redirect to race: ${invitationDetails.raceId}`);
+            // Use window.location for a full page reload
+            window.location.href = `/race?id=${invitationDetails.raceId}`;
+          }
+        }}
+        onDecline={() => {
+          setInviteModalOpen(false);
+          console.log('User declined redirect');
+        }}
+      />
     </div>
   );
 };
