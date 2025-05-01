@@ -134,8 +134,14 @@ const EnhancedRaceMode: React.FC = () => {
     // Update local participants when race channel participants change
     if (raceParticipants && raceParticipants.length > 0) {
       setParticipants(raceParticipants);
+      
+      // If we're in racing state, reset inactivity timer when participants are updated
+      if (raceStatus === 'racing') {
+        lastActivityTimeRef.current = Date.now();
+        console.log('Received participant updates - resetting inactivity timer');
+      }
     }
-  }, [raceParticipants]);
+  }, [raceParticipants, raceStatus]);
   
   // Keep the onlineUsers state in sync with the race channel
   useEffect(() => {
@@ -475,6 +481,10 @@ const EnhancedRaceMode: React.FC = () => {
       setRaceStatus('racing');
       setStartTime(startTime);
       setUserInput('');
+      
+      // Reset the activity timer when race starts
+      lastActivityTimeRef.current = Date.now();
+      console.log('Race started - initializing activity timer');
       
       // Start playing just the first character
       // setCurrentCharIndex(0);
@@ -938,6 +948,16 @@ const EnhancedRaceMode: React.FC = () => {
     return getMappedUserId(userId);
   }, [getMappedUserId]);
   
+  // Add an effect that updates the activity time when participants make progress
+  useEffect(() => {
+    // Only track activity during racing
+    if (raceStatus === 'racing') {
+      // Update the last activity time when any participant makes progress
+      lastActivityTimeRef.current = Date.now();
+      console.log('Race activity detected - resetting inactivity timer');
+    }
+  }, [participants, raceStatus]);
+  
   // Function to end an inactive race
   const endInactiveRace = useCallback(() => {
     if (!raceId || raceStatus !== 'racing') return;
@@ -946,7 +966,7 @@ const EnhancedRaceMode: React.FC = () => {
     const inactiveTime = now - lastActivityTimeRef.current;
     const inactivityThreshold = 10000; // 10 seconds
     
-    console.log(`Checking race activity: ${inactiveTime}ms since last activity`);
+    console.log(`Checking race activity: ${inactiveTime}ms since last activity from any participant`);
     
     if (inactiveTime > inactivityThreshold) {
       console.log('Race inactive for more than 10 seconds - ending race');
