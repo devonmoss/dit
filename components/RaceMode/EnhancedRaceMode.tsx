@@ -1787,9 +1787,26 @@ const EnhancedRaceMode: React.FC = () => {
         text += levelChars[randomIndex];
       }
       
-      // For the created_by field, ensure we use a valid UUID
-      // If it's an anonymous user, generate a UUID instead of using their anon-ID
-      const createdById = currentUser.id.startsWith('anon-') ? uuidv4() : currentUser.id;
+      // Use consistent ID mapping for anonymous users
+      let createdById = currentUser.id;
+      if (currentUser.id.startsWith('anon-')) {
+        // If user already has a mapped UUID, use it instead of generating a new one
+        if (anonUserIdMapRef.current[currentUser.id]) {
+          createdById = anonUserIdMapRef.current[currentUser.id];
+          console.log('Using existing mapped UUID for anonymous user:', createdById);
+        } else {
+          // Generate a new UUID only if we don't have one yet
+          createdById = uuidv4();
+          anonUserIdMapRef.current[currentUser.id] = createdById;
+          console.log('Generated new UUID for anonymous user:', createdById);
+          
+          // Store in localStorage for persistence
+          if (isBrowser) {
+            localStorage.setItem('morse_anon_user_uuid_map', 
+              JSON.stringify(anonUserIdMapRef.current));
+          }
+        }
+      }
       
       // Create race through API with the same parameters
       const race = await raceService.createRace({
@@ -1800,8 +1817,8 @@ const EnhancedRaceMode: React.FC = () => {
         level_id: state.selectedLevelId
       });
       
-      // For the user_id in race_participants, also use UUID for anonymous users
-      const participantUserId = currentUser.id.startsWith('anon-') ? createdById : currentUser.id;
+      // For the user_id in race_participants, use the same ID consistently
+      const participantUserId = createdById;
       
       // Join race automatically through API
       await raceService.joinRace(race.id, {
