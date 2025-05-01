@@ -92,7 +92,7 @@ const RaceModeSelector: React.FC<{
 const EnhancedRaceMode: React.FC = () => {
   const router = useRouter();
   const { id: queryId } = router.query;
-  const { state } = useAppState();
+  const { state, selectLevel } = useAppState();
   const { user, refreshXpInfo } = useAuth();
   const { playMorseCode, playMorseChar, stopAudio } = useMorseAudio();
   
@@ -331,6 +331,12 @@ const EnhancedRaceMode: React.FC = () => {
       setRaceText(race.text || '');
       setRaceMode(race.mode || 'copy');
       
+      // Store the level ID if it exists in the race data
+      if (race.level_id) {
+        console.log('Setting race level ID:', race.level_id);
+        selectLevel(race.level_id);
+      }
+      
       // Set race status - ENSURE we set to 'created' if the race hasn't actually started
       if (race.status === 'countdown' || race.status === 'racing' || race.status === 'finished') {
         setRaceStatus(race.status);
@@ -418,7 +424,7 @@ const EnhancedRaceMode: React.FC = () => {
       console.error('Error joining race:', err);
       alert('Could not join race. Please try again.');
     }
-  }, [getCurrentUser, getUserDisplayName, stopAudio]);
+  }, [getCurrentUser, getUserDisplayName, stopAudio, selectLevel]);
   
   // Initialize race ID from URL if present
   useEffect(() => {
@@ -697,7 +703,7 @@ const EnhancedRaceMode: React.FC = () => {
       }
       stopAudio();
     };
-  }, [raceId, getCurrentUser, playMorseCode, stopAudio, getUserDisplayName, playMorseChar]);
+  }, [raceId, getCurrentUser, playMorseCode, stopAudio, getUserDisplayName, playMorseChar, selectLevel]);
   
   // Create a new race
   const createRace = useCallback(async (options?: { mode: 'copy' | 'send' }) => {
