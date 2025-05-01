@@ -35,6 +35,7 @@ import {
 } from '../../types/raceTypes';
 import { useAnonymousUser } from '../../hooks/useAnonymousUser';
 import { useRaceChannel } from '../../hooks/useRaceChannel';
+import { useRaceProgress } from '../../hooks/useRaceProgress';
 
 const EnhancedRaceMode: React.FC = () => {
   const router = useRouter();
@@ -69,13 +70,10 @@ const EnhancedRaceMode: React.FC = () => {
   const [isCreatingRace, setIsCreatingRace] = useState(false);
   // Presence state for connected participants
   const [onlineUsers, setOnlineUsers] = useState<AnyRecord[]>([]);
-  const [userProgress, setUserProgress] = useState(0);
-  const [errorCount, setErrorCount] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [finishTime, setFinishTime] = useState<number | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(5);
   const [userInput, setUserInput] = useState('');
-  const [currentCharIndex, setCurrentCharIndex] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [xpEarned, setXpEarned] = useState<XpEarned | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -85,21 +83,8 @@ const EnhancedRaceMode: React.FC = () => {
   
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   
-  // Reference to store the latest progress for database syncing
-  const latestProgressRef = useRef<number>(0);
-  // Track when we last sent a database update to avoid too many requests
-  const lastUpdateTimeRef = useRef<number>(0);
-  const pendingUpdateRef = useRef<boolean>(false);
-  const raceFinishedRef = useRef<boolean>(false);
-  
   // First, add a state for the visual feedback
   const [showCorrectIndicator, setShowCorrectIndicator] = useState(false);
-  
-  // Add a reference to track the last activity time
-  const lastActivityTimeRef = useRef<number>(0);
-  
-  // Add a reference to track the inactivity check interval
-  const inactivityIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // For send mode with arrow keys (similar to SendingMode)
   const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
@@ -128,6 +113,33 @@ const EnhancedRaceMode: React.FC = () => {
     setInitialParticipants,
     clearInvitation
   } = useRaceChannel(raceId, currentUserId, currentUserName);
+  
+  // Use the race progress hook
+  const {
+    userProgress,
+    errorCount,
+    currentCharIndex,
+    latestProgressRef,
+    pendingUpdateRef,
+    lastActivityTimeRef,
+    updateProgress: updateProgressInDatabase,
+    incrementProgress,
+    incrementErrorCount,
+    resetProgress,
+    checkInactivity
+  } = useRaceProgress({
+    raceId,
+    raceText,
+    raceStatus,
+    broadcastProgress,
+    onComplete: () => {
+      if (raceId && currentUser) {
+        finishRace();
+      }
+    },
+    getMappedUserId,
+    getCurrentUser
+  });
   
   // Keep participants in sync with race channel
   useEffect(() => {
@@ -189,6 +201,9 @@ const EnhancedRaceMode: React.FC = () => {
     try {
       console.log('Joining race:', raceId, 'as user:', currentUser.id);
       
+      // Reset progress for a new race
+      resetProgress();
+      
       // Get proper user ID with mapping for anonymous users
       const participantUserId = getMappedUserId(currentUser.id);
       
@@ -239,22 +254,14 @@ const EnhancedRaceMode: React.FC = () => {
           if (userParticipant.finished) {
             console.log('User already finished the race - showing results');
             // Set user progress and mark as finished
-            setUserProgress(100);
-            raceFinishedRef.current = true;
+            updateProgressInDatabase(race.text?.length || 0, participantUserId);
             setFinishTime(userParticipant.finish_time);
             setStartTime(race.start_time);
-            setErrorCount(userParticipant.error_count || 0);
-            // Set character index to the end
-            setCurrentCharIndex(race.text?.length || 0);
           } else if (userParticipant.progress > 0) {
             console.log('User has existing progress:', userParticipant.progress);
             // Restore user progress
-            const progressPercent = Math.round((userParticipant.progress / (race.text?.length || 1)) * 100);
-            setUserProgress(progressPercent);
-            latestProgressRef.current = userParticipant.progress;
+            updateProgressInDatabase(userParticipant.progress, participantUserId);
             // Set character index to their progress
-            setCurrentCharIndex(userParticipant.progress);
-            setErrorCount(userParticipant.error_count || 0);
           }
         }
         
@@ -304,139 +311,7 @@ const EnhancedRaceMode: React.FC = () => {
       console.error('Error joining race:', err);
       alert('Could not join race. Please try again.');
     }
-  }, [getCurrentUser, getUserDisplayName, stopAudio, selectLevel, getMappedUserId, setInitialParticipants]);
-  
-  // Update progress in database with proper throttling
-  const updateProgressInDatabase = useCallback((progress: number, userId: string) => {
-    if (!raceId) return;
-    
-    const now = Date.now();
-    // Only update if it's been more than 500ms since last update or if this is a forced update
-    if (now - lastUpdateTimeRef.current > 500) {
-      console.log('Sending throttled database update, progress:', progress, 'errors:', errorCount);
-      
-      // Call the race service to update progress
-      raceService.updateProgress(raceId, userId, progress, errorCount)
-        .then(() => {
-          console.log('Progress updated successfully in database');
-          
-          // Update the last update timestamp
-          lastUpdateTimeRef.current = now;
-          pendingUpdateRef.current = false;
-          
-          // Also broadcast the update via the race channel
-          broadcastProgress(progress, errorCount);
-          
-          // Reset activity time
-          lastActivityTimeRef.current = Date.now();
-        })
-        .catch(error => {
-          console.error('Error updating progress:', error);
-        });
-    } else {
-      // If we're throttling, mark that we have a pending update
-      pendingUpdateRef.current = true;
-      console.log('Throttling update, will send in next batch');
-    }
-  }, [raceId, errorCount, broadcastProgress]);
-  
-  // Replace the handleRaceAgain function to use broadcastRedirect
-  const handleRaceAgain = useCallback(async () => {
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
-      alert('Error creating race');
-      return;
-    }
-    
-    try {
-      setIsCreatingRace(true);
-      
-      // Reset state for a new race
-      stopAudio();
-      setUserProgress(0);
-      setCurrentCharIndex(0);
-      setErrorCount(0);
-      setStartTime(null);
-      setFinishTime(null);
-      raceFinishedRef.current = false;
-      
-      // Generate new race text with the same parameters
-      const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
-      const levelChars = currentLevel && currentLevel.chars.length > 0 ? 
-        [...currentLevel.chars] : 
-        state.chars.length > 0 ? [...state.chars] : 
-        'abcdefghijklmnopqrstuvwxyz'.split('');
-      
-      const raceLength = 20;
-      let text = '';
-      
-      for (let i = 0; i < raceLength; i++) {
-        const randomIndex = Math.floor(Math.random() * levelChars.length);
-        text += levelChars[randomIndex];
-      }
-      
-      // Use getMappedUserId for consistent ID
-      const createdById = getMappedUserId(currentUser.id);
-      
-      // Create race through API with the same parameters
-      const race = await raceService.createRace({
-        created_by: createdById,
-        mode: raceMode,
-        char_sequence: text.split(''),
-        text: text,
-        level_id: state.selectedLevelId
-      });
-      
-      // Join race automatically through API
-      await raceService.joinRace(race.id, {
-        user_id: createdById,
-        name: getUserDisplayName(currentUser)
-      });
-      
-      // Broadcast a redirect message using the race channel
-      if (raceId) {
-        const initiatorName = getUserDisplayName(currentUser);
-        await broadcastRedirect(race.id, initiatorName);
-      }
-      
-      // Set the race creator
-      setRaceCreator(createdById);
-      
-      // Update local state
-      setRaceId(race.id);
-      setRaceText(text);
-      setRaceStatus('created');
-      setInitialParticipants([{
-        id: createdById,
-        name: getUserDisplayName(currentUser),
-        progress: 0,
-        finished: false
-      }]);
-      
-      // Move to share stage
-      setRaceStage(RaceStage.SHARE);
-      
-      // Navigate to /race?id=race.id with full page reload
-      window.location.href = `/race?id=${race.id}`;
-      
-    } catch (err) {
-      console.error('Error creating race:', err);
-      alert('Could not create race. Please try again.');
-    } finally {
-      setIsCreatingRace(false);
-    }
-  }, [
-    getCurrentUser, 
-    getUserDisplayName, 
-    raceMode, 
-    state.chars, 
-    state.selectedLevelId, 
-    stopAudio, 
-    raceId, 
-    getMappedUserId,
-    broadcastRedirect,
-    setInitialParticipants
-  ]);
+  }, [getCurrentUser, getUserDisplayName, stopAudio, selectLevel, getMappedUserId, setInitialParticipants, resetProgress, updateProgressInDatabase]);
   
   // Initialize race ID from URL if present
   useEffect(() => {
@@ -502,13 +377,6 @@ const EnhancedRaceMode: React.FC = () => {
   const finishRace = useCallback(async () => {
     const currentUser = getCurrentUser();
     if (!currentUser || !raceId || !startTime) return;
-    
-    // Prevent multiple executions
-    if (raceFinishedRef.current) {
-      console.log('Race already finished, preventing duplicate execution');
-      return;
-    }
-    raceFinishedRef.current = true;
     
     const endTime = Date.now();
     setFinishTime(endTime);
@@ -701,41 +569,24 @@ const EnhancedRaceMode: React.FC = () => {
         const newInput = userInput + input;
         setUserInput(newInput);
         
-        // Calculate new progress
-        const newProgress = Math.round(((currentCharIndex + 1) / raceText.length) * 100);
-        setUserProgress(newProgress);
+        // Get proper user ID with mapping
+        const userId = getMappedUserId(currentUser.id);
         
-        // Update latest progress reference for database syncing
-        latestProgressRef.current = currentCharIndex + 1;
+        // Increment progress using the hook function
+        incrementProgress(currentCharIndex, userId);
         
-        // Move to next character
-        const nextCharIndex = currentCharIndex + 1;
-        setCurrentCharIndex(nextCharIndex);
-        
-        // Update progress in database
-        if (raceId) {
-          // Mark that we have a new update, but let the throttling handle when to actually send it
-          pendingUpdateRef.current = true;
-          
-          // Get proper user ID with mapping
-          const userId = getMappedUserId(currentUser.id);
-          
-          // Try to update, but the throttle mechanism will decide if it happens now or later
-          updateProgressInDatabase(currentCharIndex + 1, userId);
-          
-          // Check if user has completed the race
-          if (nextCharIndex >= raceText.length) {
-            finishRace();
-            stopAudio();
-          } else if (raceMode === 'copy') {
-            // Only play the next character in copy mode
-            playMorseChar(raceText[nextCharIndex]);
-          }
+        // Check if user has completed the race
+        if (currentCharIndex + 1 >= raceText.length) {
+          finishRace();
+          stopAudio();
+        } else if (raceMode === 'copy') {
+          // Only play the next character in copy mode
+          playMorseChar(raceText[currentCharIndex + 1]);
         }
       }, 400); // 400ms pause
     } else {
       // Incorrect input - play error sound
-      setErrorCount(prev => prev + 1);
+      incrementErrorCount();
       
       if (audioContext) {
         audioContext.playErrorSound().then(() => {
@@ -763,7 +614,6 @@ const EnhancedRaceMode: React.FC = () => {
   }, [
     raceStage, 
     raceText, 
-    raceId, 
     getCurrentUser, 
     finishRace, 
     stopAudio, 
@@ -771,10 +621,11 @@ const EnhancedRaceMode: React.FC = () => {
     playMorseChar, 
     audioContext, 
     userInput, 
-    updateProgressInDatabase,
     raceMode, 
     replayCurrent, 
-    getMappedUserId
+    getMappedUserId,
+    incrementProgress,
+    incrementErrorCount
   ]);
   
   // Calculate race statistics for results view - use calculation function
@@ -913,62 +764,17 @@ const EnhancedRaceMode: React.FC = () => {
     };
   }, [raceId, raceStage, getCurrentUser]);
   
-  // Effect to process pending updates
-  useEffect(() => {
-    if (!raceStage || raceStage !== RaceStage.RACING) return;
-    
-    const currentUser = getCurrentUser();
-    if (!currentUser) return;
-    
-    // Set up a timer to periodically update database if throttled updates are pending
-    const intervalId = setInterval(() => {
-      // Check if we have pending updates
-      if (pendingUpdateRef.current && latestProgressRef.current > 0) {
-        const userId = getMappedUserId(currentUser.id);
-        console.log('Sending periodic update for throttled progress:', latestProgressRef.current);
-        updateProgressInDatabase(latestProgressRef.current, userId);
-      }
-    }, 500); // Check every 500ms to match the throttle time
-    
-    return () => {
-      clearInterval(intervalId);
-      
-      // Do a final update when unmounting if we have pending changes
-      if (pendingUpdateRef.current && latestProgressRef.current > 0) {
-        // Get proper user ID with mapping
-        const userId = getMappedUserId(currentUser.id);
-        console.log('Sending final update before unmounting:', latestProgressRef.current);
-        updateProgressInDatabase(latestProgressRef.current, userId);
-      }
-    };
-  }, [raceStage, updateProgressInDatabase, getCurrentUser, getMappedUserId]);
-  
   // Helper function to get the user ID to display (either mapped UUID or regular ID)
   const getUserIdForDisplay = useCallback((userId: string) => {
     return getMappedUserId(userId);
   }, [getMappedUserId]);
   
-  // Add an effect that updates the activity time when participants make progress
-  useEffect(() => {
-    // Only track activity during racing
-    if (raceStatus === 'racing') {
-      // Update the last activity time when any participant makes progress
-      lastActivityTimeRef.current = Date.now();
-      console.log('Race activity detected - resetting inactivity timer');
-    }
-  }, [participants, raceStatus]);
-  
   // Function to end an inactive race
   const endInactiveRace = useCallback(() => {
     if (!raceId || raceStatus !== 'racing') return;
     
-    const now = Date.now();
-    const inactiveTime = now - lastActivityTimeRef.current;
-    const inactivityThreshold = 10000; // 10 seconds
-    
-    console.log(`Checking race activity: ${inactiveTime}ms since last activity from any participant`);
-    
-    if (inactiveTime > inactivityThreshold) {
+    // Use the checkInactivity function from the hook
+    if (checkInactivity()) {
       console.log('Race inactive for more than 10 seconds - ending race');
       raceService.updateRaceStatus(raceId, 'finished')
         .then(() => {
@@ -981,8 +787,14 @@ const EnhancedRaceMode: React.FC = () => {
           console.error('Error ending inactive race:', error);
         });
     }
-  }, [raceId, raceStatus, stopAudio]);
+  }, [raceId, raceStatus, stopAudio, checkInactivity]);
   
+  // Add reference for inactivity check interval
+  const inactivityIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Add reference for race finished state
+  const raceFinishedRef = useRef<boolean>(false);
+
   // Effect to track activity and end inactive races
   useEffect(() => {
     // Only monitor activity during racing state
@@ -994,9 +806,6 @@ const EnhancedRaceMode: React.FC = () => {
       }
       return;
     }
-    
-    // Initialize the last activity time when race starts
-    lastActivityTimeRef.current = Date.now();
     
     // Set up interval to check for inactivity
     inactivityIntervalRef.current = setInterval(endInactiveRace, 5000); // Check every 5 seconds
@@ -1053,17 +862,14 @@ const EnhancedRaceMode: React.FC = () => {
     setRaceStatus('created'); // Reset race status
     setRaceId(null); // Reset race ID
     stopAudio();
-    // Reset other state
-    setUserProgress(0);
-    setCurrentCharIndex(0);
-    setErrorCount(0);
+    // Reset progress state
+    resetProgress();
     setStartTime(null);
     setFinishTime(null);
-    raceFinishedRef.current = false;
     
     // Navigate to home page without using history.pushState
     router.push('/');
-  }, [stopAudio, router]);
+  }, [stopAudio, router, resetProgress]);
   
   // Debugging to ensure host detection is working
   useEffect(() => {
@@ -1089,6 +895,9 @@ const EnhancedRaceMode: React.FC = () => {
       alert('Error creating anonymous user');
       return;
     }
+    
+    // Reset progress for a new race
+    resetProgress();
     
     // Get the selected mode or default to 'copy'
     const mode = options?.mode || 'copy';
@@ -1152,7 +961,7 @@ const EnhancedRaceMode: React.FC = () => {
       console.error('Error creating race:', err);
       alert('Could not create race. Please try again.');
     }
-  }, [getCurrentUser, getUserDisplayName, getMappedUserId, state.chars, state.selectedLevelId, router, setInitialParticipants]);
+  }, [getCurrentUser, getUserDisplayName, getMappedUserId, state.chars, state.selectedLevelId, router, setInitialParticipants, resetProgress]);
   
   // Restore the updateProgress reference for compatibility
   useEffect(() => {
@@ -1163,6 +972,102 @@ const EnhancedRaceMode: React.FC = () => {
       }
     };
   }, [broadcastProgress, getMappedUserId, currentUser, errorCount]);
+  
+  // Replace the handleRaceAgain function to use broadcastRedirect
+  const handleRaceAgain = useCallback(async () => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      alert('Error creating race');
+      return;
+    }
+    
+    try {
+      setIsCreatingRace(true);
+      
+      // Reset state for a new race
+      stopAudio();
+      resetProgress();
+      setStartTime(null);
+      setFinishTime(null);
+      
+      // Generate new race text with the same parameters
+      const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
+      const levelChars = currentLevel && currentLevel.chars.length > 0 ? 
+        [...currentLevel.chars] : 
+        state.chars.length > 0 ? [...state.chars] : 
+        'abcdefghijklmnopqrstuvwxyz'.split('');
+      
+      const raceLength = 20;
+      let text = '';
+      
+      for (let i = 0; i < raceLength; i++) {
+        const randomIndex = Math.floor(Math.random() * levelChars.length);
+        text += levelChars[randomIndex];
+      }
+      
+      // Use getMappedUserId for consistent ID
+      const createdById = getMappedUserId(currentUser.id);
+      
+      // Create race through API with the same parameters
+      const race = await raceService.createRace({
+        created_by: createdById,
+        mode: raceMode,
+        char_sequence: text.split(''),
+        text: text,
+        level_id: state.selectedLevelId
+      });
+      
+      // Join race automatically through API
+      await raceService.joinRace(race.id, {
+        user_id: createdById,
+        name: getUserDisplayName(currentUser)
+      });
+      
+      // Broadcast a redirect message using the race channel
+      if (raceId) {
+        const initiatorName = getUserDisplayName(currentUser);
+        await broadcastRedirect(race.id, initiatorName);
+      }
+      
+      // Set the race creator
+      setRaceCreator(createdById);
+      
+      // Update local state
+      setRaceId(race.id);
+      setRaceText(text);
+      setRaceStatus('created');
+      setInitialParticipants([{
+        id: createdById,
+        name: getUserDisplayName(currentUser),
+        progress: 0,
+        finished: false
+      }]);
+      
+      // Move to share stage
+      setRaceStage(RaceStage.SHARE);
+      
+      // Navigate to /race?id=race.id with full page reload
+      window.location.href = `/race?id=${race.id}`;
+      
+    } catch (err) {
+      console.error('Error creating race:', err);
+      alert('Could not create race. Please try again.');
+    } finally {
+      setIsCreatingRace(false);
+    }
+  }, [
+    getCurrentUser, 
+    getUserDisplayName, 
+    raceMode, 
+    state.chars, 
+    state.selectedLevelId, 
+    stopAudio, 
+    raceId, 
+    getMappedUserId,
+    broadcastRedirect,
+    setInitialParticipants,
+    resetProgress
+  ]);
   
   // Render appropriate stage of race
   return (
