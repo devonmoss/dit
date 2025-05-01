@@ -431,18 +431,6 @@ const EnhancedRaceMode: React.FC = () => {
   // Only depend on queryId to prevent re-joining when raceId changes for other reasons
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryId]);
-
-  // Add separate effect to clear query parameter when going to INFO stage
-  useEffect(() => {
-    if (raceStage === RaceStage.INFO && router.query.id) {
-      // Remove race ID from URL without full navigation
-      const newUrl = window.location.pathname;
-      window.history.pushState({ path: newUrl }, '', newUrl);
-      
-      // Also clear the router's query object
-      router.replace(router.pathname, undefined, { shallow: true });
-    }
-  }, [raceStage, router]);
   
   // Set up and clean up the channel subscription
   useEffect(() => {
@@ -532,8 +520,8 @@ const EnhancedRaceMode: React.FC = () => {
         
         if (confirmRedirect) {
           console.log(`User confirmed redirect to race: ${new_race_id}`);
-          // Navigate to the new race
-          router.push(`/race?id=${new_race_id}`);
+          // Use window.location for a full page reload instead of router.push
+          window.location.href = `/race?id=${new_race_id}`;
         } else {
           console.log('User declined redirect');
         }
@@ -1748,12 +1736,9 @@ const EnhancedRaceMode: React.FC = () => {
     setFinishTime(null);
     raceFinishedRef.current = false;
     
-    // Remove race ID from URL without triggering navigation events
-    if (typeof window !== 'undefined') {
-      const newUrl = window.location.pathname;
-      window.history.pushState({ path: newUrl }, '', newUrl);
-    }
-  }, [stopAudio]);
+    // Navigate to home page without using history.pushState
+    router.push('/');
+  }, [stopAudio, router]);
   
   // Debugging to ensure host detection is working
   useEffect(() => {
@@ -1878,8 +1863,8 @@ const EnhancedRaceMode: React.FC = () => {
       // Move to share stage
       setRaceStage(RaceStage.SHARE);
       
-      // Navigate to /race?id=race.id
-      router.push(`/race?id=${race.id}`);
+      // Navigate to /race?id=race.id with full page reload
+      window.location.href = `/race?id=${race.id}`;
       
     } catch (err) {
       console.error('Error creating race:', err);
