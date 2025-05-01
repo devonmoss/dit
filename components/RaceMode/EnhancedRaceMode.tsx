@@ -33,6 +33,7 @@ import {
   XpEarned,
   RaceStats
 } from '../../types/raceTypes';
+import { useAnonymousUser } from '../../hooks/useAnonymousUser';
 
 const EnhancedRaceMode: React.FC = () => {
   const router = useRouter();
@@ -40,6 +41,14 @@ const EnhancedRaceMode: React.FC = () => {
   const { state, selectLevel } = useAppState();
   const { user, refreshXpInfo } = useAuth();
   const { playMorseCode, playMorseChar, stopAudio } = useMorseAudio();
+  
+  // Use the anonymous user hook
+  const { 
+    getCurrentUser, 
+    getUserDisplayName, 
+    getMappedUserId,
+    anonUserIdMap 
+  } = useAnonymousUser(user);
   
   // Initialize audio context on client-side only
   const [audioContext, setAudioContext] = useState<ReturnType<typeof createAudioContext> | null>(null);
@@ -75,8 +84,6 @@ const EnhancedRaceMode: React.FC = () => {
   
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   
-  const [anonymousUser, setAnonymousUser] = useState<AnonymousUser | null>(null);
-  
   // Reference to store the latest progress for database syncing
   const latestProgressRef = useRef<number>(0);
   // Track when we last sent a database update to avoid too many requests
@@ -86,12 +93,6 @@ const EnhancedRaceMode: React.FC = () => {
   
   // First, add a state for the visual feedback
   const [showCorrectIndicator, setShowCorrectIndicator] = useState(false);
-  
-  // Add a reference to store the mapped anonymous user IDs
-  const anonUserIdMapRef = useRef<{[key: string]: string}>({});
-  
-  // Add a reference to store the updateProgress function
-  const updateProgressRef = useRef<((progress: number) => void) | null>(null);
   
   // Add a reference to track the last activity time
   const lastActivityTimeRef = useRef<number>(0);
@@ -104,11 +105,11 @@ const EnhancedRaceMode: React.FC = () => {
   const [keyerOutput, setKeyerOutput] = useState('');
   const sendQueueRef = useRef<string[]>([]);
   
-  // Helper function to get display name for a user
-  const getUserDisplayName = useCallback((user: User | any) => {
-    if (!user) return 'Anonymous';
-    return user.user_metadata?.username || user.user_metadata?.full_name || 'Anonymous';
-  }, []);
+  // Add a reference to track the updateProgress function
+  const updateProgressRef = useRef<((progress: number) => void) | null>(null);
+  
+  // Add a state to track race creator
+  const [raceCreator, setRaceCreator] = useState<string | null>(null);
   
   // Throttled function to update the database - only sends updates every 500ms at most
   const updateProgressInDatabase = useCallback((progress: number, userId: string) => {
@@ -116,8 +117,8 @@ const EnhancedRaceMode: React.FC = () => {
     
     // For anonymous users, use the mapped UUID
     let dbUserId = userId;
-    if (userId.startsWith('anon-') && anonUserIdMapRef.current[userId]) {
-      dbUserId = anonUserIdMapRef.current[userId];
+    if (userId.startsWith('anon-') && anonUserIdMap[userId]) {
+      dbUserId = anonUserIdMap[userId];
     }
     
     const now = Date.now();
@@ -138,74 +139,7 @@ const EnhancedRaceMode: React.FC = () => {
       // If we're throttling, mark that we have a pending update
       pendingUpdateRef.current = true;
     }
-  }, [raceId, errorCount]);
-  
-  // Initialize anonymous user mapping from localStorage
-  useEffect(() => {
-    if (isBrowser) {
-      // Check for stored UUID mapping
-      const storedMapping = localStorage.getItem('morse_anon_user_uuid_map');
-      if (storedMapping) {
-        try {
-          anonUserIdMapRef.current = JSON.parse(storedMapping);
-        } catch (e) {
-          console.error('Error parsing stored anonymous user mapping:', e);
-        }
-      }
-    }
-  }, []);
-  
-  // Modify the anonymous user handling
-  const getCurrentUser = useCallback(() => {
-    if (user) return user;
-    
-    // Create anonymous user if not created yet
-    if (!anonymousUser) {
-      // Use a consistent approach for anonymous users to prevent hydration mismatches
-      let anonUserId = '';
-      let anonUserName = '';
-      
-      // Only access localStorage on the client side
-      if (isBrowser) {
-        // Try to get existing anonymous user ID from localStorage
-        anonUserId = localStorage.getItem('morse_anon_user_id') || '';
-        anonUserName = localStorage.getItem('morse_anon_user_name') || '';
-        
-        // If no existing ID, create a new one and store it
-        if (!anonUserId) {
-          anonUserId = `anon-${Math.random().toString(36).substring(2, 10)}`;
-          anonUserName = `Anonymous-${Math.floor(Math.random() * 1000)}`;
-          localStorage.setItem('morse_anon_user_id', anonUserId);
-          localStorage.setItem('morse_anon_user_name', anonUserName);
-        }
-      } else {
-        // For server-side rendering, use a consistent placeholder
-        // This will be replaced with the localStorage value on client
-        anonUserId = 'anon-user';
-        anonUserName = 'Anonymous';
-      }
-      
-      const newAnonymousUser: AnonymousUser = {
-        id: anonUserId,
-        email: anonUserName,
-        user_metadata: { full_name: anonUserName }
-      };
-      setAnonymousUser(newAnonymousUser);
-      return newAnonymousUser;
-    }
-    
-    return anonymousUser;
-  }, [user, anonymousUser]);
-  
-  // Use effect to initialize anonymous user on client side
-  useEffect(() => {
-    if (!user && isBrowser) {
-      getCurrentUser();
-    }
-  }, [user, getCurrentUser]);
-  
-  // Add a state to track race creator
-  const [raceCreator, setRaceCreator] = useState<string | null>(null);
+  }, [raceId, errorCount, anonUserIdMap]);
   
   // Modify the joinRace function to handle anonymous user persistence
   const joinRace = useCallback(async (raceId: string) => {
@@ -215,41 +149,8 @@ const EnhancedRaceMode: React.FC = () => {
     try {
       console.log('Joining race:', raceId, 'as user:', currentUser.id);
       
-      // For anonymous users, generate a consistent UUID
-      let participantUserId = currentUser.id;
-      if (currentUser.id.startsWith('anon-')) {
-        // Check for stored UUID for this race in localStorage first
-        const raceParticipantKey = `morse_race_${raceId}_participant_${currentUser.id}`;
-        let storedUuid = '';
-        
-        if (isBrowser) {
-          storedUuid = localStorage.getItem(raceParticipantKey) || '';
-        }
-        
-        if (storedUuid) {
-          // Use the stored UUID
-          console.log('Using stored UUID for anonymous user:', storedUuid);
-          participantUserId = storedUuid;
-          // Update the ref map
-          anonUserIdMapRef.current[currentUser.id] = storedUuid;
-        } else {
-          // Check if we already have a UUID for this anonymous user
-          if (!anonUserIdMapRef.current[currentUser.id]) {
-            // Generate a new UUID and store it
-            const newUuid = uuidv4();
-            anonUserIdMapRef.current[currentUser.id] = newUuid;
-            
-            // Store in localStorage for persistence
-            if (isBrowser) {
-              localStorage.setItem(raceParticipantKey, newUuid);
-              // Also update the overall mapping
-              localStorage.setItem('morse_anon_user_uuid_map', 
-                JSON.stringify(anonUserIdMapRef.current));
-            }
-          }
-          participantUserId = anonUserIdMapRef.current[currentUser.id];
-        }
-      }
+      // Get proper user ID with mapping for anonymous users
+      const participantUserId = getMappedUserId(currentUser.id);
       
       // Get race details from API
       const race = await raceService.getRaceDetails(raceId);
@@ -357,7 +258,7 @@ const EnhancedRaceMode: React.FC = () => {
       console.error('Error joining race:', err);
       alert('Could not join race. Please try again.');
     }
-  }, [getCurrentUser, getUserDisplayName, stopAudio, selectLevel]);
+  }, [getCurrentUser, getUserDisplayName, stopAudio, selectLevel, getMappedUserId]);
   
   // Initialize race ID from URL if present
   useEffect(() => {
@@ -380,16 +281,8 @@ const EnhancedRaceMode: React.FC = () => {
     if (raceId && currentUser) {
       console.log('Setting up realtime channel for race:', raceId, 'user:', currentUser.id);
       
-      // Get the mapped UUID for anonymous users
-      let presenceUserId = currentUser.id;
-      if (currentUser.id.startsWith('anon-')) {
-        // Check if we already have a UUID for this anonymous user
-        if (!anonUserIdMapRef.current[currentUser.id]) {
-          // Generate a new UUID and store it
-          anonUserIdMapRef.current[currentUser.id] = uuidv4();
-        }
-        presenceUserId = anonUserIdMapRef.current[currentUser.id];
-      }
+      // Get mapped user ID for presence tracking
+      const presenceUserId = getMappedUserId(currentUser.id);
       
       // Open a realtime channel with presence enabled
       channel = supabase.channel(`race_${raceId}`, {
@@ -630,10 +523,10 @@ const EnhancedRaceMode: React.FC = () => {
       }
       stopAudio();
     };
-  }, [raceId, getCurrentUser, playMorseCode, stopAudio, getUserDisplayName, playMorseChar, selectLevel]);
+  }, [raceId, getCurrentUser, playMorseCode, stopAudio, getUserDisplayName, playMorseChar, selectLevel, getMappedUserId]);
   
   // Create a new race
-  const createRace = useCallback(async (options?: { mode: 'copy' | 'send' }) => {
+  const createRace = useCallback(async (options?: { mode: RaceMode }) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
       alert('Error creating anonymous user');
@@ -660,9 +553,8 @@ const EnhancedRaceMode: React.FC = () => {
     }
     
     try {
-      // For the created_by field, ensure we use a valid UUID
-      // If it's an anonymous user, generate a UUID instead of using their anon-ID
-      const createdById = currentUser.id.startsWith('anon-') ? uuidv4() : currentUser.id;
+      // For the created_by field, use getMappedUserId to generate a consistent ID
+      const createdById = getMappedUserId(currentUser.id);
       
       // Set the race creator
       setRaceCreator(createdById);
@@ -676,8 +568,8 @@ const EnhancedRaceMode: React.FC = () => {
         level_id: state.selectedLevelId
       });
       
-      // For the user_id in race_participants, also use UUID for anonymous users
-      const participantUserId = currentUser.id.startsWith('anon-') ? createdById : currentUser.id;
+      // For the user_id in race_participants, also use consistent ID
+      const participantUserId = createdById;
       
       // Join race automatically through API
       const joinResult = await raceService.joinRace(race.id, {
@@ -706,7 +598,7 @@ const EnhancedRaceMode: React.FC = () => {
       console.error('Error creating race:', err);
       alert('Could not create race. Please try again.');
     }
-  }, [getCurrentUser, state.chars, state.selectedLevelId, router, getUserDisplayName]);
+  }, [getCurrentUser, getUserDisplayName, getMappedUserId, state.chars, state.selectedLevelId, router]);
   
   // Start the race
   const startRace = useCallback(async () => {
@@ -770,11 +662,8 @@ const EnhancedRaceMode: React.FC = () => {
     // Calculate race duration in seconds
     const raceDuration = (endTime - startTime) / 1000;
     
-    // For anonymous users, use the mapped UUID
-    let dbUserId = currentUser.id;
-    if (currentUser.id.startsWith('anon-') && anonUserIdMapRef.current[currentUser.id]) {
-      dbUserId = anonUserIdMapRef.current[currentUser.id];
-    }
+    // Get the properly mapped user ID for database operations
+    const dbUserId = getMappedUserId(currentUser.id);
     
     try {
       console.log('User finished race - updating final state');
@@ -863,7 +752,7 @@ const EnhancedRaceMode: React.FC = () => {
     } catch (err) {
       console.error('Error finishing race:', err);
     }
-  }, [raceId, startTime, getCurrentUser, raceText.length, errorCount, user, raceMode, refreshXpInfo]);
+  }, [raceId, startTime, getCurrentUser, raceText.length, errorCount, user, raceMode, refreshXpInfo, getMappedUserId]);
   
   // Handle user input during race 
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -911,11 +800,8 @@ const EnhancedRaceMode: React.FC = () => {
           // Mark that we have a new update, but let the throttling handle when to actually send it
           pendingUpdateRef.current = true;
           
-          // Get the mapped ID for anonymous users
-          let userId = currentUser.id;
-          if (currentUser.id.startsWith('anon-') && anonUserIdMapRef.current[currentUser.id]) {
-            userId = anonUserIdMapRef.current[currentUser.id];
-          }
+          // Get proper user ID with mapping
+          const userId = getMappedUserId(currentUser.id);
           
           // Try to update, but the throttle mechanism will decide if it happens now or later
           updateProgressInDatabase(correctCount, userId);
@@ -1069,11 +955,8 @@ const EnhancedRaceMode: React.FC = () => {
             // Mark that we have a new update, but let the throttling handle when to actually send it
             pendingUpdateRef.current = true;
             
-            // Get the mapped ID for anonymous users
-            let userId = currentUser.id;
-            if (currentUser.id.startsWith('anon-') && anonUserIdMapRef.current[currentUser.id]) {
-              userId = anonUserIdMapRef.current[currentUser.id];
-            }
+            // Get proper user ID with mapping
+            const userId = getMappedUserId(currentUser.id);
             
             // Try to update, but the throttle mechanism will decide if it happens now or later
             updateProgressInDatabase(currentCharIndex + 1, userId);
@@ -1104,7 +987,7 @@ const EnhancedRaceMode: React.FC = () => {
       }
     }
   }, [raceStage, getCurrentUser, decodeMorseCode, raceText, currentCharIndex, userInput, raceId, 
-      channelRef, anonUserIdMapRef, updateProgressInDatabase, finishRace, stopAudio, audioContext, updateProgressRef]);
+      channelRef, anonUserIdMap, updateProgressInDatabase, finishRace, stopAudio, audioContext, updateProgressRef]);
 
   // Key processing interval for send mode - properly implementing iambic keyer behavior
   useEffect(() => {
@@ -1321,11 +1204,8 @@ const EnhancedRaceMode: React.FC = () => {
             // Mark that we have a new update, but let the throttling handle when to actually send it
             pendingUpdateRef.current = true;
             
-            // Get the mapped ID for anonymous users
-            let userId = currentUser.id;
-            if (currentUser.id.startsWith('anon-') && anonUserIdMapRef.current[currentUser.id]) {
-              userId = anonUserIdMapRef.current[currentUser.id];
-            }
+            // Get proper user ID with mapping
+            const userId = getMappedUserId(currentUser.id);
             
             // Try to update, but the throttle mechanism will decide if it happens now or later
             updateProgressInDatabase(currentCharIndex + 1, userId);
@@ -1438,8 +1318,8 @@ const EnhancedRaceMode: React.FC = () => {
         if (latestProgressRef.current === 0) {
           // Get proper user ID - for anonymous users, use the mapped UUID
           let dbUserId = currentUser.id;
-          if (currentUser.id.startsWith('anon-') && anonUserIdMapRef.current[currentUser.id]) {
-            dbUserId = anonUserIdMapRef.current[currentUser.id];
+          if (currentUser.id.startsWith('anon-') && anonUserIdMap[currentUser.id]) {
+            dbUserId = anonUserIdMap[currentUser.id];
             console.log('Using mapped UUID for anonymous user:', { 
               anonId: currentUser.id, 
               mappedId: dbUserId 
@@ -1485,8 +1365,8 @@ const EnhancedRaceMode: React.FC = () => {
         try {
           // Get the mapped UUID for anonymous users
           let dbUserId = currentUser.id;
-          if (currentUser.id.startsWith('anon-') && anonUserIdMapRef.current[currentUser.id]) {
-            dbUserId = anonUserIdMapRef.current[currentUser.id];
+          if (currentUser.id.startsWith('anon-') && anonUserIdMap[currentUser.id]) {
+            dbUserId = anonUserIdMap[currentUser.id];
           }
           
           // For best-effort final save, use sendBeacon to our API
@@ -1520,17 +1400,11 @@ const EnhancedRaceMode: React.FC = () => {
     const currentUser = getCurrentUser();
     if (!currentUser) return;
     
-    // Capture current values to prevent closure issues
-    const userIdMap = { ...anonUserIdMapRef.current };
-    
     // Set up an interval to check for pending updates
     const intervalId = setInterval(() => {
       if (pendingUpdateRef.current) {
-        // Use the mapped ID for anonymous users
-        let userId = currentUser.id;
-        if (currentUser.id.startsWith('anon-') && userIdMap[currentUser.id]) {
-          userId = userIdMap[currentUser.id];
-        }
+        // Get proper user ID with mapping
+        const userId = getMappedUserId(currentUser.id);
         
         updateProgressInDatabase(latestProgressRef.current, userId);
         
@@ -1544,11 +1418,8 @@ const EnhancedRaceMode: React.FC = () => {
       
       // Do a final update when unmounting if we have pending changes
       if (pendingUpdateRef.current) {
-        // Use the mapped ID for anonymous users - using the captured map
-        let userId = currentUser.id;
-        if (currentUser.id.startsWith('anon-') && userIdMap[currentUser.id]) {
-          userId = userIdMap[currentUser.id];
-        }
+        // Get proper user ID with mapping
+        const userId = getMappedUserId(currentUser.id);
         
         updateProgressInDatabase(latestProgressRef.current, userId);
         
@@ -1556,15 +1427,12 @@ const EnhancedRaceMode: React.FC = () => {
         if (updateProgressRef.current) updateProgressRef.current(latestProgressRef.current);
       }
     };
-  }, [raceStage, updateProgressInDatabase, getCurrentUser, updateProgressRef]);
+  }, [raceStage, updateProgressInDatabase, getCurrentUser, updateProgressRef, getMappedUserId]);
   
   // Helper function to get the user ID to display (either mapped UUID or regular ID)
   const getUserIdForDisplay = useCallback((userId: string) => {
-    if (userId.startsWith('anon-') && anonUserIdMapRef.current[userId]) {
-      return anonUserIdMapRef.current[userId];
-    }
-    return userId;
-  }, []);
+    return getMappedUserId(userId);
+  }, [getMappedUserId]);
   
   // Function to end an inactive race
   const endInactiveRace = useCallback(() => {
@@ -1622,18 +1490,19 @@ const EnhancedRaceMode: React.FC = () => {
     const currentUser = getCurrentUser();
     if (!currentUser || !raceCreator) return false;
     
-    // For anonymous users, check their mapped UUID
-    if (currentUser.id.startsWith('anon-')) {
-      const mappedId = anonUserIdMapRef.current[currentUser.id];
-      const isCreator = mappedId === raceCreator;
-      console.log('Anonymous user host check:', { mappedId, raceCreator, isCreator });
-      return isCreator;
-    }
+    // Get the mapped user ID for comparison
+    const mappedUserId = getMappedUserId(currentUser.id);
+    const isCreator = mappedUserId === raceCreator;
     
-    const isCreator = currentUser.id === raceCreator;
-    console.log('Host check:', { currentUserId: currentUser.id, raceCreator, isCreator });
+    console.log('Host check:', { 
+      currentUserId: currentUser.id, 
+      mappedUserId, 
+      raceCreator, 
+      isCreator 
+    });
+    
     return isCreator;
-  }, [getCurrentUser, raceCreator]);
+  }, [getCurrentUser, raceCreator, getMappedUserId]);
   
   // Get creator display name
   const getCreatorDisplayName = useCallback(() => {
@@ -1669,7 +1538,7 @@ const EnhancedRaceMode: React.FC = () => {
         isHost: isRaceCreator(),
         raceCreator,
         currentUser: getCurrentUser()?.id,
-        mappedId: getCurrentUser()?.id.startsWith('anon-') ? anonUserIdMapRef.current[getCurrentUser()?.id] : null
+        mappedId: getCurrentUser()?.id.startsWith('anon-') ? anonUserIdMap[getCurrentUser()?.id] : null
       });
     }
   }, [raceStage, isRaceCreator, raceCreator, getCurrentUser]);
@@ -1709,26 +1578,8 @@ const EnhancedRaceMode: React.FC = () => {
         text += levelChars[randomIndex];
       }
       
-      // Use consistent ID mapping for anonymous users
-      let createdById = currentUser.id;
-      if (currentUser.id.startsWith('anon-')) {
-        // If user already has a mapped UUID, use it instead of generating a new one
-        if (anonUserIdMapRef.current[currentUser.id]) {
-          createdById = anonUserIdMapRef.current[currentUser.id];
-          console.log('Using existing mapped UUID for anonymous user:', createdById);
-        } else {
-          // Generate a new UUID only if we don't have one yet
-          createdById = uuidv4();
-          anonUserIdMapRef.current[currentUser.id] = createdById;
-          console.log('Generated new UUID for anonymous user:', createdById);
-          
-          // Store in localStorage for persistence
-          if (isBrowser) {
-            localStorage.setItem('morse_anon_user_uuid_map', 
-              JSON.stringify(anonUserIdMapRef.current));
-          }
-        }
-      }
+      // Use getMappedUserId for consistent ID
+      const createdById = getMappedUserId(currentUser.id);
       
       // Create race through API with the same parameters
       const race = await raceService.createRace({
@@ -1739,12 +1590,9 @@ const EnhancedRaceMode: React.FC = () => {
         level_id: state.selectedLevelId
       });
       
-      // For the user_id in race_participants, use the same ID consistently
-      const participantUserId = createdById;
-      
       // Join race automatically through API
       await raceService.joinRace(race.id, {
-        user_id: participantUserId,
+        user_id: createdById,
         name: getUserDisplayName(currentUser)
       });
       
@@ -1767,7 +1615,7 @@ const EnhancedRaceMode: React.FC = () => {
             event: 'race_redirect',
             payload: {
               new_race_id: race.id,
-              initiator_id: currentUser.id,
+              initiator_id: getMappedUserId(currentUser.id),
               initiator_name: initiator_name
             }
           }).then(() => {
@@ -1793,7 +1641,7 @@ const EnhancedRaceMode: React.FC = () => {
       setRaceText(text);
       setRaceStatus('created');
       setParticipants([{
-        id: participantUserId,
+        id: createdById,
         name: getUserDisplayName(currentUser),
         progress: 0,
         finished: false
@@ -1811,7 +1659,7 @@ const EnhancedRaceMode: React.FC = () => {
     } finally {
       setIsCreatingRace(false);
     }
-  }, [getCurrentUser, getUserDisplayName, raceMode, router, state.chars, state.selectedLevelId, stopAudio, raceId]);
+  }, [getCurrentUser, getUserDisplayName, raceMode, state.chars, state.selectedLevelId, stopAudio, raceId, getMappedUserId]);
   
   // Navigate to home page
   const handleNavigateHome = useCallback(() => {
