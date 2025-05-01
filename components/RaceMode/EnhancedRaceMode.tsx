@@ -36,6 +36,7 @@ import {
 import { useAnonymousUser } from '../../hooks/useAnonymousUser';
 import { useRaceChannel } from '../../hooks/useRaceChannel';
 import { useRaceProgress } from '../../hooks/useRaceProgress';
+import { useRaceCreation } from '../../hooks/useRaceCreation';
 
 const EnhancedRaceMode: React.FC = () => {
   const router = useRouter();
@@ -67,7 +68,6 @@ const EnhancedRaceMode: React.FC = () => {
   const [raceMode, setRaceMode] = useState<RaceMode>(state.mode === 'copy' || state.mode === 'send' ? state.mode : 'copy');
   const [raceStatus, setRaceStatus] = useState<string>('created');
   const [participants, setParticipants] = useState<RaceParticipant[]>([]);
-  const [isCreatingRace, setIsCreatingRace] = useState(false);
   // Presence state for connected participants
   const [onlineUsers, setOnlineUsers] = useState<AnyRecord[]>([]);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -139,6 +139,29 @@ const EnhancedRaceMode: React.FC = () => {
     },
     getMappedUserId,
     getCurrentUser
+  });
+  
+  // Use the race creation hook
+  const {
+    isCreatingRace,
+    createRace,
+    handleRaceAgain
+  } = useRaceCreation({
+    getCurrentUser,
+    getUserDisplayName,
+    getMappedUserId,
+    setRaceId,
+    setRaceText,
+    setRaceStatus,
+    setRaceCreator,
+    setInitialParticipants,
+    setRaceStage,
+    resetProgress,
+    stopAudio,
+    broadcastRedirect,
+    state,
+    raceMode,
+    raceId
   });
   
   // Keep participants in sync with race channel
@@ -888,93 +911,6 @@ const EnhancedRaceMode: React.FC = () => {
     router.push('/');
   }, [router]);
   
-  // Create a new race
-  const createRace = useCallback(async (options?: { mode: RaceMode }) => {
-    const currentUser = getCurrentUser();
-
-    
-    if (!currentUser) {
-      alert('Error creating anonymous user');
-      return;
-    }
-    
-    // For anonymous users, we need to create a UUID mapping before creating the race
-    let createdById = currentUser.id;
-    if (currentUser.id.startsWith('anon-')) {
-      // Generate a proper UUID for anonymous users before creating the race
-      createdById = getMappedUserId(currentUser.id);
-    }
-    
-    // Determine race mode or use default (ensuring it's compatible with API)
-    const mode = (options?.mode || state.mode) === 'race' ? 'copy' : (options?.mode || state.mode);
-    
-    // Generate random race text based on training level
-    const chars = [...state.chars];
-    let text = '';
-    const textLength = 5; // Short test sequence for racing
-    
-    // If no chars available, default to alphabet
-    if (chars.length === 0) {
-      const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('');
-      for (let i = 0; i < textLength; i++) {
-        const randomIndex = Math.floor(Math.random() * alphabet.length);
-        text += alphabet[randomIndex];
-      }
-    } else {
-      for (let i = 0; i < textLength; i++) {
-        const randomIndex = Math.floor(Math.random() * chars.length);
-        text += chars[randomIndex];
-      }
-    }
-    
-    try {
-      // Create race with the proper UUID
-      const raceResult = await raceService.createRace({
-        created_by: createdById, // Use the proper UUID for database compatibility
-        mode: mode as 'copy' | 'send', // Type assertion to ensure API compatibility
-        char_sequence: text.split(''),
-        text: text,
-        level_id: state.selectedLevelId
-      });
-      
-      // Update local state
-      setRaceId(raceResult.id);
-      
-      // IMPORTANT: For anonymous users, ensure we map this anonymous ID to the same UUID for this race
-      if (currentUser.id.startsWith('anon-')) {
-        // This ensures future getMappedUserId calls with this race ID return the same UUID
-        getMappedUserId(currentUser.id, raceResult.id);
-      }
-      
-      // After race creation, join race with the user's display name
-      await raceService.joinRace(raceResult.id, {
-        user_id: createdById,
-        name: getUserDisplayName(currentUser)
-      });
-      
-      // Update local state
-      setRaceText(text);
-      setRaceStatus('created');
-      setRaceCreator(createdById);
-      setInitialParticipants([{
-        id: createdById,
-        name: getUserDisplayName(currentUser),
-        progress: 0,
-        finished: false
-      }]);
-      
-      // Move to share stage
-      setRaceStage(RaceStage.SHARE);
-      
-      // Navigate to /race?id=race.id
-      router.push(`/race?id=${raceResult.id}`);
-      
-    } catch (err) {
-      console.error('Error creating race:', err);
-      alert('Could not create race. Please try again.');
-    }
-  }, [getCurrentUser, getUserDisplayName, getMappedUserId, state.chars, state.selectedLevelId, state.mode, router, setInitialParticipants, resetProgress]);
-  
   // Restore the updateProgress reference for compatibility
   useEffect(() => {
     updateProgressRef.current = (progress: number) => {
@@ -984,110 +920,6 @@ const EnhancedRaceMode: React.FC = () => {
       }
     };
   }, [broadcastProgress, getMappedUserId, currentUser, errorCount]);
-  
-  // Replace the handleRaceAgain function to use broadcastRedirect
-  const handleRaceAgain = useCallback(async () => {
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
-      alert('Error creating race');
-      return;
-    }
-    
-    try {
-      setIsCreatingRace(true);
-      
-      // Reset state for a new race
-      stopAudio();
-      resetProgress();
-      setStartTime(null);
-      setFinishTime(null);
-      
-      // Generate new race text with the same parameters
-      const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
-      const levelChars = currentLevel && currentLevel.chars.length > 0 ? 
-        [...currentLevel.chars] : 
-        state.chars.length > 0 ? [...state.chars] : 
-        'abcdefghijklmnopqrstuvwxyz'.split('');
-      
-      const raceLength = 20;
-      let text = '';
-      
-      for (let i = 0; i < raceLength; i++) {
-        const randomIndex = Math.floor(Math.random() * levelChars.length);
-        text += levelChars[randomIndex];
-      }
-      
-      // Use getMappedUserId for consistent ID
-      const createdById = getMappedUserId(currentUser.id, raceId || undefined);
-      
-      // Create race through API with the same parameters
-      const raceResult = await raceService.createRace({
-        created_by: createdById,
-        mode: raceMode,
-        char_sequence: text.split(''),
-        text: text,
-        level_id: state.selectedLevelId
-      });
-      
-      // Update local state first to establish the race ID
-      setRaceId(raceResult.id);
-      
-      // IMPORTANT: For anonymous users, ensure we map this anonymous ID to the same UUID for this race
-      if (currentUser.id.startsWith('anon-')) {
-        // This ensures future getMappedUserId calls with this race ID return the same UUID
-        getMappedUserId(currentUser.id, raceResult.id);
-      }
-      
-      // Join race automatically through API
-      await raceService.joinRace(raceResult.id, {
-        user_id: createdById,
-        name: getUserDisplayName(currentUser)
-      });
-      
-      // Broadcast a redirect message using the race channel
-      if (raceId) {
-        const initiatorName = getUserDisplayName(currentUser);
-        await broadcastRedirect(raceResult.id, initiatorName);
-      }
-      
-      // Set the race creator
-      setRaceCreator(createdById);
-      
-      // Update local state
-      setRaceText(text);
-      setRaceStatus('created');
-      setInitialParticipants([{
-        id: createdById,
-        name: getUserDisplayName(currentUser),
-        progress: 0,
-        finished: false
-      }]);
-      
-      // Move to share stage
-      setRaceStage(RaceStage.SHARE);
-      
-      // Navigate to /race?id=race.id with full page reload
-      window.location.href = `/race?id=${raceResult.id}`;
-      
-    } catch (err) {
-      console.error('Error creating race:', err);
-      alert('Could not create race. Please try again.');
-    } finally {
-      setIsCreatingRace(false);
-    }
-  }, [
-    getCurrentUser, 
-    getUserDisplayName, 
-    raceMode, 
-    state.chars, 
-    state.selectedLevelId, 
-    stopAudio, 
-    raceId, 
-    getMappedUserId,
-    broadcastRedirect,
-    setInitialParticipants,
-    resetProgress
-  ]);
   
   // Render appropriate stage of race
   return (
