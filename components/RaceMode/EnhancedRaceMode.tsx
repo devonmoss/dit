@@ -111,6 +111,7 @@ const EnhancedRaceMode: React.FC = () => {
   const [raceMode, setRaceMode] = useState<'copy' | 'send'>(state.mode === 'copy' || state.mode === 'send' ? state.mode : 'copy');
   const [raceStatus, setRaceStatus] = useState<string>('created');
   const [participants, setParticipants] = useState<RaceParticipant[]>([]);
+  const [isCreatingRace, setIsCreatingRace] = useState(false);
   // Presence state for connected participants
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
@@ -500,6 +501,42 @@ const EnhancedRaceMode: React.FC = () => {
         setParticipants(prev => 
           prev.map(p => p.id === user_id ? { ...p, progress, errorCount } : p)
         );
+      });
+      
+      // Listen for race redirect events
+      channel.on('broadcast', { event: 'race_redirect' }, (event) => {
+        console.log('Received race_redirect broadcast:', event);
+        
+        // Make sure we're accessing the payload correctly
+        const payload = event.payload || event;
+        const { new_race_id, initiator_id, initiator_name } = payload;
+        
+        if (!new_race_id) {
+          console.warn('Ignoring invalid race redirect: missing new_race_id', payload);
+          return;
+        }
+        
+        // Don't redirect the initiator (they're already being redirected)
+        const currentUser = getCurrentUser();
+        if (currentUser && initiator_id === currentUser.id) {
+          console.log('Not redirecting - user is the initiator');
+          return;
+        }
+        
+        console.log(`Received redirect to new race: ${new_race_id} from ${initiator_name}`);
+        
+        // Show a notification briefly before redirecting
+        const confirmRedirect = window.confirm(
+          `${initiator_name} started a new race. Join now?`
+        );
+        
+        if (confirmRedirect) {
+          console.log(`User confirmed redirect to race: ${new_race_id}`);
+          // Navigate to the new race
+          router.push(`/race?id=${new_race_id}`);
+        } else {
+          console.log('User declined redirect');
+        }
       });
       
       // Listen for race status changes
@@ -1718,6 +1755,18 @@ const EnhancedRaceMode: React.FC = () => {
     }
   }, [stopAudio]);
   
+  // Debugging to ensure host detection is working
+  useEffect(() => {
+    if (raceStage === RaceStage.SHARE) {
+      console.log('Race Share Stage: Host check', {
+        isHost: isRaceCreator(),
+        raceCreator,
+        currentUser: getCurrentUser()?.id,
+        mappedId: getCurrentUser()?.id.startsWith('anon-') ? anonUserIdMapRef.current[getCurrentUser()?.id] : null
+      });
+    }
+  }, [raceStage, isRaceCreator, raceCreator, getCurrentUser]);
+  
   // Handle the "Race Again" button click
   const handleRaceAgain = useCallback(async () => {
     const currentUser = getCurrentUser();
@@ -1727,6 +1776,8 @@ const EnhancedRaceMode: React.FC = () => {
     }
     
     try {
+      setIsCreatingRace(true);
+      
       // Reset state for a new race
       stopAudio();
       setUserProgress(0);
@@ -1773,6 +1824,43 @@ const EnhancedRaceMode: React.FC = () => {
         name: getUserDisplayName(currentUser)
       });
       
+      // Broadcast a redirect message to all participants in the current race
+      if (channelRef.current && raceId) {
+        try {
+          const initiator_name = getUserDisplayName(currentUser);
+          
+          // Send the payload content directly, not inside another 'payload' field
+          console.log('Broadcasting redirect to new race:', race.id);
+          console.log('Current channel is setup and active');
+          
+          // Get current presence state to verify users are online
+          const presenceState = await channelRef.current.presenceState();
+          console.log('Current online users:', presenceState);
+          
+          // Use a promise to track the broadcast result
+          await channelRef.current.send({
+            type: 'broadcast',
+            event: 'race_redirect',
+            payload: {
+              new_race_id: race.id,
+              initiator_id: currentUser.id,
+              initiator_name: initiator_name
+            }
+          }).then(() => {
+            console.log('Broadcast sent successfully with new_race_id:', race.id);
+          }).catch(err => {
+            console.error('Error sending broadcast:', err);
+          });
+        } catch (err) {
+          console.error('Error during broadcast operation:', err);
+        }
+      } else {
+        console.warn('Cannot broadcast redirect: missing channel or raceId', { 
+          hasChannel: !!channelRef.current,
+          raceId
+        });
+      }
+      
       // Set the race creator
       setRaceCreator(createdById);
       
@@ -1796,20 +1884,15 @@ const EnhancedRaceMode: React.FC = () => {
     } catch (err) {
       console.error('Error creating race:', err);
       alert('Could not create race. Please try again.');
+    } finally {
+      setIsCreatingRace(false);
     }
-  }, [getCurrentUser, getUserDisplayName, raceMode, router, state.chars, state.selectedLevelId, stopAudio]);
+  }, [getCurrentUser, getUserDisplayName, raceMode, router, state.chars, state.selectedLevelId, stopAudio, raceId]);
   
-  // Debugging to ensure host detection is working
-  useEffect(() => {
-    if (raceStage === RaceStage.SHARE) {
-      console.log('Race Share Stage: Host check', {
-        isHost: isRaceCreator(),
-        raceCreator,
-        currentUser: getCurrentUser()?.id,
-        mappedId: getCurrentUser()?.id.startsWith('anon-') ? anonUserIdMapRef.current[getCurrentUser()?.id] : null
-      });
-    }
-  }, [raceStage, isRaceCreator, raceCreator, getCurrentUser]);
+  // Navigate to home page
+  const handleNavigateHome = useCallback(() => {
+    router.push('/');
+  }, [router]);
   
   // Render appropriate stage of race
   return (
@@ -1938,20 +2021,7 @@ const EnhancedRaceMode: React.FC = () => {
             showPlacement={true}
           />
           
-          <div className={styles.actions}>
-            <button
-              className={styles.newRaceButton}
-              onClick={handleCreateNewRace}
-            >
-              Create New Race
-            </button>
-            <button
-              className={styles.raceAgainButton}
-              onClick={handleRaceAgain}
-            >
-              Race Again
-            </button>
-          </div>
+          <div className={`${styles.correctIndicator} ${showCorrectIndicator ? styles.visible : ''}`}>✓</div>
         </div>
       )}
       
@@ -1998,15 +2068,16 @@ const EnhancedRaceMode: React.FC = () => {
           <div className={styles.actions}>
             <button
               className={styles.newRaceButton}
-              onClick={handleCreateNewRace}
+              onClick={handleNavigateHome}
             >
               Create New Race
             </button>
             <button
               className={styles.raceAgainButton}
               onClick={handleRaceAgain}
+              disabled={isCreatingRace}
             >
-              Race Again
+              {isCreatingRace ? 'Creating...' : 'Race Again'}
             </button>
           </div>
         </div>
