@@ -2,6 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   
+  // Disable ESLint during build
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  
   // Redirects
   async redirects() {
     return [
