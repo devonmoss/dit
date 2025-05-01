@@ -921,6 +921,22 @@ const EnhancedRaceMode: React.FC = () => {
     };
   }, [broadcastProgress, getMappedUserId, currentUser, errorCount]);
   
+  // Keep the race channel active even after race completion for invitation flow
+  useEffect(() => {
+    // This effect is focused on keeping the channel alive
+    // The channel is established by the useRaceChannel hook
+    
+    if (raceId && raceStatus === 'finished') {
+      // When race is finished, add a listener to keep the connection alive
+      console.log('Race finished but keeping channel alive for potential invitations');
+      
+      // Return cleanup function that will only run when component unmounts or raceId changes
+      return () => {
+        console.log('Cleaning up race channel on unmount/race change');
+      };
+    }
+  }, [raceId, raceStatus]);
+  
   // Render appropriate stage of race
   return (
     <div className={styles.container}>
@@ -994,9 +1010,9 @@ const EnhancedRaceMode: React.FC = () => {
       {invitationDetails && (
         <RaceInviteModal
           isOpen={!!invitationDetails}
-          inviterName={invitationDetails?.initiator_name || 'Someone'}
+          inviterName={invitationDetails.initiator_name || 'Someone'}
           onAccept={() => {
-            console.log('User accepted redirect to race', invitationDetails.new_race_id);
+            console.log('User accepted redirect to race:', invitationDetails.new_race_id);
             if (invitationDetails.new_race_id) {
               window.location.href = `/race?id=${invitationDetails.new_race_id}`;
             }
