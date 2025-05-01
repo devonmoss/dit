@@ -15,80 +15,20 @@ import { v4 as uuidv4 } from 'uuid';
 import { calculateRaceXp, XpSource } from '../../utils/xpSystem';
 import * as raceService from '../../services/raceService';
 import * as xpService from '../../services/xpService';
+import { calculateRaceStats } from '../../utils/raceUtils';
 import RaceInviteModal from './RaceInviteModal';
-
-// Utility type for suppressing eslint errors
-/* eslint-disable @typescript-eslint/no-explicit-any */
-type AnyRecord = Record<string, any>;
-/* eslint-enable @typescript-eslint/no-explicit-any */
-
-interface RaceParticipant {
-  id: string;
-  name: string;
-  progress: number;
-  finished: boolean;
-  finishTime?: number;
-  errorCount?: number;
-  raceTime?: number; // Duration in seconds
-}
-
-// No unused empty functions
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// Message type for WebSocket participant updates (for future implementation)
-interface ParticipantUpdateMessage {
-  type: 'progress_update' | 'finish_race';
-  user_id: string;
-  race_id: string;
-  progress: number;
-  finished?: boolean;
-  finish_time?: number;
-}
-/* eslint-enable @typescript-eslint/no-unused-vars */
-
-enum RaceStage {
-  INFO = 'info',
-  SHARE = 'share',
-  COUNTDOWN = 'countdown',
-  RACING = 'racing',
-  RESULTS = 'results'
-}
-
-// Type for anonymous user
-interface AnonymousUser {
-  id: string;
-  email: string;
-  user_metadata?: {
-    full_name?: string;
-  };
-}
-
-// Race mode selector component
-const RaceModeSelector: React.FC<{
-  onSelectMode: (mode: 'copy' | 'send') => void;
-  selectedMode: 'copy' | 'send';
-}> = ({ onSelectMode, selectedMode }) => {
-  return (
-    <div className={styles.raceModeSelector}>
-      <h3>Select Race Mode</h3>
-      <div className={styles.modeButtonsContainer}>
-        <button 
-          className={`${styles.modeButton} ${selectedMode === 'copy' ? styles.selectedMode : ''}`}
-          onClick={() => onSelectMode('copy')}
-        >
-          <h4>Copy Mode</h4>
-          <p>Identify the characters you hear</p>
-        </button>
-        <button 
-          className={`${styles.modeButton} ${selectedMode === 'send' ? styles.selectedMode : ''}`}
-          onClick={() => onSelectMode('send')}
-        >
-          <h4>Send Mode</h4>
-          <p>Send the characters you see</p>
-        </button>
-      </div>
-    </div>
-  );
-};
+import RaceModeSelector from './RaceModeSelector';
+import { 
+  AnyRecord,
+  RaceParticipant,
+  RaceStage, 
+  AnonymousUser,
+  User,
+  RaceMode,
+  InvitationDetails,
+  XpEarned,
+  RaceStats
+} from '../../types/raceTypes';
 
 const EnhancedRaceMode: React.FC = () => {
   const router = useRouter();
@@ -109,14 +49,12 @@ const EnhancedRaceMode: React.FC = () => {
   const [raceId, setRaceId] = useState<string | null>(null);
   const [raceStage, setRaceStage] = useState<RaceStage>(RaceStage.INFO);
   const [raceText, setRaceText] = useState('');
-  const [raceMode, setRaceMode] = useState<'copy' | 'send'>(state.mode === 'copy' || state.mode === 'send' ? state.mode : 'copy');
+  const [raceMode, setRaceMode] = useState<RaceMode>(state.mode === 'copy' || state.mode === 'send' ? state.mode : 'copy');
   const [raceStatus, setRaceStatus] = useState<string>('created');
   const [participants, setParticipants] = useState<RaceParticipant[]>([]);
   const [isCreatingRace, setIsCreatingRace] = useState(false);
   // Presence state for connected participants
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
-  /* eslint-enable @typescript-eslint/no-explicit-any */
+  const [onlineUsers, setOnlineUsers] = useState<AnyRecord[]>([]);
   const [userProgress, setUserProgress] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -125,7 +63,7 @@ const EnhancedRaceMode: React.FC = () => {
   const [userInput, setUserInput] = useState('');
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [xpEarned, setXpEarned] = useState<{ total: number, breakdown: Record<string, number> } | null>(null);
+  const [xpEarned, setXpEarned] = useState<XpEarned | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showXpAnimation, setShowXpAnimation] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -162,17 +100,7 @@ const EnhancedRaceMode: React.FC = () => {
   const [keyerOutput, setKeyerOutput] = useState('');
   const sendQueueRef = useRef<string[]>([]);
   
-  // Define a proper type for user to avoid type errors
-  type User = {
-    id: string;
-    user_metadata?: {
-      username?: string;
-      full_name?: string;
-    };
-  };
-  
   // Helper function to get display name for a user
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   const getUserDisplayName = useCallback((user: User | any) => {
     if (!user) return 'Anonymous';
     return user.user_metadata?.username || user.user_metadata?.full_name || 'Anonymous';
@@ -1445,20 +1373,9 @@ const EnhancedRaceMode: React.FC = () => {
   }, [raceStage, raceText, raceId, getCurrentUser, finishRace, stopAudio, currentCharIndex, 
       playMorseChar, audioContext, userInput, updateProgressInDatabase, raceMode, replayCurrent, updateProgressRef]);
   
-  // Calculate race statistics for results view - use useMemo directly
-  const stats = React.useMemo(() => {
-    if (!startTime || !finishTime) return null;
-    
-    const durationSeconds = (finishTime - startTime) / 1000;
-    const minutes = durationSeconds / 60;
-    // Calculate words per minute (assuming 5 chars per word)
-    const wpm = Math.round((raceText.length / 5) / minutes);
-    
-    return {
-      time: durationSeconds,
-      wpm,
-      errors: errorCount
-    };
+  // Calculate race statistics for results view - use calculation function
+  const stats = React.useMemo((): RaceStats | null => {
+    return calculateRaceStats(startTime, finishTime, raceText.length, errorCount);
   }, [startTime, finishTime, raceText.length, errorCount]);
   
   // Handle keyup event for send mode
@@ -1899,10 +1816,7 @@ const EnhancedRaceMode: React.FC = () => {
   
   // Add state for the invitation modal in the EnhancedRaceMode component
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [invitationDetails, setInvitationDetails] = useState<{ 
-    raceId: string, 
-    initiatorName: string 
-  } | null>(null);
+  const [invitationDetails, setInvitationDetails] = useState<InvitationDetails | null>(null);
   
   // Render appropriate stage of race
   return (
