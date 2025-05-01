@@ -1,6 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import supabaseAdmin from '../../../lib/supabaseAdmin';
-import { v4 as uuidv4 } from 'uuid';
+
+// Generate a simple ID for the race
+const generateSimpleId = () => {
+  return Math.random().toString(36).substring(2, 10);
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // POST - Create a new race
@@ -13,10 +17,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Missing required fields' });
       }
       
-      // Generate a simple ID for the race
-      const generateSimpleId = () => {
-        return Math.random().toString(36).substring(2, 10);
-      };
       const raceId = generateSimpleId();
       
       // Create race in database
@@ -37,9 +37,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (error) throw error;
       
       return res.status(200).json(data);
-    } catch (error: any) {
-      console.error('Error creating race:', error.message);
-      return res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Error creating race:', errorMessage);
+      return res.status(500).json({ error: errorMessage });
     }
   }
   
@@ -56,9 +57,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (error) throw error;
       
       return res.status(200).json(data);
-    } catch (error: any) {
-      console.error('Error listing races:', error.message);
-      return res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Error listing races:', errorMessage);
+      return res.status(500).json({ error: errorMessage });
     }
   }
   

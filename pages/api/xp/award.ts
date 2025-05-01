@@ -34,9 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...xpInfo,
         leveledUp: data || false // data from award_xp is whether user leveled up
       });
-    } catch (error: any) {
-      console.error('Error awarding XP:', error.message);
-      return res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Error awarding XP:', errorMessage);
+      return res.status(500).json({ error: errorMessage });
     }
   }
   
