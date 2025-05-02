@@ -1028,31 +1028,34 @@ const EnhancedRaceMode: React.FC = () => {
         level_id: state.selectedLevelId
       });
       
-      // Update local state first to establish the race ID
-      setRaceId(raceResult.id);
+      // Store the new race ID but don't update state yet (we still need the old raceId)
+      const newRaceId = raceResult.id;
       
       // IMPORTANT: For anonymous users, ensure we map this anonymous ID to the same UUID for this race
       if (currentUser.id.startsWith('anon-')) {
         // This ensures future getMappedUserId calls with this race ID return the same UUID
-        getMappedUserId(currentUser.id, raceResult.id);
+        getMappedUserId(currentUser.id, newRaceId);
       }
       
       // Join race automatically through API
-      await raceService.joinRace(raceResult.id, {
+      await raceService.joinRace(newRaceId, {
         user_id: createdById,
         name: getUserDisplayName(currentUser)
       });
       
-      // Broadcast a redirect message using the race channel
+      // IMPORTANT: Broadcast redirect message using the CURRENT race channel before navigation
+      // Only if we have a valid current raceId
       if (raceId) {
         const initiatorName = getUserDisplayName(currentUser);
-        await broadcastRedirect(raceResult.id, initiatorName);
+        await broadcastRedirect(newRaceId, initiatorName);
+        
+        // Add a small delay to ensure the message is sent before navigation
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
       
-      // Set the race creator
+      // AFTER broadcasting redirect, update local state and navigate
+      setRaceId(newRaceId);
       setRaceCreator(createdById);
-      
-      // Update local state
       setRaceText(text);
       setRaceStatus('created');
       setInitialParticipants([{
@@ -1066,7 +1069,7 @@ const EnhancedRaceMode: React.FC = () => {
       setRaceStage(RaceStage.SHARE);
       
       // Navigate to /race?id=race.id with full page reload
-      window.location.href = `/race?id=${raceResult.id}`;
+      window.location.href = `/race?id=${newRaceId}`;
       
     } catch (err) {
       console.error('Error creating race:', err);
