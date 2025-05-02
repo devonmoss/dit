@@ -153,6 +153,18 @@ export function useRaceInputHandler({
   const codeBufferRef = useRef('');
   const lastEvaluatedInputRef = useRef('');
   
+  // Reference to track the last symbol for iambic keying
+  const lastSymbolRef = useRef<string | null>(null);
+  
+  // References for key debouncing to prevent multiple presses
+  const lastKeyPressTimeRef = useRef<{[key: string]: number}>({
+    ArrowLeft: 0,
+    ArrowRight: 0
+  });
+  
+  // Reference to track whether we're actively processing a symbol
+  const activelyProcessingRef = useRef(false);
+  
   // Process the send queue at regular intervals - using similar timing logic as SendingMode
   useEffect(() => {
     if (raceStage !== RaceStage.RACING || raceMode !== 'send') {
@@ -161,16 +173,25 @@ export function useRaceInputHandler({
         clearInterval(sendIntervalRef.current);
         sendIntervalRef.current = null;
       }
+      activelyProcessingRef.current = false;
       return;
     }
     
     let lastTime = Date.now();
     
     // Set up interval to check character breaks and handle timing
-    sendIntervalRef.current = setInterval(() => {
+    sendIntervalRef.current = setInterval(async () => {
+      // Skip this cycle if we're already processing
+      if (activelyProcessingRef.current) return;
+      
       const now = Date.now();
       const gap = now - lastTime;
       const sendUnit = 1200 / (sendWpm || 20); // Use sendWpm prop or default to 20
+      
+      // Get proper WPM timing - this is the key to correct speed
+      const dotUnit = 1200 / (sendWpm || 20); // Duration of one dot at current WPM (ms)
+      const dashUnit = dotUnit * 3;           // Duration of one dash (3x dot duration)
+      const elementSpace = dotUnit;           // Space between elements is 1 dot unit
       
       // Process queue items first
       if (sendQueueRef.current.length > 0) {
@@ -186,8 +207,59 @@ export function useRaceInputHandler({
         return;
       }
       
+      // Implement iambic keying logic (like in SendingMode)
+      // Check if we should generate symbols based on paddle state
+      const left = keyStateRef.current.ArrowLeft;
+      const right = keyStateRef.current.ArrowRight;
+      
+      if (left || right) {
+        activelyProcessingRef.current = true;
+        let symbol: string;
+        let duration: number;
+        
+        // Iambic keying - alternate between dot and dash based on which was last
+        if (left && right) {
+          // Iambic squeeze mode - alternating dots and dashes
+          symbol = lastSymbolRef.current === "." ? "-" : ".";
+          duration = symbol === "." ? dotUnit : dashUnit;
+        } else if (left) {
+          // Left paddle = dot
+          symbol = ".";
+          duration = dotUnit;
+        } else {
+          // Right paddle = dash
+          symbol = "-";
+          duration = dashUnit;
+        }
+        
+        // Remember this symbol for next alternation
+        lastSymbolRef.current = symbol;
+        
+        // Add the symbol to output
+        setKeyerOutput(prev => {
+          const updatedOutput = prev + symbol;
+          codeBufferRef.current = updatedOutput;
+          return updatedOutput;
+        });
+        
+        // Play appropriate sound with the correct duration based on WPM
+        if (audioContext) {
+          try {
+            await audioContext.playTone(600, duration, 1.0);
+          } catch (err) {
+            console.error(`Error playing ${symbol} sound:`, err);
+          }
+        }
+        
+        // Wait appropriate inter-element time (1 unit) before allowing next symbol
+        await new Promise(resolve => setTimeout(resolve, elementSpace));
+        lastTime = Date.now(); // Reset last time after sound + pause
+        activelyProcessingRef.current = false;
+        return;
+      }
+      
       // Character gap detection (>=3 units) - similar to SendingMode
-      if (gap >= sendUnit * 3 && codeBufferRef.current && !processingMorseRef.current) {
+      if (gap >= dotUnit * 3 && codeBufferRef.current && !processingMorseRef.current) {
         // Only evaluate if there's something to evaluate and we're not already processing
         const bufferToEvaluate = codeBufferRef.current;
         
@@ -203,7 +275,7 @@ export function useRaceInputHandler({
       
       // Word gap detection (>=7 units) - similar to SendingMode
       // Only evaluate if we haven't already processed this input and if there's input to evaluate
-      if (gap >= sendUnit * 7 && keyerOutput && !processingMorseRef.current && keyerOutput !== lastEvaluatedInputRef.current) {
+      if (gap >= dotUnit * 7 && keyerOutput && !processingMorseRef.current && keyerOutput !== lastEvaluatedInputRef.current) {
         // If we have output but user has stopped keying for word gap duration
         // and we haven't evaluated it yet, force evaluation once
         const outputToEvaluate = keyerOutput;
@@ -214,7 +286,7 @@ export function useRaceInputHandler({
         // Reset the timing
         lastTime = now;
       }
-    }, 50); // Check more frequently (50ms) to be more responsive
+    }, 10); // Match SendingMode's interval at 10ms for consistent timing
     
     return () => {
       if (sendIntervalRef.current) {
@@ -251,47 +323,48 @@ export function useRaceInputHandler({
     // Special handling for send mode with arrow keys
     if (raceMode === 'send') {
       // Handle paddle key presses for send mode
-      if (e.key === 'ArrowLeft') {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
-        console.log(`ArrowLeft DOWN (ref state: ${JSON.stringify(keyStateRef.current)})`);
         
-        // Only queue a dot if key wasn't already pressed
-        if (!keyStateRef.current.ArrowLeft) {
-          console.log('Queueing a DOT');
-          sendQueueRef.current.push('.');
-          
-          // Play dot sound (short tone)
-          if (audioContext) {
-            audioContext.playTone(600, 60, 1.0).catch((err: Error) => {
-              console.error("Error playing dot sound:", err);
-            });
-          }
+        // Implement debouncing to prevent key repeats causing multiple inputs
+        const now = Date.now();
+        const lastPressTime = lastKeyPressTimeRef.current[e.key] || 0;
+        const dotUnit = 1200 / (sendWpm || 20); // Duration of one dot at current WPM
+        
+        // Ignore key presses that happen too quickly after the last one
+        // Use 1/2 of a dot unit as the debounce period
+        if (now - lastPressTime < dotUnit * 0.5) {
+          console.log(`Debounced ${e.key} press - too soon after last press`);
+          return;
         }
         
-        // Update ref state immediately
-        keyStateRef.current.ArrowLeft = true;
+        // Update the last press time
+        lastKeyPressTimeRef.current[e.key] = now;
         
-        return;
-      } 
-      else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        console.log(`ArrowRight DOWN (ref state: ${JSON.stringify(keyStateRef.current)})`);
+        // Log key state
+        console.log(`${e.key} DOWN (ref state: ${JSON.stringify(keyStateRef.current)})`);
         
-        // Only queue a dash if key wasn't already pressed
-        if (!keyStateRef.current.ArrowRight) {
-          console.log('Queueing a DASH');
-          sendQueueRef.current.push('-');
-          
-          // Play dash sound (longer tone)
-          if (audioContext) {
-            audioContext.playTone(600, 180, 1.0).catch((err: Error) => {
-              console.error("Error playing dash sound:", err);
-            });
+        // Handle specific key
+        if (e.key === 'ArrowLeft') {
+          // Just update key state - the iambic keyer interval will handle generating symbols
+          if (!keyStateRef.current.ArrowLeft) {
+            console.log('Left paddle active (dot)');
+            
+            // The main iambic loop will handle generating symbols and playing sounds
+            // This just updates the key state that the loop checks
+            keyStateRef.current.ArrowLeft = true;
+          }
+        } 
+        else { // ArrowRight
+          // Just update key state - the iambic keyer interval will handle generating symbols
+          if (!keyStateRef.current.ArrowRight) {
+            console.log('Right paddle active (dash)');
+            
+            // The main iambic loop will handle generating symbols and playing sounds
+            // This just updates the key state that the loop checks
+            keyStateRef.current.ArrowRight = true;
           }
         }
-        
-        // Update ref state immediately
-        keyStateRef.current.ArrowRight = true;
         
         return;
       }
@@ -304,6 +377,7 @@ export function useRaceInputHandler({
         sendQueueRef.current = [];
         keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
         setKeyerOutput('');
+        lastSymbolRef.current = null; // Reset iambic state
         return;
       }
       
@@ -389,7 +463,8 @@ export function useRaceInputHandler({
     getMappedUserId,
     incrementProgress,
     incrementErrorCount,
-    raceId
+    raceId,
+    sendWpm // Add sendWpm to dependencies for debounce timing
   ]);
   
   // Handle keyup event for send mode
@@ -424,7 +499,7 @@ export function useRaceInputHandler({
         document.removeEventListener('keyup', handleKeyUp);
       }
     };
-  }, [raceStage, handleKeyDown, raceMode, handleKeyUp]);
+  }, [raceStage, handleKeyDown, raceMode, handleKeyUp, sendWpm]);
 
   return {
     userInput,
