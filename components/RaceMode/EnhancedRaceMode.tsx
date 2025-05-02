@@ -713,10 +713,15 @@ const EnhancedRaceMode: React.FC = () => {
       // Only play the sound in copy mode, not in send mode,
       if (raceMode === 'copy') {
         console.log('Playing first character: ', raceText[0]);
-        playMorseChar(raceText[0])
-          .catch(err => {
-            console.error("Error playing first character:", err);
-          });
+        
+        // Make sure to add a small delay to ensure audio context is ready
+        setTimeout(() => {
+          playMorseChar(raceText[0])
+            .then(() => console.log('First character played successfully'))
+            .catch(err => {
+              console.error("Error playing first character:", err);
+            });
+        }, 500);
       }
     }
   }, [raceStage, raceText, currentCharIndex, playMorseChar, getCurrentUser, raceId, raceMode]);

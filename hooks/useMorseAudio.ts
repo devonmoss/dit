@@ -10,16 +10,71 @@ export function useMorseAudio() {
   // Initialize audio context on client-side only
   useEffect(() => {
     if (isBrowser) {
-      setAudioContextInstance(createAudioContext());
+      const context = createAudioContext();
+      setAudioContextInstance(context);
+      
+      // Add a one-time event listener to the document to resume the context on user interaction
+      const resumeAudioContext = async () => {
+        if (context.getRawContext().state === 'suspended') {
+          try {
+            await context.getRawContext().resume();
+            console.log('AudioContext resumed by user interaction');
+          } catch (err) {
+            console.error('Failed to resume AudioContext:', err);
+          }
+        }
+      };
+      
+      document.addEventListener('click', resumeAudioContext, { once: true });
+      document.addEventListener('keydown', resumeAudioContext, { once: true });
+      
+      return () => {
+        document.removeEventListener('click', resumeAudioContext);
+        document.removeEventListener('keydown', resumeAudioContext);
+      };
     }
   }, []);
   
   // Play a single character of Morse code
   const playMorseChar = useCallback(async (char: string) => {
-    if (!char || !audioContextInstance) return;
+    if (!char) return;
+    
+    // Ensure audio context is initialized
+    if (!audioContextInstance && isBrowser) {
+      const newContext = createAudioContext();
+      setAudioContextInstance(newContext);
+      
+      // Handle autoplay policy - we need to resume the context on user interaction
+      // This is needed because browsers require user interaction before playing audio
+      if (newContext.getRawContext().state === 'suspended') {
+        try {
+          await newContext.getRawContext().resume();
+          console.log('AudioContext resumed successfully');
+        } catch (err) {
+          console.error('Failed to resume AudioContext:', err);
+          return;
+        }
+      }
+      
+      // Use the new context to play the morse
+      isPlaying.current = true;
+      await newContext.playMorse(char);
+      return;
+    }
+    
+    // If context exists but is suspended, try to resume it
+    if (audioContextInstance && audioContextInstance.getRawContext().state === 'suspended') {
+      try {
+        await audioContextInstance.getRawContext().resume();
+        console.log('AudioContext resumed successfully');
+      } catch (err) {
+        console.error('Failed to resume AudioContext:', err);
+        return;
+      }
+    }
     
     isPlaying.current = true;
-    await audioContextInstance.playMorse(char);
+    await audioContextInstance?.playMorse(char);
   }, [audioContextInstance]);
   
   // Play an entire text string as Morse code
