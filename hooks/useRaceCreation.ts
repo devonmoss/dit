@@ -74,7 +74,7 @@ export const useRaceCreation = ({
     // Generate random race text based on training level
     const chars = [...state.chars];
     let text = '';
-    const textLength = 5; // Short test sequence for racing
+    const textLength = 20; // Changed from 5 to 20 characters for racing
     
     // If no chars available, default to alphabet
     if (chars.length === 0) {
