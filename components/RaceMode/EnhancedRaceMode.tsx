@@ -53,6 +53,9 @@ const EnhancedRaceMode: React.FC = () => {
   const { user, refreshXpInfo } = useAuth();
   const { playMorseCode, playMorseChar, stopAudio } = useMorseAudio();
   
+  // Constants
+  const RACE_LENGTH = 20; // Standard length for race text
+  
   // Use the anonymous user hook
   const { 
     getCurrentUser, 
@@ -910,7 +913,7 @@ const EnhancedRaceMode: React.FC = () => {
     // Generate random race text based on training level
     const chars = [...state.chars];
     let text = '';
-    const textLength = 5; // Short test sequence for racing
+    const textLength = RACE_LENGTH; // Use constant for race length
     
     // If no chars available, default to alphabet
     if (chars.length === 0) {
@@ -1008,7 +1011,7 @@ const EnhancedRaceMode: React.FC = () => {
         state.chars.length > 0 ? [...state.chars] : 
         'abcdefghijklmnopqrstuvwxyz'.split('');
       
-      const raceLength = 20;
+      const raceLength = RACE_LENGTH; // Use constant for race length
       let text = '';
       
       for (let i = 0; i < raceLength; i++) {
