@@ -16,6 +16,7 @@ interface UseRaceInputHandlerProps {
   getCurrentUser: () => any;
   getMappedUserId: (userId: string, raceId?: string) => string;
   raceId: string | null;
+  sendWpm?: number; // Optional WPM for send mode
 }
 
 interface UseRaceInputHandlerResult {
@@ -40,7 +41,8 @@ export function useRaceInputHandler({
   audioContext,
   getCurrentUser,
   getMappedUserId,
-  raceId
+  raceId,
+  sendWpm = 20 // Default to 20 WPM if not provided
 }: UseRaceInputHandlerProps): UseRaceInputHandlerResult {
   // State for input handling
   const [userInput, setUserInput] = useState('');
@@ -64,6 +66,15 @@ export function useRaceInputHandler({
   const evaluateMorse = useCallback((sentMorse: string) => {
     if (processingMorseRef.current) return;
     
+    // Don't evaluate empty input
+    if (!sentMorse || sentMorse.length === 0) return;
+    
+    // If we've already evaluated this exact input, don't evaluate it again
+    if (sentMorse === lastEvaluatedInputRef.current) return;
+    
+    // Remember this input to prevent duplicate evaluations
+    lastEvaluatedInputRef.current = sentMorse;
+    
     processingMorseRef.current = true;
     
     const currentUser = getCurrentUser();
@@ -86,6 +97,7 @@ export function useRaceInputHandler({
       setTimeout(() => {
         setShowCorrectIndicator(false);
         setKeyerOutput('');
+        codeBufferRef.current = ''; // Reset the buffer
         
         // Get proper user ID with mapping
         const userId = getMappedUserId(currentUser.id, raceId || undefined);
@@ -105,10 +117,11 @@ export function useRaceInputHandler({
       // Incorrect or too long - consider it a mistake
       incrementErrorCount();
       
-      // Clear the queue and reset keyerOutput after a delay
+      // Clear the queue and reset keyerOutput and buffer after a delay
       setTimeout(() => {
         sendQueueRef.current = [];
         setKeyerOutput('');
+        codeBufferRef.current = ''; // Reset the buffer
         processingMorseRef.current = false;
       }, 600);
       
@@ -136,7 +149,11 @@ export function useRaceInputHandler({
     raceId
   ]);
 
-  // Process the send queue at regular intervals
+  // References for tracking the morse code buffer and preventing duplicate evaluations
+  const codeBufferRef = useRef('');
+  const lastEvaluatedInputRef = useRef('');
+  
+  // Process the send queue at regular intervals - using similar timing logic as SendingMode
   useEffect(() => {
     if (raceStage !== RaceStage.RACING || raceMode !== 'send') {
       // Clean up interval if not in send mode racing
@@ -147,18 +164,57 @@ export function useRaceInputHandler({
       return;
     }
     
-    // Set up interval to check and process the send queue
+    let lastTime = Date.now();
+    
+    // Set up interval to check character breaks and handle timing
     sendIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      const gap = now - lastTime;
+      const sendUnit = 1200 / (sendWpm || 20); // Use sendWpm prop or default to 20
+      
+      // Process queue items first
       if (sendQueueRef.current.length > 0) {
-        // Get what's in the queue and update the keyer output
-        const currentMorse = keyerOutput + sendQueueRef.current.join('');
-        setKeyerOutput(currentMorse);
+        // Add the new symbols to keyer output
+        const newSymbols = sendQueueRef.current.join('');
+        setKeyerOutput(prev => {
+          const updatedOutput = prev + newSymbols;
+          codeBufferRef.current = updatedOutput;
+          return updatedOutput;
+        });
         sendQueueRef.current = []; // Clear the queue after processing
-        
-        // Try to evaluate the morse after adding the new symbols
-        evaluateMorse(currentMorse);
+        lastTime = now;
+        return;
       }
-    }, 200); // Check queue every 200ms
+      
+      // Character gap detection (>=3 units) - similar to SendingMode
+      if (gap >= sendUnit * 3 && codeBufferRef.current && !processingMorseRef.current) {
+        // Only evaluate if there's something to evaluate and we're not already processing
+        const bufferToEvaluate = codeBufferRef.current;
+        
+        // Clear the buffer immediately to prevent double evaluation
+        codeBufferRef.current = '';
+        
+        // Evaluate the morse after sufficient gap time
+        evaluateMorse(bufferToEvaluate);
+        
+        // Reset the timing
+        lastTime = now;
+      }
+      
+      // Word gap detection (>=7 units) - similar to SendingMode
+      // Only evaluate if we haven't already processed this input and if there's input to evaluate
+      if (gap >= sendUnit * 7 && keyerOutput && !processingMorseRef.current && keyerOutput !== lastEvaluatedInputRef.current) {
+        // If we have output but user has stopped keying for word gap duration
+        // and we haven't evaluated it yet, force evaluation once
+        const outputToEvaluate = keyerOutput;
+        
+        // Evaluate the code
+        evaluateMorse(outputToEvaluate);
+        
+        // Reset the timing
+        lastTime = now;
+      }
+    }, 50); // Check more frequently (50ms) to be more responsive
     
     return () => {
       if (sendIntervalRef.current) {

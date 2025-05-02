@@ -169,7 +169,8 @@ const EnhancedRaceMode: React.FC = () => {
     audioContext: audioContext,
     getCurrentUser,
     getMappedUserId,
-    raceId
+    raceId,
+    sendWpm: state.sendWpm // Pass the sendWpm from app state
   });
   
   // Keep participants in sync with race channel
