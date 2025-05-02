@@ -37,6 +37,7 @@ import { useAnonymousUser } from '../../hooks/useAnonymousUser';
 import { useRaceChannel } from '../../hooks/useRaceChannel';
 import { useRaceProgress } from '../../hooks/useRaceProgress';
 import { useRaceCreation } from '../../hooks/useRaceCreation';
+import { useRaceInputHandler } from '../../hooks/useRaceInputHandler';
 import { 
   useRaceInfoStage,
   useRaceShareStage,
@@ -80,7 +81,6 @@ const EnhancedRaceMode: React.FC = () => {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [finishTime, setFinishTime] = useState<number | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(5);
-  const [userInput, setUserInput] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [xpEarned, setXpEarned] = useState<XpEarned | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -90,13 +90,10 @@ const EnhancedRaceMode: React.FC = () => {
   
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   
-  // First, add a state for the visual feedback
-  const [showCorrectIndicator, setShowCorrectIndicator] = useState(false);
-  
-  // For send mode with arrow keys (similar to SendingMode)
+  // References for send mode - will be synced with the hook
   const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
-  const [keyerOutput, setKeyerOutput] = useState('');
   const sendQueueRef = useRef<string[]>([]);
+  const [keyerOutput, setKeyerOutput] = useState('');
   
   // Add a reference to track the updateProgress function
   const updateProgressRef = useRef<((progress: number) => void) | null>(null);
@@ -170,7 +167,7 @@ const EnhancedRaceMode: React.FC = () => {
     raceMode,
     raceId
   });
-  
+
   // Keep participants in sync with race channel
   useEffect(() => {
     // Update local participants when race channel participants change
@@ -385,23 +382,15 @@ const EnhancedRaceMode: React.FC = () => {
       setRaceStage(RaceStage.RACING);
       setRaceStatus('racing');
       setStartTime(startTime);
-      setUserInput('');
       
       // Reset the activity timer when race starts
       lastActivityTimeRef.current = Date.now();
       console.log('Race started - initializing activity timer');
       
-      // Start playing just the first character
-      // setCurrentCharIndex(0);
-      // if (raceText && raceText.length > 0) {
-      //   console.log('Playing first character: ', raceText[0]);
-      //   playMorseChar(raceText[0]);
-      // }
-      
     } catch (err) {
       console.error('Error starting race:', err);
     }
-  }, [raceId, raceText, playMorseChar]);
+  }, [raceId]);
   
   // Finish the race for a user
   const finishRace = useCallback(async () => {
@@ -506,199 +495,41 @@ const EnhancedRaceMode: React.FC = () => {
     }
   }, [raceId, startTime, getCurrentUser, raceText.length, errorCount, user, raceMode, refreshXpInfo, getMappedUserId]);
   
-  // Add a replay function to replay current character
-  const replayCurrent = useCallback(() => {
-    if (raceStage !== RaceStage.RACING || currentCharIndex >= raceText.length) return;
-    
-    // Play the current character again
-    playMorseChar(raceText[currentCharIndex]);
-  }, [raceStage, raceText, currentCharIndex, playMorseChar]);
-  
-  // Handle user input during race 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (raceStage !== RaceStage.RACING) return;
-    
-    const currentUser = getCurrentUser();
-    if (!currentUser) return;
-    
-    // Tab key for replaying current character (in copy mode only)
-    if (e.key === 'Tab') {
-      e.preventDefault(); // Prevent tab from changing focus
-      if (raceMode === 'copy') {
-        replayCurrent();
-      }
-      return;
-    }
-    
-    // Special handling for send mode with arrow keys
-    if (raceMode === 'send') {
-      // Handle paddle key presses for send mode
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        console.log(`ArrowLeft DOWN (ref state: ${JSON.stringify(keyStateRef.current)})`);
-        
-        // Only queue a dot if key wasn't already pressed
-        if (!keyStateRef.current.ArrowLeft) {
-          console.log('Queueing a DOT');
-          sendQueueRef.current.push('.');
-        }
-        
-        // Update ref state immediately
-        keyStateRef.current.ArrowLeft = true;
-        
-        return;
-      } 
-      else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        console.log(`ArrowRight DOWN (ref state: ${JSON.stringify(keyStateRef.current)})`);
-        
-        // Only queue a dash if key wasn't already pressed
-        if (!keyStateRef.current.ArrowRight) {
-          console.log('Queueing a DASH');
-          sendQueueRef.current.push('-');
-        }
-        
-        // Update ref state immediately
-        keyStateRef.current.ArrowRight = true;
-        
-        return;
-      }
-      
-      // Process other keys in send mode
-      if (e.key === 'Escape') {
-        // Cancel race
-        e.preventDefault();
-        // Clear send queue and state
-        sendQueueRef.current = [];
-        keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
-        return;
-      }
-      
-      return; // Don't process other keys in send mode
-    }
-    
-    // Below is the copy mode logic (only process character keys in copy mode)
-    // Only process alphanumeric keys and basic punctuation
-    if (!/^[a-zA-Z0-9\s.,?!]$/.test(e.key)) return;
-    
-    const input = e.key.toLowerCase();
-    const expectedChar = raceText[currentCharIndex]?.toLowerCase();
-    
-    if (!expectedChar) return;
-    
-    // Process the character input
-    if (input === expectedChar) {
-      // Show correct indicator
-      setShowCorrectIndicator(true);
-      
-      // Slight pause before continuing (200ms)
-      setTimeout(() => {
-        setShowCorrectIndicator(false);
-        
-        // Correct input
-        const newInput = userInput + input;
-        setUserInput(newInput);
-        
-        // Get proper user ID with mapping
-        const userId = getMappedUserId(currentUser.id, raceId || undefined);
-        
-        // Increment progress using the hook function
-        incrementProgress(currentCharIndex, userId);
-        
-        // Check if user has completed the race
-        if (currentCharIndex + 1 >= raceText.length) {
-          finishRace();
-          stopAudio();
-        } else if (raceMode === 'copy') {
-          // Only play the next character in copy mode
-          playMorseChar(raceText[currentCharIndex + 1]);
-        }
-      }, 400); // 400ms pause
-    } else {
-      // Incorrect input - play error sound
-      incrementErrorCount();
-      
-      if (audioContext) {
-        audioContext.playErrorSound().then(() => {
-          // Short delay before replaying the current character (in copy mode only)
-          if (raceMode === 'copy') {
-            setTimeout(() => {
-              if (currentCharIndex < raceText.length) {
-                playMorseChar(raceText[currentCharIndex]);
-              }
-            }, 750); // Match the delay used in training mode
-          }
-        }).catch(err => {
-          console.error("Error playing error sound:", err);
-          // Even if error sound fails, still replay the character (in copy mode only)
-          if (raceMode === 'copy') {
-            setTimeout(() => {
-              if (currentCharIndex < raceText.length) {
-                playMorseChar(raceText[currentCharIndex]);
-              }
-            }, 750);
-          }
-        });
-      }
-    }
-  }, [
-    raceStage, 
-    raceText, 
-    getCurrentUser, 
-    finishRace, 
-    stopAudio, 
-    currentCharIndex, 
-    playMorseChar, 
-    audioContext, 
-    userInput, 
-    raceMode, 
-    replayCurrent, 
-    getMappedUserId,
+  // Use the race input handler hook - now moved after finishRace is defined
+  const {
+    userInput,
+    keyerOutput: inputKeyerOutput,
+    showCorrectIndicator,
+    replayCurrent,
+    keyStateRef: inputKeyStateRef,
+    sendQueueRef: inputSendQueueRef
+  } = useRaceInputHandler({
+    raceStage,
+    raceMode,
+    raceText,
+    currentCharIndex,
     incrementProgress,
-    incrementErrorCount
-  ]);
+    incrementErrorCount,
+    finishRace,
+    stopAudio,
+    playMorseChar,
+    audioContext,
+    getCurrentUser,
+    getMappedUserId,
+    raceId
+  });
+
+  // Update local refs from the hook's refs
+  useEffect(() => {
+    keyStateRef.current = inputKeyStateRef.current;
+    sendQueueRef.current = inputSendQueueRef.current;
+    setKeyerOutput(inputKeyerOutput);
+  }, [inputKeyStateRef, inputSendQueueRef, inputKeyerOutput]);
   
   // Calculate race statistics for results view - use calculation function
   const stats = React.useMemo((): RaceStats | null => {
     return calculateRaceStats(startTime, finishTime, raceText.length, errorCount);
   }, [startTime, finishTime, raceText.length, errorCount]);
-  
-  // Handle keyup event for send mode
-  const handleKeyUp = useCallback((e: KeyboardEvent) => {
-    if (raceStage !== RaceStage.RACING || raceMode !== 'send') return;
-    
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      e.preventDefault();
-      console.log(`${e.key} UP (ref state: ${JSON.stringify(keyStateRef.current)})`);
-      
-      // Update ref state immediately
-      keyStateRef.current[e.key as 'ArrowLeft' | 'ArrowRight'] = false;
-      
-      // Update React state for UI rendering
-      // No need to update UI state as we're using refs for key state
-    }
-  }, [raceStage, raceMode]);
-
-  // Set up keyboard listeners for racing
-  useEffect(() => {
-    if (raceStage !== RaceStage.RACING) return;
-    
-    document.addEventListener('keydown', handleKeyDown);
-    
-    // Add keyup listener for send mode
-    if (raceMode === 'send') {
-      document.addEventListener('keyup', handleKeyUp);
-    }
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      
-      // Clean up keyup listener
-      if (raceMode === 'send') {
-        document.removeEventListener('keyup', handleKeyUp);
-      }
-    };
-  }, [raceStage, handleKeyDown, raceMode, handleKeyUp]);
   
   // Effect to start the race when race begins (only play sound in copy mode)
   useEffect(() => {
@@ -1068,7 +899,7 @@ const EnhancedRaceMode: React.FC = () => {
           onlineUserIds={playStage.onlineUserIds}
           keyerOutput={keyerOutput}
           showCorrectIndicator={showCorrectIndicator}
-          onReplayCurrent={playStage.handleReplayCurrent}
+          onReplayCurrent={replayCurrent}
         />
       )}
       
