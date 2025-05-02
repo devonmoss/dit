@@ -37,6 +37,13 @@ import { useAnonymousUser } from '../../hooks/useAnonymousUser';
 import { useRaceChannel } from '../../hooks/useRaceChannel';
 import { useRaceProgress } from '../../hooks/useRaceProgress';
 import { useRaceCreation } from '../../hooks/useRaceCreation';
+import { 
+  useRaceInfoStage,
+  useRaceShareStage,
+  useRaceCountdownStage,
+  useRacePlayStage,
+  useRaceResultsStage
+} from '../../hooks/raceStages';
 
 const EnhancedRaceMode: React.FC = () => {
   const router = useRouter();
@@ -937,14 +944,73 @@ const EnhancedRaceMode: React.FC = () => {
     }
   }, [raceId, raceStatus]);
   
+  // Use race stage hooks
+  const infoStage = useRaceInfoStage({
+    raceMode,
+    setRaceMode,
+    createRace,
+  });
+  
+  const shareStage = useRaceShareStage({
+    raceId,
+    raceText,
+    raceMode,
+    raceStatus,
+    selectedLevelId: state.selectedLevelId,
+    currentUser: getCurrentUser(),
+    participants,
+    onlineUsers,
+    startRace,
+    isRaceCreator,
+    getCreatorDisplayName,
+    getUserIdForDisplay,
+  });
+  
+  const countdownStage = useRaceCountdownStage({
+    countdownSeconds,
+    raceText,
+    participants,
+    onlineUsers,
+    currentUser: getCurrentUser(),
+    getUserIdForDisplay,
+    startRacing,
+  });
+  
+  const playStage = useRacePlayStage({
+    raceMode,
+    raceText,
+    userProgress,
+    currentCharIndex,
+    participants,
+    onlineUsers,
+    currentUser: getCurrentUser(),
+    getUserIdForDisplay,
+    keyerOutput,
+    showCorrectIndicator,
+    replayCurrent,
+  });
+  
+  const resultsStage = useRaceResultsStage({
+    stats,
+    errorCount,
+    raceText,
+    participants,
+    onlineUsers,
+    currentUser: getCurrentUser(),
+    getUserIdForDisplay,
+    isCreatingRace,
+    navigateHome: handleNavigateHome,
+    handleRaceAgain,
+  });
+  
   // Render appropriate stage of race
   return (
     <div className={styles.container}>
       {raceStage === RaceStage.INFO && (
         <InfoStage
           raceMode={raceMode}
-          onModeChange={setRaceMode}
-          onCreateRace={() => createRace({ mode: raceMode })}
+          onModeChange={infoStage.handleModeChange}
+          onCreateRace={infoStage.handleCreateRace}
         />
       )}
       
@@ -953,26 +1019,26 @@ const EnhancedRaceMode: React.FC = () => {
           raceId={raceId || ''}
           raceMode={raceMode}
           raceStatus={raceStatus}
-          raceLength={raceText.length}
-          chars={raceText.split('')}
+          raceLength={shareStage.raceLength}
+          chars={shareStage.chars}
           levelId={state.selectedLevelId}
-          isHost={isRaceCreator()}
-          hostName={getCreatorDisplayName()}
+          isHost={shareStage.isHost}
+          hostName={shareStage.hostName}
           participants={participants}
-          currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
-          onlineUserIds={onlineUsers.map(user => user.user_id)}
-          onStartRace={startRace}
+          currentUserId={shareStage.currentUserId}
+          onlineUserIds={shareStage.onlineUserIds}
+          onStartRace={shareStage.handleStartRace}
         />
       )}
       
       {raceStage === RaceStage.COUNTDOWN && (
         <CountdownStage
-          seconds={countdownSeconds}
+          seconds={countdownStage.seconds}
           participants={participants}
-          currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
-          raceLength={raceText.length}
-          onlineUserIds={onlineUsers.map(user => user.user_id)}
-          onComplete={startRacing}
+          currentUserId={countdownStage.currentUserId}
+          raceLength={countdownStage.raceLength}
+          onlineUserIds={countdownStage.onlineUserIds}
+          onComplete={countdownStage.handleCountdownComplete}
         />
       )}
       
@@ -981,12 +1047,12 @@ const EnhancedRaceMode: React.FC = () => {
           stats={stats}
           errorCount={errorCount}
           participants={participants}
-          currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
-          raceLength={raceText.length}
-          onlineUserIds={onlineUsers.map(user => user.user_id)}
+          currentUserId={resultsStage.currentUserId}
+          raceLength={resultsStage.raceLength}
+          onlineUserIds={resultsStage.onlineUserIds}
           isCreatingRace={isCreatingRace}
-          onNavigateHome={handleNavigateHome}
-          onRaceAgain={handleRaceAgain}
+          onNavigateHome={resultsStage.handleNavigateHome}
+          onRaceAgain={resultsStage.handleRaceAgain}
         />
       )}
       
@@ -997,12 +1063,12 @@ const EnhancedRaceMode: React.FC = () => {
           userProgress={userProgress}
           currentCharIndex={currentCharIndex}
           participants={participants}
-          currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
-          raceLength={raceText.length}
-          onlineUserIds={onlineUsers.map(user => user.user_id)}
+          currentUserId={playStage.currentUserId}
+          raceLength={playStage.raceLength}
+          onlineUserIds={playStage.onlineUserIds}
           keyerOutput={keyerOutput}
           showCorrectIndicator={showCorrectIndicator}
-          onReplayCurrent={replayCurrent}
+          onReplayCurrent={playStage.handleReplayCurrent}
         />
       )}
       
