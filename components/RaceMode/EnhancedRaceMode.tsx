@@ -1071,8 +1071,8 @@ const EnhancedRaceMode: React.FC = () => {
       // Move to share stage
       setRaceStage(RaceStage.SHARE);
       
-      // Navigate to /race?id=race.id with full page reload
-      window.location.href = `/race?id=${newRaceId}`;
+      // Navigate to /race?id=race.id using Next.js router instead of full page reload
+      router.push(`/race?id=${newRaceId}`);
       
     } catch (err) {
       console.error('Error creating race:', err);
