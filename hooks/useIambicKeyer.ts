@@ -83,6 +83,7 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     opts.playElement?.(sym);
     bufferRef.current += sym;
     scheduleChar();
+    // Schedule word gap (relative to this element)
     scheduleWord();
     // Determine durations
     const unit = unitRef.current;
