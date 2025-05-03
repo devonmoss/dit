@@ -79,11 +79,12 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
 
   // Recursive cycle function for a held paddle
   const cycleEmit = (sym: Symbol) => {
+    // Emit the symbol
     opts.onElement?.(sym);
     opts.playElement?.(sym);
+    // Append to buffer
     bufferRef.current += sym;
-    scheduleChar();
-    // Schedule word gap (relative to this element)
+    // Schedule word gap after this element
     scheduleWord();
     // Determine durations
     const unit = unitRef.current;
@@ -100,18 +101,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   // Key event handlers
   const handleKeyDown = (e: KeyboardEvent) => {
     // Speed control
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const next = Math.min(maxWpm, wpmRef.current + 1);
-      updateUnit(next);
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const prev = Math.max(minWpm, wpmRef.current - 1);
-      updateUnit(prev);
-      return;
-    }
     // Morse paddles
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
@@ -153,6 +142,8 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && cycleTimer.current != null) {
       clearTimeout(cycleTimer.current);
       cycleTimer.current = null;
+      // On release, schedule character decode
+      scheduleChar();
     }
   };
 

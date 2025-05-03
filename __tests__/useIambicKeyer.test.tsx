@@ -54,18 +54,6 @@ describe('useIambicKeyer', () => {
     expect(onWord).toHaveBeenCalled();
   });
 
-  it('supports dynamic WPM speed by ArrowUp/Down and persists to localStorage', () => {
-    const onWpmChange = jest.fn();
-    render(<TestComp wpm={10} onWpmChange={onWpmChange} />);
-    // Increase speed
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
-    expect(onWpmChange).toHaveBeenCalledWith(11);
-    expect(localStorage.getItem('morseSendWpm')).toBe('11');
-    // Decrease speed
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
-    expect(onWpmChange).toHaveBeenCalledWith(10);
-    expect(localStorage.getItem('morseSendWpm')).toBe('10');
-  });
 
   it('clear() stops pending decode', () => {
     const onCharacter = jest.fn();
