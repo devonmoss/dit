@@ -1,0 +1,87 @@
+.container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 10px;
+  border-radius: 5px;
+  font-family: monospace;
+  z-index: 9999;
+  max-width: 500px;
+  max-height: 400px;
+  overflow: auto;
+}
+
+.title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 4px;
+}
+
+.states {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.paddle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #333;
+}
+
+.active {
+  background-color: #4CAF50;
+}
+
+.buffer {
+  margin-bottom: 8px;
+  font-family: monospace;
+  overflow-wrap: break-word;
+}
+
+.events {
+  height: 200px;
+  overflow-y: auto;
+  border-top: 1px solid #444;
+  padding-top: 4px;
+}
+
+.event {
+  margin-bottom: 2px;
+  padding: 2px;
+  font-size: 12px;
+}
+
+.event:nth-child(odd) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dotEvent {
+  color: #8BC34A;
+}
+
+.dashEvent {
+  color: #FF9800;
+}
+
+.charEvent {
+  color: #03A9F4;
+}
+
+.keyEvent {
+  color: #F06292;
+}
+
+.otherEvent {
+  color: #B0BEC5;
+}
