@@ -192,38 +192,57 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     }, unit.current * 7);
   };
   
+  // Track the last key event timestamp to handle OS key repeat
+  const lastKeyDownTimestamps = useRef<{[key: string]: number}>({});
+  
   // Handle key press
   const handleKeyDown = (e: KeyboardEvent) => {
-    debugLog(`Key down: ${e.key}`);
+    // Get current time for rate limiting
+    const now = Date.now();
+    const lastTimestamp = lastKeyDownTimestamps.current[e.key] || 0;
+    const timeSinceLastKeyDown = now - lastTimestamp;
+    
+    debugLog(`Key down: ${e.key} (${timeSinceLastKeyDown}ms since last press)`);
+    
+    // Store this keydown timestamp
+    lastKeyDownTimestamps.current[e.key] = now;
     
     // Left arrow = dot
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      addDebugEvent('key_down', 'ArrowLeft');
       
-      // Update paddle state
-      dotPressed.current = true;
-      
-      // If no element is being emitted, start with a dot
-      if (elementTimer.current === null) {
-        emitElement('.');
+      // Always update paddle state on keydown
+      if (!dotPressed.current) {
+        dotPressed.current = true;
+        addDebugEvent('paddle_down', 'dot');
+        
+        // If no element is being emitted, start with a dot
+        if (elementTimer.current === null) {
+          emitElement('.');
+        }
+      } else {
+        // This is likely a key repeat - still log it so we know
+        addDebugEvent('key_repeat', 'ArrowLeft');
       }
-      // Otherwise let the current element finish and check state on next cycle
     }
     
     // Right arrow = dash
     else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      addDebugEvent('key_down', 'ArrowRight');
       
-      // Update paddle state
-      dashPressed.current = true;
-      
-      // If no element is being emitted, start with a dash
-      if (elementTimer.current === null) {
-        emitElement('-');
+      // Always update paddle state on keydown
+      if (!dashPressed.current) {
+        dashPressed.current = true;
+        addDebugEvent('paddle_down', 'dash');
+        
+        // If no element is being emitted, start with a dash
+        if (elementTimer.current === null) {
+          emitElement('-');
+        }
+      } else {
+        // This is likely a key repeat - still log it so we know
+        addDebugEvent('key_repeat', 'ArrowRight');
       }
-      // Otherwise let the current element finish and check state on next cycle
     }
     
     // Tab = clear buffer
@@ -252,22 +271,30 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      addDebugEvent('key_up', 'ArrowLeft');
-      dotPressed.current = false;
+      lastKeyDownTimestamps.current['ArrowLeft'] = 0; // Reset timestamp on keyup
       
-      // If element timer is null and dash isn't pressed, schedule char
-      if (elementTimer.current === null && !dashPressed.current) {
-        scheduleChar();
+      if (dotPressed.current) {
+        dotPressed.current = false;
+        addDebugEvent('paddle_up', 'dot');
+        
+        // If element timer is null and dash isn't pressed, schedule char
+        if (elementTimer.current === null && !dashPressed.current) {
+          scheduleChar();
+        }
       }
     }
     else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      addDebugEvent('key_up', 'ArrowRight');
-      dashPressed.current = false;
+      lastKeyDownTimestamps.current['ArrowRight'] = 0; // Reset timestamp on keyup
       
-      // If element timer is null and dot isn't pressed, schedule char
-      if (elementTimer.current === null && !dotPressed.current) {
-        scheduleChar();
+      if (dashPressed.current) {
+        dashPressed.current = false;
+        addDebugEvent('paddle_up', 'dash');
+        
+        // If element timer is null and dot isn't pressed, schedule char
+        if (elementTimer.current === null && !dotPressed.current) {
+          scheduleChar();
+        }
       }
     }
   };
