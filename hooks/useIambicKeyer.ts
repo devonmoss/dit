@@ -113,12 +113,16 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       elementTimer.current = null;
     }
     
-    // Calculate timing - current element + inter-element gap
+    // Calculate timing - the key is we only care about the element duration here
+    // The gap comes after the element stops playing
     const elementDuration = lastSymbol.current === '.' ? unit.current : unit.current * 3;
+    
+    // The gap duration is ALWAYS 1 unit, regardless of whether the element was a dot or dash
     const gapDuration = unit.current; // One unit between elements
+    
     const totalDuration = elementDuration + gapDuration;
     
-    debugLog(`Scheduling next element in ${totalDuration}ms`);
+    debugLog(`Scheduling next element - element: ${elementDuration}ms, gap: ${gapDuration}ms, total: ${totalDuration}ms`);
     
     // Schedule next element after current + gap
     elementTimer.current = window.setTimeout(() => {
