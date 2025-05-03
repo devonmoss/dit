@@ -37,30 +37,31 @@ export interface IambicKeyer {
 }
 
 export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
-  // State
+  // Track playback and paddle state
   const wpm = useRef<number>(opts.wpm);
-  const unit = useRef<number>(1200 / opts.wpm); // dit duration in ms
+  const unit = useRef<number>(1200 / opts.wpm);
   const buffer = useRef<string>('');
-  const dotPressed = useRef<boolean>(false);
-  const dashPressed = useRef<boolean>(false);
+  const dotHeld = useRef<boolean>(false);
+  const dashHeld = useRef<boolean>(false);
   const lastSymbol = useRef<Symbol | null>(null);
   const isActive = useRef<boolean>(false);
   
-  // Timers
+  // Element scheduled, played, etc.
   const elementTimer = useRef<number | null>(null);
   const charTimer = useRef<number | null>(null);
   const wordTimer = useRef<number | null>(null);
   
-  // Debug events
+  // Debug
   const debugEvents = useRef<Array<{type: string, value?: string, timestamp: number}>>([]);
   
-  // Debug functions
+  // Debug log
   const debugLog = (message: string) => {
     if (process.env.NODE_ENV === 'development') {
       console.log(`[IambicKeyer] ${message}`);
     }
   };
   
+  // Add debug event
   const addDebugEvent = (type: string, value?: string) => {
     if (process.env.NODE_ENV === 'development') {
       const event = { type, value, timestamp: Date.now() };
@@ -69,97 +70,79 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     }
   };
   
-  // Update WPM and unit duration
-  const setWpm = (newWpm: number) => {
+  // Update WPM
+  const updateWpm = (newWpm: number) => {
     wpm.current = newWpm;
     unit.current = 1200 / newWpm;
-    // Persist to localStorage in browser
     if (typeof window !== 'undefined') {
       localStorage.setItem('morseSendWpm', String(newWpm));
     }
-    // Notify parent
     opts.onWpmChange?.(newWpm);
     addDebugEvent('wpm_change', String(newWpm));
   };
   
-  // Handle element emission (dot or dash)
-  const emitElement = (sym: Symbol) => {
-    // Log debug info
-    addDebugEvent('emit', sym);
-    debugLog(`Emitting ${sym === '.' ? 'DOT' : 'DASH'}`);
-    
-    // Store as last symbol
+  // Handle emit and schedule next
+  const emitSymbol = (sym: Symbol) => {
+    // Update last symbol
     lastSymbol.current = sym;
     
-    // Add to buffer
+    // Add to buffer 
     buffer.current += sym;
     
-    // Trigger callbacks
+    // Log and emit
+    addDebugEvent('emit', sym);
     opts.onElement?.(sym);
     opts.playElement?.(sym);
     
-    // Schedule word gap after this element
+    // Schedule next element based on current element duration and gap
+    const symbolDuration = sym === '.' ? unit.current : unit.current * 3;
+    const gapDuration = unit.current; // Always 1 unit gap between elements
+    const totalDuration = symbolDuration + gapDuration;
+    
+    debugLog(`Playing ${sym === '.' ? 'DOT' : 'DASH'} - duration: ${symbolDuration}ms, gap: ${gapDuration}ms`);
+    
+    // Schedule word gap
     scheduleWord();
     
-    // Schedule the next element based on state
-    scheduleNextElement();
+    // Schedule next element
+    scheduleNextElement(totalDuration);
   };
   
-  // Schedule the next element based on paddle state
-  const scheduleNextElement = () => {
-    // Clear any existing element timer
+  // Schedule next element after current one finishes
+  const scheduleNextElement = (delayMs: number) => {
+    // Clear existing timer
     if (elementTimer.current !== null) {
       clearTimeout(elementTimer.current);
       elementTimer.current = null;
     }
     
-    // Calculate timing - the key is we only care about the element duration here
-    // The gap comes after the element stops playing
-    const elementDuration = lastSymbol.current === '.' ? unit.current : unit.current * 3;
-    
-    // The gap duration is ALWAYS 1 unit, regardless of whether the element was a dot or dash
-    const gapDuration = unit.current; // One unit between elements
-    
-    const totalDuration = elementDuration + gapDuration;
-    
-    debugLog(`Scheduling next element - element: ${elementDuration}ms, gap: ${gapDuration}ms, total: ${totalDuration}ms`);
-    
-    // Schedule next element after current + gap
+    // Set new timer
     elementTimer.current = window.setTimeout(() => {
-      debugLog('Element timer fired - checking paddle state');
       elementTimer.current = null;
       
-      // At this point, it's time for the next element
-      // Check paddle state and determine what element to play next
-      debugLog(`Paddle state: dot=${dotPressed.current}, dash=${dashPressed.current}`);
-      
-      if (dotPressed.current && dashPressed.current) {
-        // Squeeze logic (both paddles pressed)
-        // Alternating pattern for iambic keyer mode A
+      // Check paddles and determine next element
+      if (dotHeld.current && dashHeld.current) {
+        // Squeeze - alternate
         addDebugEvent('squeeze');
-        const nextSymbol: Symbol = lastSymbol.current === '.' ? '-' : '.';
-        debugLog(`Squeeze: emitting ${nextSymbol}`);
-        emitElement(nextSymbol);
-      } else if (dotPressed.current) {
-        // Dot paddle still held
+        const nextSym: Symbol = lastSymbol.current === '.' ? '-' : '.';
+        emitSymbol(nextSym);
+      } else if (dotHeld.current) {
+        // Continuous dots
         addDebugEvent('continuous', 'dot');
-        debugLog('Continuous dot');
-        emitElement('.');
-      } else if (dashPressed.current) {
-        // Dash paddle still held
+        emitSymbol('.');
+      } else if (dashHeld.current) {
+        // Continuous dashes
         addDebugEvent('continuous', 'dash');
-        debugLog('Continuous dash');
-        emitElement('-');
+        emitSymbol('-');
       } else {
         // No paddles held, end of sequence
         addDebugEvent('element_end');
-        debugLog('Element sequence ended - scheduling char decode');
         scheduleChar();
       }
-    }, totalDuration);
+    }, delayMs);
   };
   
-  // Schedule character decode after element end
+  // Schedule character decode
   const scheduleChar = () => {
     if (charTimer.current !== null) {
       clearTimeout(charTimer.current);
@@ -167,14 +150,13 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     
     addDebugEvent('schedule_char');
     
-    // 3 units after last element to detect character end
     charTimer.current = window.setTimeout(() => {
       charTimer.current = null;
       decodeChar();
     }, unit.current * 3);
   };
   
-  // Decode the current buffer as a character
+  // Decode character from buffer
   const decodeChar = () => {
     if (!buffer.current) return;
     
@@ -186,7 +168,7 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       addDebugEvent('char', char);
       opts.onCharacter?.(char);
     } else {
-      addDebugEvent('unknown_char', code);
+      addDebugEvent('unknown', code);
     }
   };
   
@@ -196,142 +178,103 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       clearTimeout(wordTimer.current);
     }
     
-    // 7 units after last element to detect word end
     wordTimer.current = window.setTimeout(() => {
       wordTimer.current = null;
-      addDebugEvent('word');
       opts.onWord?.();
+      addDebugEvent('word');
     }, unit.current * 7);
   };
   
-  // Track the last key event timestamp to handle OS key repeat
-  const lastKeyDownTimestamps = useRef<{[key: string]: number}>({});
+  // Track key events to filter OS key repeat
+  const lastKeyTime = useRef<{[key: string]: number}>({});
   
-  // Handle key press
+  // Handle key down
   const handleKeyDown = (e: KeyboardEvent) => {
-    // Get current time for rate limiting
     const now = Date.now();
-    const lastTimestamp = lastKeyDownTimestamps.current[e.key] || 0;
-    const timeSinceLastKeyDown = now - lastTimestamp;
+    const lastTime = lastKeyTime.current[e.key] || 0;
+    const timeSince = now - lastTime;
     
-    debugLog(`Key down: ${e.key} (${timeSinceLastKeyDown}ms since last press)`);
+    lastKeyTime.current[e.key] = now;
     
-    // Store this keydown timestamp
-    lastKeyDownTimestamps.current[e.key] = now;
-    
-    // Left arrow = dot
+    // Dot key (left arrow)
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       
-      // Update paddle state regardless of previous state
-      // This ensures the key repeat doesn't get lost
-      dotPressed.current = true;
-      
-      if (!isActive.current) {
-        debugLog('Keyer not active, activating');
-        isActive.current = true;
-      }
-      
-      // If we weren't already pressing dot, log it as a new paddle press
-      if (timeSinceLastKeyDown > 100) {
-        addDebugEvent('paddle_down', 'dot');
-      } else {
-        // This is a key repeat but we still want to track it
-        addDebugEvent('key_repeat', 'ArrowLeft');
-      }
-      
-      // If no element is being emitted, start with a dot
-      if (elementTimer.current === null) {
-        debugLog('No element timer, starting dot emission');
-        emitElement('.');
+      // If not already held, update state
+      if (!dotHeld.current) {
+        addDebugEvent('key_down', 'ArrowLeft');
+        dotHeld.current = true;
+        
+        // If no element is currently playing, start one
+        if (elementTimer.current === null) {
+          emitSymbol('.');
+        }
+        // Otherwise current element will finish and next one determined by paddle state
       }
     }
     
-    // Right arrow = dash
+    // Dash key (right arrow)
     else if (e.key === 'ArrowRight') {
       e.preventDefault();
       
-      // Update paddle state regardless of previous state
-      // This ensures the key repeat doesn't get lost
-      dashPressed.current = true;
-      
-      if (!isActive.current) {
-        debugLog('Keyer not active, activating');
-        isActive.current = true;
-      }
-      
-      // If we weren't already pressing dash, log it as a new paddle press
-      if (timeSinceLastKeyDown > 100) {
-        addDebugEvent('paddle_down', 'dash');
-      } else {
-        // This is a key repeat but we still want to track it
-        addDebugEvent('key_repeat', 'ArrowRight');
-      }
-      
-      // If no element is being emitted, start with a dash
-      if (elementTimer.current === null) {
-        debugLog('No element timer, starting dash emission');
-        emitElement('-');
+      // If not already held, update state
+      if (!dashHeld.current) {
+        addDebugEvent('key_down', 'ArrowRight');
+        dashHeld.current = true;
+        
+        // If no element is currently playing, start one
+        if (elementTimer.current === null) {
+          emitSymbol('-');
+        }
+        // Otherwise current element will finish and next one determined by paddle state
       }
     }
     
-    // Tab = clear buffer
+    // Tab - clear
     else if (e.key === 'Tab') {
       e.preventDefault();
-      addDebugEvent('clear');
       clear();
     }
     
-    // Speed controls
+    // Speed control
     else if (e.key === 'ArrowUp') {
       e.preventDefault();
       const newWpm = Math.min(opts.maxWpm || 40, wpm.current + 1);
-      setWpm(newWpm);
+      updateWpm(newWpm);
     }
     else if (e.key === 'ArrowDown') {
       e.preventDefault();
       const newWpm = Math.max(opts.minWpm || 5, wpm.current - 1);
-      setWpm(newWpm);
+      updateWpm(newWpm);
     }
   };
   
-  // Handle key release
+  // Handle key up
   const handleKeyUp = (e: KeyboardEvent) => {
-    debugLog(`Key up: ${e.key}`);
-    
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      lastKeyDownTimestamps.current['ArrowLeft'] = 0; // Reset timestamp on keyup
+      dotHeld.current = false;
+      addDebugEvent('key_up', 'ArrowLeft');
       
-      if (dotPressed.current) {
-        dotPressed.current = false;
-        addDebugEvent('paddle_up', 'dot');
-        
-        // If element timer is null and dash isn't pressed, schedule char
-        if (elementTimer.current === null && !dashPressed.current) {
-          scheduleChar();
-        }
+      // If both paddles released and no element playing, decode character
+      if (!dashHeld.current && elementTimer.current === null && buffer.current) {
+        scheduleChar();
       }
     }
     else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      lastKeyDownTimestamps.current['ArrowRight'] = 0; // Reset timestamp on keyup
+      dashHeld.current = false;
+      addDebugEvent('key_up', 'ArrowRight');
       
-      if (dashPressed.current) {
-        dashPressed.current = false;
-        addDebugEvent('paddle_up', 'dash');
-        
-        // If element timer is null and dot isn't pressed, schedule char
-        if (elementTimer.current === null && !dotPressed.current) {
-          scheduleChar();
-        }
+      // If both paddles released and no element playing, decode character
+      if (!dotHeld.current && elementTimer.current === null && buffer.current) {
+        scheduleChar();
       }
     }
   };
   
   // Install event listeners
   const install = () => {
-    debugLog('Installing keyer');
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     isActive.current = true;
@@ -340,7 +283,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   
   // Remove event listeners and cleanup
   const uninstall = () => {
-    debugLog('Uninstalling keyer');
     window.removeEventListener('keydown', handleKeyDown);
     window.removeEventListener('keyup', handleKeyUp);
     clear();
@@ -350,7 +292,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   
   // Clear state and timers
   const clear = () => {
-    debugLog('Clearing keyer state');
     buffer.current = '';
     
     if (elementTimer.current !== null) {
@@ -373,7 +314,7 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   
   // Set initial WPM
   useEffect(() => {
-    setWpm(opts.wpm);
+    updateWpm(opts.wpm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opts.wpm]);
   
@@ -384,11 +325,11 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     clear
   };
   
-  // Add debug info in development
+  // Add debug in development
   if (process.env.NODE_ENV === 'development') {
     keyer.debug = {
-      dotHeld: dotPressed.current,
-      dashHeld: dashPressed.current,
+      dotHeld: dotHeld.current,
+      dashHeld: dashHeld.current,
       buffer: buffer.current,
       lastSymbol: lastSymbol.current,
       wpm: wpm.current,
@@ -396,12 +337,12 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       addEvent: (event) => addDebugEvent(event.type, event.value)
     };
     
-    // Update debug values every 50ms
+    // Update debug values
     useEffect(() => {
       const interval = setInterval(() => {
         if (keyer.debug) {
-          keyer.debug.dotHeld = dotPressed.current;
-          keyer.debug.dashHeld = dashPressed.current;
+          keyer.debug.dotHeld = dotHeld.current;
+          keyer.debug.dashHeld = dashHeld.current;
           keyer.debug.buffer = buffer.current;
           keyer.debug.lastSymbol = lastSymbol.current;
           keyer.debug.wpm = wpm.current;
