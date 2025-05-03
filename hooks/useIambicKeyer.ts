@@ -120,7 +120,15 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     elementTimer.current = window.setTimeout(() => {
       elementTimer.current = null;
       
-      // Check paddles and determine next element
+      // First check for explicitly queued symbols from quick keypresses
+      if (pendingSymbols.current.length > 0) {
+        const nextSymbol = pendingSymbols.current.shift()!;
+        addDebugEvent('dequeue', nextSymbol);
+        emitSymbol(nextSymbol);
+        return;
+      }
+      
+      // Otherwise check paddle states for continuous/squeeze behavior
       if (dotHeld.current && dashHeld.current) {
         // Squeeze - alternate
         addDebugEvent('squeeze');
@@ -188,6 +196,9 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   // Track key events to filter OS key repeat
   const lastKeyTime = useRef<{[key: string]: number}>({});
   
+  // Queue for quick successive keypresses
+  const pendingSymbols = useRef<Symbol[]>([]);
+  
   // Handle key down
   const handleKeyDown = (e: KeyboardEvent) => {
     const now = Date.now();
@@ -200,16 +211,24 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       
-      // If not already held, update state
-      if (!dotHeld.current) {
+      // Always record a new keypress when the key is pressed (not just released and pressed again)
+      // This detects both: 1) newly pressed paddles and 2) quick successive presses
+      if (timeSince > 50) { // Filter out OS key repeat events
         addDebugEvent('key_down', 'ArrowLeft');
+        
+        // Always update paddle state
         dotHeld.current = true;
         
-        // If no element is currently playing, start one
+        // If no element is playing, start immediately
         if (elementTimer.current === null) {
           emitSymbol('.');
+        } 
+        // If an element is playing but this is a quick explicit press (not just held state)
+        // then queue this symbol to be played next
+        else if (timeSince > 200) {
+          addDebugEvent('queue', 'dot');
+          pendingSymbols.current.push('.');
         }
-        // Otherwise current element will finish and next one determined by paddle state
       }
     }
     
@@ -217,16 +236,24 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     else if (e.key === 'ArrowRight') {
       e.preventDefault();
       
-      // If not already held, update state
-      if (!dashHeld.current) {
+      // Always record a new keypress when the key is pressed (not just released and pressed again)
+      // This detects both: 1) newly pressed paddles and 2) quick successive presses
+      if (timeSince > 50) { // Filter out OS key repeat events
         addDebugEvent('key_down', 'ArrowRight');
+        
+        // Always update paddle state
         dashHeld.current = true;
         
-        // If no element is currently playing, start one
+        // If no element is playing, start immediately
         if (elementTimer.current === null) {
           emitSymbol('-');
+        } 
+        // If an element is playing but this is a quick explicit press (not just held state)
+        // then queue this symbol to be played next
+        else if (timeSince > 200) {
+          addDebugEvent('queue', 'dash');
+          pendingSymbols.current.push('-');
         }
-        // Otherwise current element will finish and next one determined by paddle state
       }
     }
     
@@ -293,6 +320,7 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   // Clear state and timers
   const clear = () => {
     buffer.current = '';
+    pendingSymbols.current = [];
     
     if (elementTimer.current !== null) {
       clearTimeout(elementTimer.current);
