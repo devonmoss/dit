@@ -92,8 +92,19 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     const cycleDur = symbolDur + unit;
     // Schedule next cycle if paddle still held
     cycleTimer.current = window.setTimeout(() => {
-      if ((sym === '.' && dotHeld.current) || (sym === '-' && dashHeld.current)) {
-        cycleEmit(sym);
+      // Determine next symbol based on iambic paddle holds
+      let next: Symbol | null = null;
+      if (dotHeld.current && dashHeld.current) {
+        // Both paddles held: alternate
+        next = sym === '.' ? '-' : '.';
+      } else if (sym === '.' && dotHeld.current) {
+        // Continue same paddle
+        next = '.';
+      } else if (sym === '-' && dashHeld.current) {
+        next = '-';
+      }
+      if (next) {
+        cycleEmit(next);
       }
     }, cycleDur);
   };
@@ -106,7 +117,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       e.preventDefault();
       if (!dotHeld.current) {
         dotHeld.current = true;
-        dashHeld.current = false;
         if (cycleTimer.current != null) clearTimeout(cycleTimer.current);
         cycleEmit('.');
       }
@@ -116,7 +126,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       e.preventDefault();
       if (!dashHeld.current) {
         dashHeld.current = true;
-        dotHeld.current = false;
         if (cycleTimer.current != null) clearTimeout(cycleTimer.current);
         cycleEmit('-');
       }
