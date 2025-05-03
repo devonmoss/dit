@@ -118,30 +118,38 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     const gapDuration = unit.current; // One unit between elements
     const totalDuration = elementDuration + gapDuration;
     
+    debugLog(`Scheduling next element in ${totalDuration}ms`);
+    
     // Schedule next element after current + gap
     elementTimer.current = window.setTimeout(() => {
+      debugLog('Element timer fired - checking paddle state');
       elementTimer.current = null;
       
       // At this point, it's time for the next element
       // Check paddle state and determine what element to play next
+      debugLog(`Paddle state: dot=${dotPressed.current}, dash=${dashPressed.current}`);
       
       if (dotPressed.current && dashPressed.current) {
         // Squeeze logic (both paddles pressed)
         // Alternating pattern for iambic keyer mode A
         addDebugEvent('squeeze');
         const nextSymbol: Symbol = lastSymbol.current === '.' ? '-' : '.';
+        debugLog(`Squeeze: emitting ${nextSymbol}`);
         emitElement(nextSymbol);
       } else if (dotPressed.current) {
         // Dot paddle still held
         addDebugEvent('continuous', 'dot');
+        debugLog('Continuous dot');
         emitElement('.');
       } else if (dashPressed.current) {
         // Dash paddle still held
         addDebugEvent('continuous', 'dash');
+        debugLog('Continuous dash');
         emitElement('-');
       } else {
         // No paddles held, end of sequence
         addDebugEvent('element_end');
+        debugLog('Element sequence ended - scheduling char decode');
         scheduleChar();
       }
     }, totalDuration);
@@ -211,18 +219,27 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       
-      // Always update paddle state on keydown
-      if (!dotPressed.current) {
-        dotPressed.current = true;
+      // Update paddle state regardless of previous state
+      // This ensures the key repeat doesn't get lost
+      dotPressed.current = true;
+      
+      if (!isActive.current) {
+        debugLog('Keyer not active, activating');
+        isActive.current = true;
+      }
+      
+      // If we weren't already pressing dot, log it as a new paddle press
+      if (timeSinceLastKeyDown > 100) {
         addDebugEvent('paddle_down', 'dot');
-        
-        // If no element is being emitted, start with a dot
-        if (elementTimer.current === null) {
-          emitElement('.');
-        }
       } else {
-        // This is likely a key repeat - still log it so we know
+        // This is a key repeat but we still want to track it
         addDebugEvent('key_repeat', 'ArrowLeft');
+      }
+      
+      // If no element is being emitted, start with a dot
+      if (elementTimer.current === null) {
+        debugLog('No element timer, starting dot emission');
+        emitElement('.');
       }
     }
     
@@ -230,18 +247,27 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     else if (e.key === 'ArrowRight') {
       e.preventDefault();
       
-      // Always update paddle state on keydown
-      if (!dashPressed.current) {
-        dashPressed.current = true;
+      // Update paddle state regardless of previous state
+      // This ensures the key repeat doesn't get lost
+      dashPressed.current = true;
+      
+      if (!isActive.current) {
+        debugLog('Keyer not active, activating');
+        isActive.current = true;
+      }
+      
+      // If we weren't already pressing dash, log it as a new paddle press
+      if (timeSinceLastKeyDown > 100) {
         addDebugEvent('paddle_down', 'dash');
-        
-        // If no element is being emitted, start with a dash
-        if (elementTimer.current === null) {
-          emitElement('-');
-        }
       } else {
-        // This is likely a key repeat - still log it so we know
+        // This is a key repeat but we still want to track it
         addDebugEvent('key_repeat', 'ArrowRight');
+      }
+      
+      // If no element is being emitted, start with a dash
+      if (elementTimer.current === null) {
+        debugLog('No element timer, starting dash emission');
+        emitElement('-');
       }
     }
     

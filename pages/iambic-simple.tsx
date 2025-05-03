@@ -98,7 +98,7 @@ const IambicSimplePage: React.FC = () => {
     onWpmChange: setWpm,
   });
   
-  // Install on mount
+  // Install on mount, only once
   useEffect(() => {
     console.log('Installing keyer');
     keyer.install();
@@ -106,7 +106,8 @@ const IambicSimplePage: React.FC = () => {
       console.log('Uninstalling keyer');
       keyer.uninstall();
     };
-  }, [keyer]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   return (
     <Layout>
