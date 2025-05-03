@@ -13,7 +13,7 @@ interface CharTiming {
 }
 
 type Mode = 'copy' | 'send' | 'race';
-type TestType = 'training' | 'time' | 'words' | 'race';
+ type TestType = 'training' | 'time' | 'words' | 'race' | 'zen';
 type Theme = 'default' | 'catppuccin-mocha';
 
 export interface AppState {

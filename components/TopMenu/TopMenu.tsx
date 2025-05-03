@@ -49,6 +49,8 @@ const TopMenu: React.FC = () => {
     // Handle navigation based on test type
     if (testType === 'race') {
       router.push('/race');
+    } else if (testType === 'zen') {
+      router.push('/zen');
     } else if (testType === 'training') {
       router.push('/');
     } else if (testType === 'time') {
@@ -125,6 +127,12 @@ const TopMenu: React.FC = () => {
             title="Coming soon! Complete as many characters as possible in a set amount of time."
           >
             time
+          </button>
+          <button 
+            className={`${styles.menuItem} ${state.testType === 'zen' ? styles.active : ''}`}
+            onClick={() => handleTestTypeClick('zen')}
+          >
+            zen
           </button>
           <button 
             className={`${styles.menuItem} ${state.testType === 'words' ? styles.active : ''}`}
