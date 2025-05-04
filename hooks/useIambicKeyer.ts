@@ -153,6 +153,25 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   // Start a new sequence if not already running
   const startSequence = (sym: Symbol) => {
     if (elementTimer.current === null) {
+      // If we're starting a new sequence, ensure any pending character timer is cleared
+      // This fixes the issue with consecutive characters being merged
+      if (charTimer.current !== null) {
+        clearTimeout(charTimer.current);
+        charTimer.current = null;
+        
+        // If there's pending content in the buffer, decode it as a character
+        if (buffer.current) {
+          const code = buffer.current;
+          buffer.current = '';
+          
+          const char = invMorseMap[code] || '';
+          if (char) {
+            addEvent('char_before_new_sequence', char);
+            opts.onCharacter?.(char);
+          }
+        }
+      }
+      
       // No element currently playing, start a new sequence
       addEvent('start', sym);
       playSymbol(sym);
@@ -170,7 +189,8 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       charTimer.current = null;
     }
     
-    addEvent('schedule_char');
+    addEvent('schedule_char', buffer.current);
+    log(`Scheduling character decode for buffer: ${buffer.current}`);
     
     // Schedule decode after 3 unit gap
     charTimer.current = window.setTimeout(() => {
@@ -178,12 +198,17 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       
       // Decode the character
       const code = buffer.current;
+      if (!code) return; // Safety check
+      
       buffer.current = '';
       
       const char = invMorseMap[code] || '';
       if (char) {
         addEvent('char', char);
+        log(`Decoded character: ${char} from ${code}`);
         opts.onCharacter?.(char);
+      } else {
+        log(`No character found for code: ${code}`);
       }
     }, unit.current * 3);
   };
@@ -207,8 +232,17 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   // Queue for explicit paddle presses during element playback
   const queuedElements = useRef<Symbol[]>([]);
   
+  // Last keydown timestamp to detect new user action vs. key repeat
+  const lastKeyActionTime = useRef<number>(0);
+  
   // Key event handlers - these are super simple now!
   const handleKeyDown = (e: KeyboardEvent) => {
+    const now = Date.now();
+    // We consider this a new user action if it's been more than 1000ms since
+    // the last keydown or if it's a different key than was last pressed
+    const isNewUserAction = (now - lastKeyActionTime.current) > 1000;
+    lastKeyActionTime.current = now;
+    
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       
@@ -216,6 +250,27 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       if (!dotHeld.current) {
         dotHeld.current = true;
         addEvent('key_down', 'dot');
+        
+        // For a completely new action (after pause), make sure we've handled
+        // any pending character from a previous sequence
+        if (isNewUserAction && charTimer.current !== null) {
+          log("New user action detected - finalizing pending character");
+          clearTimeout(charTimer.current);
+          charTimer.current = null;
+          
+          // Immediately decode any pending character
+          if (buffer.current) {
+            const code = buffer.current;
+            buffer.current = '';
+            
+            const char = invMorseMap[code] || '';
+            if (char) {
+              addEvent('immediate_char', char);
+              log(`Immediate character: ${char} from ${code}`);
+              opts.onCharacter?.(char);
+            }
+          }
+        }
         
         // If an element is currently playing, queue a dot to play next
         if (elementTimer.current !== null) {
@@ -237,6 +292,27 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       if (!dashHeld.current) {
         dashHeld.current = true;
         addEvent('key_down', 'dash');
+        
+        // For a completely new action (after pause), make sure we've handled
+        // any pending character from a previous sequence
+        if (isNewUserAction && charTimer.current !== null) {
+          log("New user action detected - finalizing pending character");
+          clearTimeout(charTimer.current);
+          charTimer.current = null;
+          
+          // Immediately decode any pending character
+          if (buffer.current) {
+            const code = buffer.current;
+            buffer.current = '';
+            
+            const char = invMorseMap[code] || '';
+            if (char) {
+              addEvent('immediate_char', char);
+              log(`Immediate character: ${char} from ${code}`);
+              opts.onCharacter?.(char);
+            }
+          }
+        }
         
         // If an element is currently playing, queue a dash to play next
         if (elementTimer.current !== null) {
