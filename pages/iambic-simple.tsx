@@ -1,10 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout/Layout';
 import { useIambicKeyer } from '../hooks/useIambicKeyer';
+import IambicVisualizer from '../components/IambicVisualizer';
+
+interface IambicEvent {
+  type: string;
+  value?: string;
+  timestamp: number;
+}
 
 const IambicSimplePage: React.FC = () => {
+  // Basic state
   const [output, setOutput] = useState<string>('');
   const [wpm, setWpm] = useState(18);
+  
+  // Debug visualization state
+  const [dotPressed, setDotPressed] = useState(false);
+  const [dashPressed, setDashPressed] = useState(false);
+  const [playingDot, setPlayingDot] = useState(false);
+  const [playingDash, setPlayingDash] = useState(false);
+  const [squeeze, setSqueeze] = useState(false);
+  const [queuedElements, setQueuedElements] = useState(false);
+  const [events, setEvents] = useState<IambicEvent[]>([]);
+  
+  // Audio state
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const oscillatorRef = useRef<OscillatorNode | null>(null);
@@ -30,6 +49,53 @@ const IambicSimplePage: React.FC = () => {
       }
     };
   }, []);
+  
+  // Handle debug events from the keyer
+  const handleDebugEvent = (event: { type: string, value?: string }) => {
+    const newEvent = {
+      type: event.type,
+      value: event.value,
+      timestamp: Date.now()
+    };
+    
+    setEvents(prev => [...prev.slice(-99), newEvent]);
+    
+    // Update visualization state based on events
+    switch (event.type) {
+      case 'key_down':
+        if (event.value === 'dot') setDotPressed(true);
+        if (event.value === 'dash') setDashPressed(true);
+        break;
+        
+      case 'key_up':
+        if (event.value === 'dot') setDotPressed(false);
+        if (event.value === 'dash') setDashPressed(false);
+        break;
+        
+      case 'play':
+        if (event.value === '.') {
+          setPlayingDot(true);
+          setPlayingDash(false);
+          setTimeout(() => setPlayingDot(false), 1200 / wpm);
+        } else if (event.value === '-') {
+          setPlayingDot(false);
+          setPlayingDash(true);
+          setTimeout(() => setPlayingDash(false), 3 * 1200 / wpm);
+        }
+        break;
+        
+      case 'squeeze':
+        setSqueeze(true);
+        setTimeout(() => setSqueeze(false), 300);
+        break;
+        
+      case 'paddle_changed_during_element':
+      case 'force_change':
+        setQueuedElements(true);
+        setTimeout(() => setQueuedElements(false), 500);
+        break;
+    }
+  };
   
   const stopSound = () => {
     if (oscillatorRef.current) {
@@ -98,6 +164,25 @@ const IambicSimplePage: React.FC = () => {
     onWpmChange: setWpm,
   });
   
+  // Connect debug events
+  useEffect(() => {
+    if (keyer.debug) {
+      keyer.debug.addEvent = handleDebugEvent;
+    }
+  }, [keyer]);
+  
+  // Update debug display from keyer state
+  useEffect(() => {
+    if (!keyer.debug) return;
+    
+    const updateInterval = setInterval(() => {
+      setDotPressed(keyer.debug?.dotHeld || false);
+      setDashPressed(keyer.debug?.dashHeld || false);
+    }, 50);
+    
+    return () => clearInterval(updateInterval);
+  }, [keyer]);
+  
   // Install on mount, only once
   useEffect(() => {
     console.log('Installing keyer');
@@ -151,12 +236,25 @@ const IambicSimplePage: React.FC = () => {
           {output || <span style={{ color: '#999' }}>Output will appear here...</span>}
         </div>
         
-        <button 
-          onClick={() => setOutput('')}
-          style={{ padding: '8px 16px' }}
-        >
-          Clear Output
-        </button>
+        <div style={{ marginBottom: '20px' }}>
+          <button 
+            onClick={() => setOutput('')}
+            style={{ padding: '8px 16px' }}
+          >
+            Clear Output
+          </button>
+        </div>
+        
+        {/* Iambic Visualizer */}
+        <IambicVisualizer
+          dotPressed={dotPressed}
+          dashPressed={dashPressed}
+          playingDot={playingDot}
+          playingDash={playingDash}
+          squeeze={squeeze}
+          queuedElements={queuedElements}
+          events={events}
+        />
       </div>
     </Layout>
   );

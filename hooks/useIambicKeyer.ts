@@ -115,13 +115,27 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   
   // Continue the element sequence based on current paddle state
   const continueSequence = () => {
+    // First check if there are queued elements from keypresses during playback
+    if (queuedElements.current.length > 0) {
+      // Play the first queued element, regardless of current paddle state
+      const nextElement = queuedElements.current.shift()!;
+      addEvent('from_queue', nextElement);
+      log(`Playing queued element: ${nextElement}`);
+      playSymbol(nextElement);
+      return;
+    }
+    
+    // Log current state
+    log(`Continue sequence: dot=${dotHeld.current}, dash=${dashHeld.current}, last=${lastSymbol.current}, queue=${queuedElements.current.length}`);
+    
     // Check current paddle state
     if (dotHeld.current && dashHeld.current) {
       // Both paddles held - alternate symbols (squeeze behavior)
       addEvent('squeeze');
       const nextSymbol = lastSymbol.current === '.' ? '-' : '.';
       playSymbol(nextSymbol);
-    } else if (dotHeld.current) {
+    } 
+    else if (dotHeld.current) {
       // Only dot paddle held
       addEvent('continuous', 'dot');
       playSymbol('.');
@@ -190,6 +204,9 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     }, unit.current * 7);
   };
   
+  // Queue for explicit paddle presses during element playback
+  const queuedElements = useRef<Symbol[]>([]);
+  
   // Key event handlers - these are super simple now!
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'ArrowLeft') {
@@ -200,8 +217,18 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
         dotHeld.current = true;
         addEvent('key_down', 'dot');
         
-        // Start with dot if nothing is playing
-        startSequence('.');
+        // If an element is currently playing, queue a dot to play next
+        if (elementTimer.current !== null) {
+          // Only queue if we don't already have this element queued
+          if (!queuedElements.current.includes('.')) {
+            queuedElements.current.push('.');
+            addEvent('queue', 'dot');
+            log('Dot queued to play after current element');
+          }
+        } else {
+          // Start with dot if nothing is playing
+          startSequence('.');
+        }
       }
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
@@ -211,8 +238,18 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
         dashHeld.current = true;
         addEvent('key_down', 'dash');
         
-        // Start with dash if nothing is playing
-        startSequence('-');
+        // If an element is currently playing, queue a dash to play next
+        if (elementTimer.current !== null) {
+          // Only queue if we don't already have this element queued
+          if (!queuedElements.current.includes('-')) {
+            queuedElements.current.push('-');
+            addEvent('queue', 'dash');
+            log('Dash queued to play after current element');
+          }
+        } else {
+          // Start with dash if nothing is playing
+          startSequence('-');
+        }
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
@@ -236,6 +273,10 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       dotHeld.current = false;
       addEvent('key_up', 'dot');
       
+      // Note: We don't remove from the queue on key up - 
+      // If the key was pressed during element playback, 
+      // we want to play the queued element even if released
+      
       // If both paddles released and nothing playing, schedule char decode
       if (!dashHeld.current && elementTimer.current === null && buffer.current) {
         scheduleChar();
@@ -246,6 +287,10 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       // Right arrow up = dash paddle release
       dashHeld.current = false;
       addEvent('key_up', 'dash');
+      
+      // Note: We don't remove from the queue on key up - 
+      // If the key was pressed during element playback, 
+      // we want to play the queued element even if released
       
       // If both paddles released and nothing playing, schedule char decode
       if (!dotHeld.current && elementTimer.current === null && buffer.current) {
@@ -271,6 +316,7 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   // Clear state
   const clear = () => {
     buffer.current = '';
+    queuedElements.current = [];
     
     if (elementTimer.current !== null) {
       clearTimeout(elementTimer.current);

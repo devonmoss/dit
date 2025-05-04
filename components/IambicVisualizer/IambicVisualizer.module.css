@@ -1,0 +1,82 @@
+.container {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 15px;
+  margin-top: 20px;
+  background-color: #f8f9fa;
+  font-family: monospace;
+}
+
+.title {
+  font-weight: bold;
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #ddd;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.indicator {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  margin-right: 10px;
+  background-color: #ddd;
+  border: 1px solid #999;
+}
+
+.active {
+  background-color: #4CAF50;
+  box-shadow: 0 0 5px #4CAF50;
+}
+
+.active.dot {
+  background-color: #2196F3;
+  box-shadow: 0 0 5px #2196F3;
+}
+
+.active.dash {
+  background-color: #FF9800;
+  box-shadow: 0 0 5px #FF9800;
+}
+
+.active.squeeze {
+  background-color: #f44336;
+  box-shadow: 0 0 5px #f44336;
+}
+
+.active.queue {
+  background-color: #9C27B0;
+  box-shadow: 0 0 5px #9C27B0;
+}
+
+.label {
+  flex: 1;
+}
+
+.events {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 10px;
+  border-top: 1px solid #ddd;
+  padding-top: 5px;
+}
+
+.event {
+  padding: 3px;
+  margin-bottom: 2px;
+  font-size: 12px;
+}
+
+.event:nth-child(odd) {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.timestamp {
+  color: #777;
+  margin-right: 5px;
+}
