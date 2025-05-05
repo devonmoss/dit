@@ -43,23 +43,40 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
   const [keyerOutput, setKeyerOutput] = useState('');
   const [showCorrectIndicator, setShowCorrectIndicator] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [keyState, setKeyState] = useState({ left: false, right: false });
   
   // Reference to track if we're still mounted
   const isMountedRef = useRef(true);
   
+  // Reference to track if keyer is installed
+  const isInstalledRef = useRef(false);
+  
   // Function to play sound when a dot or dash is keyed
   const playElementSound = useCallback((sym: '.' | '-') => {
-    if (!audioContext) return;
+    if (!audioContext) {
+      console.log('[SEND MODE] No audio context available');
+      return;
+    }
     
     const unitDuration = 1200 / sendWpm;
     const duration = sym === '.' ? unitDuration : unitDuration * 3;
     
     console.log(`[SEND MODE] Playing ${sym} with duration ${duration}ms`);
     
-    audioContext.playTone(600, duration, 1.0).catch((err: Error) => {
-      console.error(`Error playing ${sym} sound:`, err);
-    });
+    audioContext.playTone(600, duration, 1.0)
+      .catch((err: Error) => {
+        console.error(`Error playing ${sym} sound:`, err);
+      });
   }, [audioContext, sendWpm]);
+  
+  // Test function to trigger a tone manually - for debugging key repeat issues
+  const playTestTone = useCallback(() => {
+    if (!audioContext) return;
+    console.log('[SEND MODE] Playing test tone');
+    audioContext.playTone(600, 100, 1.0).catch((err: Error) => {
+      console.error('Error playing test tone:', err);
+    });
+  }, [audioContext]);
   
   // Handle when a character is recognized in send mode
   const handleCharacterDetected = useCallback((char: string) => {
@@ -144,7 +161,7 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
     }, 600);
   }, [onError, audioContext]);
   
-  // Initialize the iambic keyer
+  // Initialize the iambic keyer at the top level
   const keyer = useIambicKeyer({
     wpm: sendWpm,
     minWpm: 5,
@@ -170,21 +187,92 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
     onInvalidCharacter: handleInvalidCode,
     onWpmChange: (newWpm) => {
       console.log(`[SEND MODE] WPM changed to ${newWpm}`);
-      // Note: We could have a callback to update global WPM state if needed
     }
   });
   
-  // Install/uninstall the keyer
+  // Prevent default keyboard behavior to avoid browser interaction
   useEffect(() => {
-    console.log("[SEND MODE] Installing iambic keyer");
-    keyer.install();
+    // This ensures arrow keys don't scroll the page
+    const preventArrowScroll = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
+          e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+      }
+      
+      // Update debug key state
+      if (e.key === 'ArrowLeft') {
+        setKeyState(prev => ({ ...prev, left: true }));
+      } else if (e.key === 'ArrowRight') {
+        setKeyState(prev => ({ ...prev, right: true }));
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        setKeyState(prev => ({ ...prev, left: false }));
+      } else if (e.key === 'ArrowRight') {
+        setKeyState(prev => ({ ...prev, right: false }));
+      }
+    };
+    
+    // Add this low-level handler that runs before the keyer handler
+    window.addEventListener('keydown', preventArrowScroll, { capture: true });
+    window.addEventListener('keyup', handleKeyUp, { capture: true });
     
     return () => {
-      console.log("[SEND MODE] Uninstalling iambic keyer");
+      window.removeEventListener('keydown', preventArrowScroll, { capture: true });
+      window.removeEventListener('keyup', handleKeyUp, { capture: true });
+    };
+  }, []);
+  
+  // Make sure all audio is stopped when unmounting
+  useEffect(() => {
+    // Log audio context state
+    if (audioContext) {
+      console.log(`[SEND MODE] Audio context state: ${audioContext.getRawContext ? audioContext.getRawContext().state : 'unknown'}`);
+      
+      // Try to resume the audio context if it's suspended
+      if (audioContext.getRawContext && audioContext.getRawContext().state === 'suspended') {
+        console.log('[SEND MODE] Attempting to resume audio context');
+        audioContext.getRawContext().resume().then(() => {
+          console.log('[SEND MODE] Audio context resumed successfully');
+        }).catch((err: Error) => {
+          console.error('[SEND MODE] Failed to resume audio context:', err);
+        });
+      }
+    } else {
+      console.log('[SEND MODE] No audio context available');
+    }
+    
+    return () => {
+      // Set flags to prevent any ongoing sounds from continuing
+      isMountedRef.current = false;
+      
+      // If we have audio context, attempt to stop any playing tones
+      if (audioContext && typeof audioContext.stopAllTones === 'function') {
+        console.log("[SEND MODE] Stopping all tones on unmount");
+        audioContext.stopAllTones();
+      }
+    };
+  }, [audioContext]);
+  
+  // Install/uninstall the keyer once on mount/unmount
+  useEffect(() => {
+    // Only install if not already installed
+    if (!isInstalledRef.current) {
+      console.log("[SEND MODE] Installing iambic keyer (should happen only once)");
+      keyer.install();
+      isInstalledRef.current = true;
+    }
+    
+    // Cleanup function - only uninstall on unmount
+    return () => {
+      console.log("[SEND MODE] Uninstalling iambic keyer (should happen only on unmount)");
       keyer.uninstall();
+      isInstalledRef.current = false;
       isMountedRef.current = false;
     };
-  }, [keyer]);
+  }, []); // Empty dependency array = only run on mount and unmount
   
   // Get the current character to display
   const currentChar = raceText[currentCharIndex]?.toUpperCase() || '';
@@ -201,7 +289,8 @@ Dash Held: ${keyer.debug.dashHeld}
 Last Symbol: ${keyer.debug.lastSymbol || 'none'}
 Active: ${keyer.debug.isActive}
 Current Char: ${currentChar}
-Expected Morse: ${currentChar ? getMorseForChar(currentChar) : 'none'}`);
+Expected Morse: ${currentChar ? getMorseForChar(currentChar) : 'none'}
+Component Key State: Left=${keyState.left}, Right=${keyState.right}`);
   };
   
   // Helper to get Morse code for a character
@@ -269,6 +358,12 @@ Expected Morse: ${currentChar ? getMorseForChar(currentChar) : 'none'}`);
               <div className={styles.debugControls}>
                 <button onClick={showKeyerState}>Debug Keyer</button>
                 <button onClick={clearDebugInfo}>Clear Debug</button>
+                <button 
+                  onMouseDown={playTestTone}
+                  style={{ backgroundColor: '#669' }}
+                >
+                  Test Tone (Hold)
+                </button>
                 <pre className={styles.debugInfo}>{debugInfo}</pre>
               </div>
             )}

@@ -155,7 +155,8 @@ const EnhancedRaceMode: React.FC = () => {
     sendQueueRef
   } = useRaceInputHandler({
     raceStage,
-    raceMode,
+    // Only use race input handler for copy mode, not for send mode
+    raceMode: raceMode === 'send' ? 'disabled' as any : raceMode,
     raceText,
     currentCharIndex,
     incrementProgress,

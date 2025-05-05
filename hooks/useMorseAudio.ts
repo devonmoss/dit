@@ -95,6 +95,7 @@ export function useMorseAudio() {
   
   // Stop all audio
   const stopAudio = useCallback(() => {
+    console.log("[AUDIO] Stopping all audio");
     isPlaying.current = false;
     
     // Stop any current oscillators
@@ -109,7 +110,22 @@ export function useMorseAudio() {
     
     // Clear the array
     currentOscillators.current = [];
-  }, []);
+    
+    // Also try to access custom methods on the audio context if they exist
+    if (audioContextInstance && audioContextInstance.getRawContext()) {
+      const rawContext = audioContextInstance.getRawContext();
+      // @ts-ignore - Check for custom method that might be added to the context
+      if (typeof rawContext.stopAllTones === 'function') {
+        try {
+          console.log("[AUDIO] Calling stopAllTones");
+          // @ts-ignore - Custom method
+          rawContext.stopAllTones();
+        } catch (err) {
+          console.error('Error stopping tones:', err);
+        }
+      }
+    }
+  }, [audioContextInstance]);
   
   return {
     playMorseCode,
