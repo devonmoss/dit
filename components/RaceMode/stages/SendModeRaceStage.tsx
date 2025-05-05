@@ -45,11 +45,34 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [keyState, setKeyState] = useState({ left: false, right: false });
   
-  // Reference to track if we're still mounted
+  // Reference to track if we're still mounted - ENSURE it starts as true
   const isMountedRef = useRef(true);
   
   // Reference to track if keyer is installed
   const isInstalledRef = useRef(false);
+  
+  // Reference to track the last character we processed
+  const lastProcessedCharRef = useRef<string | null>(null);
+  
+  // Use an effect to force the mounted state to true
+  useEffect(() => {
+    console.log('[SEND MODE] 🔒 Setting isMountedRef to TRUE');
+    isMountedRef.current = true;
+    return () => {
+      console.log('[SEND MODE] 🔓 Setting isMountedRef to FALSE (unmounting)');
+      isMountedRef.current = false;
+    };
+  }, []);
+  
+  // Add logs for props on every render
+  console.log("[SEND MODE] RENDER with props:", { 
+    raceText: raceText.substring(0, 20) + (raceText.length > 20 ? '...' : ''),
+    userProgress, 
+    currentCharIndex,
+    currentCharacter: raceText[currentCharIndex] || 'none',
+    participantsCount: participants.length,
+    isMounted: isMountedRef.current,
+  });
   
   // Function to play sound when a dot or dash is keyed
   const playElementSound = useCallback((sym: '.' | '-') => {
@@ -78,65 +101,6 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
     });
   }, [audioContext]);
   
-  // Handle when a character is recognized in send mode
-  const handleCharacterDetected = useCallback((char: string) => {
-    console.log(`[SEND MODE] Character detected: '${char}'`);
-    
-    if (isDevelopment) {
-      setDebugInfo(prev => `${prev}\nDetected: '${char}'`);
-    }
-    
-    if (!isMountedRef.current) return;
-    
-    const expectedChar = raceText[currentCharIndex]?.toLowerCase();
-    if (!expectedChar) {
-      console.log("[SEND MODE] No expected character found!");
-      return;
-    }
-    
-    console.log(`[SEND MODE] Expected: '${expectedChar}', Got: '${char}'`);
-    
-    // Check if the character matches
-    if (char.toLowerCase() === expectedChar.toLowerCase()) {
-      console.log("[SEND MODE] CORRECT CHARACTER!");
-      
-      // Show correct indicator
-      setShowCorrectIndicator(true);
-      
-      // Slight pause before continuing
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        
-        setShowCorrectIndicator(false);
-        setKeyerOutput('');
-        
-        // Increment progress
-        onCharacterCorrect(currentCharIndex);
-        
-        // Check if race is complete
-        if (currentCharIndex + 1 >= raceText.length) {
-          onComplete();
-        }
-      }, 400);
-    } else {
-      console.log("[SEND MODE] INCORRECT CHARACTER!");
-      onError();
-      
-      // Clear keyer output after a short delay
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        setKeyerOutput('');
-      }, 600);
-      
-      // Play error sound if available
-      if (audioContext) {
-        audioContext.playErrorSound().catch((err: Error) => {
-          console.error("Error playing error sound:", err);
-        });
-      }
-    }
-  }, [raceText, currentCharIndex, onCharacterCorrect, onError, onComplete, audioContext]);
-  
   // Handle invalid Morse code
   const handleInvalidCode = useCallback((code: string) => {
     console.log(`[SEND MODE] Invalid Morse code: '${code}'`);
@@ -156,10 +120,94 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
     
     // Clear keyer output after a short delay
     setTimeout(() => {
-      if (!isMountedRef.current) return;
       setKeyerOutput('');
     }, 600);
   }, [onError, audioContext]);
+  
+  // Log when onCharacterCorrect is called
+  const debugOnCharacterCorrect = useCallback((index: number) => {
+    console.log(`[SEND MODE] 🚀 Calling onCharacterCorrect(${index}) - isMounted: ${isMountedRef.current}`);
+    onCharacterCorrect(index);
+    // Log again after it's called to see if we got any updates 
+    setTimeout(() => {
+      console.log(`[SEND MODE] ⏩ After onCharacterCorrect: currentCharIndex=${currentCharIndex}`);
+    }, 50);
+  }, [onCharacterCorrect, currentCharIndex]);
+  
+  // Function to handle character detection without caring about mount state
+  const handleCharacter = useCallback((char: string) => {
+    // Make sure we're not processing the same character multiple times
+    if (lastProcessedCharRef.current === char) {
+      console.log(`[SEND MODE] 🔄 Skipping duplicate character: '${char}'`);
+      return;
+    }
+    
+    lastProcessedCharRef.current = char;
+    
+    console.log(`[SEND MODE] ⭐️ Character detected: '${char}' - isMounted: ${isMountedRef.current}`);
+    
+    if (isDevelopment) {
+      setDebugInfo(prev => `${prev}\nDetected: '${char}'`);
+    }
+    
+    const expectedChar = raceText[currentCharIndex]?.toLowerCase();
+    
+    console.log(`[SEND MODE] 🎯 Comparing: expected='${expectedChar}', received='${char.toLowerCase()}'`);
+    console.log(`[SEND MODE] 📋 Race text: '${raceText.substring(Math.max(0, currentCharIndex-3), currentCharIndex+5)}'`);
+    console.log(`[SEND MODE] 📊 Current index: ${currentCharIndex}, Progress: ${userProgress}%`);
+    
+    if (!expectedChar) {
+      console.log("[SEND MODE] ❓ No expected character found!");
+      return;
+    }
+    
+    // Check if the character matches
+    if (char.toLowerCase() === expectedChar.toLowerCase()) {
+      console.log("[SEND MODE] ✅ CORRECT CHARACTER MATCH!");
+      
+      // Show correct indicator
+      setShowCorrectIndicator(true);
+      
+      // Slight pause before continuing
+      setTimeout(() => {
+        setShowCorrectIndicator(false);
+        setKeyerOutput('');
+        lastProcessedCharRef.current = null; // Reset for next character
+        
+        // Increment progress
+        console.log(`[SEND MODE] 📈 Incrementing progress at index ${currentCharIndex}`);
+        debugOnCharacterCorrect(currentCharIndex);
+        
+        // Check if race is complete
+        if (currentCharIndex + 1 >= raceText.length) {
+          console.log("[SEND MODE] 🏁 RACE COMPLETE!");
+          onComplete();
+        }
+      }, 400);
+    } else {
+      console.log(`[SEND MODE] ❌ INCORRECT CHARACTER! Expected '${expectedChar}', got '${char.toLowerCase()}'`);
+      onError();
+      
+      // Clear keyer output and last processed character after a short delay
+      setTimeout(() => {
+        setKeyerOutput('');
+        lastProcessedCharRef.current = null; // Reset for next attempt
+      }, 600);
+      
+      // Play error sound if available
+      if (audioContext) {
+        audioContext.playErrorSound().catch((err: Error) => {
+          console.error("Error playing error sound:", err);
+        });
+      }
+    }
+  }, [raceText, currentCharIndex, userProgress, onError, audioContext, onComplete, debugOnCharacterCorrect]);
+  
+  // Function to test a specific character for debugging
+  const testCharacter = useCallback((char: string) => {
+    console.log(`[SEND MODE] 🧪 TEST: Processing character '${char}' directly`);
+    handleCharacter(char);
+  }, [handleCharacter]);
   
   // Initialize the iambic keyer at the top level
   const keyer = useIambicKeyer({
@@ -167,6 +215,8 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
     minWpm: 5,
     maxWpm: 50,
     onElement: (sym) => {
+      console.log(`[SEND MODE] Received element: ${sym}`);
+      
       // Update the keyer output display
       setKeyerOutput(prev => prev + sym);
       
@@ -175,7 +225,8 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
       }
     },
     playElement: playElementSound,
-    onCharacter: handleCharacterDetected,
+    // Direct character validation in the onCharacter callback
+    onCharacter: handleCharacter,
     onWord: () => {
       console.log("[SEND MODE] Word boundary detected");
       setKeyerOutput('');
@@ -189,6 +240,18 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
       console.log(`[SEND MODE] WPM changed to ${newWpm}`);
     }
   });
+  
+  // Log each time currentCharIndex changes
+  useEffect(() => {
+    console.log(`[SEND MODE] 🔄 currentCharIndex changed to ${currentCharIndex}`);
+    if (currentCharIndex < raceText.length) {
+      const nextChar = raceText[currentCharIndex];
+      console.log(`[SEND MODE] 📝 Current character to send: '${nextChar}'`);
+    }
+    
+    // Reset the lastProcessedCharRef when the index changes
+    lastProcessedCharRef.current = null;
+  }, [currentCharIndex, raceText]);
   
   // Prevent default keyboard behavior to avoid browser interaction
   useEffect(() => {
@@ -243,17 +306,6 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
     } else {
       console.log('[SEND MODE] No audio context available');
     }
-    
-    return () => {
-      // Set flags to prevent any ongoing sounds from continuing
-      isMountedRef.current = false;
-      
-      // If we have audio context, attempt to stop any playing tones
-      if (audioContext && typeof audioContext.stopAllTones === 'function') {
-        console.log("[SEND MODE] Stopping all tones on unmount");
-        audioContext.stopAllTones();
-      }
-    };
   }, [audioContext]);
   
   // Install/uninstall the keyer once on mount/unmount
@@ -270,7 +322,6 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
       console.log("[SEND MODE] Uninstalling iambic keyer (should happen only on unmount)");
       keyer.uninstall();
       isInstalledRef.current = false;
-      isMountedRef.current = false;
     };
   }, []); // Empty dependency array = only run on mount and unmount
   
@@ -289,28 +340,21 @@ Dash Held: ${keyer.debug.dashHeld}
 Last Symbol: ${keyer.debug.lastSymbol || 'none'}
 Active: ${keyer.debug.isActive}
 Current Char: ${currentChar}
-Expected Morse: ${currentChar ? getMorseForChar(currentChar) : 'none'}
-Component Key State: Left=${keyState.left}, Right=${keyState.right}`);
-  };
-  
-  // Helper to get Morse code for a character
-  const getMorseForChar = (char: string) => {
-    const morseMap: Record<string, string> = {
-      'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 
-      'F': '..-.', 'G': '--.', 'H': '....', 'I': '..', 'J': '.---',
-      'K': '-.-', 'L': '.-..', 'M': '--', 'N': '-.', 'O': '---',
-      'P': '.--.', 'Q': '--.-', 'R': '.-.', 'S': '...', 'T': '-',
-      'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-', 'Y': '-.--',
-      'Z': '--..', '0': '-----', '1': '.----', '2': '..---', '3': '...--',
-      '4': '....-', '5': '.....', '6': '-....', '7': '--...', '8': '---..',
-      '9': '----.', '.': '.-.-.-', ',': '--..--', '?': '..--..'
-    };
-    return morseMap[char.toUpperCase()] || 'unknown';
+Current Index: ${currentCharIndex}
+Last Processed: ${lastProcessedCharRef.current || 'none'}
+Component Key State: Left=${keyState.left}, Right=${keyState.right}
+isMounted: ${isMountedRef.current}`);
   };
   
   // Function to clear debug output
   const clearDebugInfo = () => {
     setDebugInfo('');
+  };
+  
+  // Function to check mount state
+  const checkMountState = () => {
+    console.log(`[SEND MODE] 🔍 Mount state check: isMountedRef.current = ${isMountedRef.current}`);
+    setDebugInfo(prev => `${prev}\nMount check: isMountedRef=${isMountedRef.current}`);
   };
   
   return (
@@ -358,11 +402,30 @@ Component Key State: Left=${keyState.left}, Right=${keyState.right}`);
               <div className={styles.debugControls}>
                 <button onClick={showKeyerState}>Debug Keyer</button>
                 <button onClick={clearDebugInfo}>Clear Debug</button>
+                <button onClick={checkMountState}>Check Mount</button>
                 <button 
                   onMouseDown={playTestTone}
                   style={{ backgroundColor: '#669' }}
                 >
                   Test Tone (Hold)
+                </button>
+                <button 
+                  onClick={() => debugOnCharacterCorrect(currentCharIndex)}
+                  style={{ backgroundColor: '#396' }}
+                >
+                  Force Progress
+                </button>
+                <button
+                  onClick={() => testCharacter('e')}
+                  style={{ backgroundColor: '#f66' }}
+                >
+                  Force 'E'
+                </button>
+                <button
+                  onClick={() => testCharacter('t')}
+                  style={{ backgroundColor: '#f99' }}
+                >
+                  Force 'T'
                 </button>
                 <pre className={styles.debugInfo}>{debugInfo}</pre>
               </div>
