@@ -25,6 +25,11 @@ const Zen: React.FC = () => {
   const [text, setText] = useState('');
   const audio = useMemo(() => createAudioContext(), []);
   
+  // Initialize audio WPM to match app state
+  useEffect(() => {
+    audio.setWpm(state.sendWpm);
+  }, [audio, state.sendWpm]);
+  
   // Function to get a random emoji from our list
   const getRandomEmoji = () => {
     const randomIndex = Math.floor(Math.random() * INVALID_EMOJIS.length);
@@ -37,7 +42,11 @@ const Zen: React.FC = () => {
     playElement: (sym) => { audio.playSymbol(sym); },
     onCharacter: (char) => setText(t => t + char),
     onWord: () => setText(t => t + ' '),
-    onWpmChange: (newWpm) => setSendWpm(newWpm),
+    onWpmChange: (newWpm) => {
+      setSendWpm(newWpm);
+      audio.setWpm(newWpm);
+      console.log(`[Zen] WPM changed to ${newWpm}, audio timing updated`);
+    },
     onInvalidCharacter: (code) => {
       console.log(`Zen received invalid code: ${code}`);
       const emoji = getRandomEmoji();
