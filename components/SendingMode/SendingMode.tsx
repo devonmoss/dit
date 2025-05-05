@@ -119,11 +119,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       
       osc.connect(gainNodeRef.current);
       osc.start();
+      oscillatorRef.current = osc;
       
+      // Ensure the error sound stops after a short time
       setTimeout(() => {
         stopSound();
         if (gainNodeRef.current) {
-          gainNodeRef.current.gain.value = 0.5;
+          gainNodeRef.current.gain.value = 0.5; // Reset gain to normal
         }
       }, 150);
     } catch (e) {
