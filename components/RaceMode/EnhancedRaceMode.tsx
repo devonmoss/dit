@@ -22,6 +22,7 @@ import ShareStage from './stages/ShareStage';
 import CountdownStage from './stages/CountdownStage';
 import ResultsStage from './stages/ResultsStage';
 import RacingStage from './stages/RacingStage';
+import SendModeRaceStage from './stages/SendModeRaceStage';
 import { 
   AnyRecord,
   RaceParticipant,
@@ -922,7 +923,7 @@ const EnhancedRaceMode: React.FC = () => {
         />
       )}
       
-      {raceStage === RaceStage.RACING && (
+      {raceStage === RaceStage.RACING && raceMode === 'copy' && (
         <RacingStage
           raceMode={raceMode}
           raceText={raceText}
@@ -935,6 +936,28 @@ const EnhancedRaceMode: React.FC = () => {
           keyerOutput={keyerOutput}
           showCorrectIndicator={showCorrectIndicator}
           onReplayCurrent={replayCurrent}
+        />
+      )}
+      
+      {raceStage === RaceStage.RACING && raceMode === 'send' && (
+        <SendModeRaceStage
+          raceText={raceText}
+          userProgress={userProgress}
+          currentCharIndex={currentCharIndex}
+          participants={participants}
+          currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
+          raceLength={raceText.length}
+          onlineUserIds={onlineUsers.map(user => user.user_id)}
+          onCharacterCorrect={(index) => {
+            const currentUser = getCurrentUser();
+            if (!currentUser) return;
+            const userId = getMappedUserId(currentUser.id, raceId || undefined);
+            incrementProgress(index, userId);
+          }}
+          onError={incrementErrorCount}
+          onComplete={finishRace}
+          audioContext={audioContext}
+          sendWpm={state.sendWpm}
         />
       )}
       
