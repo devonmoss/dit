@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './SendingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
-import { createAudioContext, invMorseMap, isBrowser } from '../../utils/morse';
+import { isBrowser } from '../../utils/morse';
 import MasteryDisplay from '../MasteryDisplay/MasteryDisplay';
 import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
 import { trainingLevels } from '../../utils/levels';
+import { useIambicKeyer } from '../../hooks/useIambicKeyer';
 
 // Constants
 const TARGET_POINTS = 3;
@@ -25,60 +26,147 @@ interface CharTiming {
 }
 
 const SendingMode: React.FC<SendingModeProps> = () => {
+  // App state
   const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel } = useAppState();
-  const [audioContextInstance, setAudioContextInstance] = useState<ReturnType<typeof createAudioContext> | null>(null);
   
-  // Initialize audio context on client-side only
-  useEffect(() => {
-    if (isBrowser) {
-      setAudioContextInstance(createAudioContext());
-    }
-  }, []);
-  
-  // Sending state
+  // UI state
   const [sendCurrentChar, setSendCurrentChar] = useState('');
-  /* eslint-disable @typescript-eslint/no-unused-vars */
-  const [sendCurrentMistakes, setSendCurrentMistakes] = useState(0);
-  const [sendStatus, setSendStatus] = useState('');
-  /* eslint-enable @typescript-eslint/no-unused-vars */
-  const [sendResults, setSendResults] = useState('');
-  const [sendProgress, setSendProgress] = useState('');
-  const [keyerOutput, setKeyerOutput] = useState('');
-  /* eslint-disable @typescript-eslint/no-unused-vars */
-  const [decodedOutput, setDecodedOutput] = useState('');
-  const [codeBuffer, setCodeBuffer] = useState('');
-  const [wordBuffer, setWordBuffer] = useState('');
-  /* eslint-enable @typescript-eslint/no-unused-vars */
-  // Track key state with useState for UI updates
-  /* eslint-disable @typescript-eslint/no-unused-vars */
-  const [keyState, setKeyState] = useState({ ArrowLeft: false, ArrowRight: false });
-  /* eslint-enable @typescript-eslint/no-unused-vars */
-  // Track key state with a ref for immediate access in event handlers
-  const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
-  const [sendingActive, setSendingActive] = useState(false);
-  const [guidedSendActive, setGuidedSendActive] = useState(false);
-  const [responseTimes, setResponseTimes] = useState<CharTiming[]>([]);
-  /* eslint-disable @typescript-eslint/no-unused-vars */
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  /* eslint-enable @typescript-eslint/no-unused-vars */
+  const [morseOutput, setMorseOutput] = useState('');
   const [feedbackState, setFeedbackState] = useState<'none' | 'correct' | 'incorrect'>('none');
-  const [incorrectChar, setIncorrectChar] = useState<string>('');
-  const [strikeCount, setStrikeCount] = useState(0);
-  const [completed, setCompleted] = useState(true);
+  const [incorrectChar, setIncorrectChar] = useState('');
+  const [sendingActive, setSendingActive] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [levelProgress, setLevelProgress] = useState('');
   
-  // Time tracking
+  // Performance tracking
+  const [responseTimes, setResponseTimes] = useState<CharTiming[]>([]);
+  const [mistakesMap, setMistakesMap] = useState<Record<string, number>>({});
+  const [strikeCount, setStrikeCount] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [completed, setCompleted] = useState(true);
+  const [testResults, setTestResults] = useState('');
+  
+  // Timing refs
   const charStartTimeRef = useRef<number>(0);
   const testStartTimeRef = useRef<number>(0);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [mistakesMap, setMistakesMap] = useState<Record<string, number>>({});
-  const [showResults, setShowResults] = useState(false);
   
-  // Get current level and check if it's a checkpoint level
+  // Audio refs
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const oscillatorRef = useRef<OscillatorNode | null>(null);
+  
+  // Get current level info
   const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
   const isCheckpoint = currentLevel?.type === 'checkpoint';
   const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
   
-  // Pick next character to practice sending
+  // Initialize audio on first render
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = ctx;
+        
+        const gain = ctx.createGain();
+        gain.gain.value = 0.5;
+        gain.connect(ctx.destination);
+        gainNodeRef.current = gain;
+        
+        console.log('Audio context initialized successfully');
+      } catch (e) {
+        console.error('Failed to initialize audio context:', e);
+      }
+    }
+    
+    return () => {
+      stopSound();
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(e => console.error('Error closing audio context:', e));
+      }
+    };
+  }, []);
+  
+  // Stop any current sound
+  const stopSound = useCallback(() => {
+    if (oscillatorRef.current) {
+      try {
+        oscillatorRef.current.stop();
+        oscillatorRef.current.disconnect();
+        oscillatorRef.current = null;
+      } catch (e) {
+        // Ignore errors on stop
+      }
+    }
+  }, []);
+  
+  // Play error sound
+  const playErrorSound = useCallback(() => {
+    if (!audioContextRef.current || !gainNodeRef.current) return;
+    
+    stopSound();
+    
+    try {
+      const osc = audioContextRef.current.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = 300;
+      
+      // Reduce volume for error sound
+      gainNodeRef.current.gain.value = 0.3;
+      
+      osc.connect(gainNodeRef.current);
+      osc.start();
+      
+      setTimeout(() => {
+        stopSound();
+        if (gainNodeRef.current) {
+          gainNodeRef.current.gain.value = 0.5;
+        }
+      }, 150);
+    } catch (e) {
+      console.error('Error playing error sound:', e);
+    }
+  }, [stopSound]);
+  
+  // Play element (dot/dash)
+  const playElement = useCallback((symbol: '.' | '-') => {
+    if (!audioContextRef.current || !gainNodeRef.current) return;
+    
+    stopSound();
+    
+    try {
+      // Calculate timing based on current WPM
+      const unitMs = 1200 / state.sendWpm;
+      const duration = symbol === '.' ? unitMs : unitMs * 3;
+      
+      const osc = audioContextRef.current.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = 600;
+      osc.connect(gainNodeRef.current);
+      
+      oscillatorRef.current = osc;
+      osc.start();
+      
+      setTimeout(() => {
+        if (oscillatorRef.current === osc) {
+          stopSound();
+        }
+      }, duration);
+    } catch (e) {
+      console.error('Error playing element:', e);
+    }
+  }, [state.sendWpm, stopSound]);
+  
+  // Calculate response time points
+  const calculatePointsForTime = useCallback((responseTime: number) => {
+    const seconds = responseTime / 1000;
+    if (seconds <= MIN_RESPONSE_TIME) return 1;
+    if (seconds >= MAX_RESPONSE_TIME) return 0;
+    
+    // Linear scale between min and max response times
+    return 1 - ((seconds - MIN_RESPONSE_TIME) / (MAX_RESPONSE_TIME - MIN_RESPONSE_TIME));
+  }, []);
+  
+  // Pick next character to practice
   const pickNextChar = useCallback(() => {
     if (!state.chars.length) return '';
     
@@ -99,230 +187,91 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     return pool[pool.length - 1].char;
   }, [state.chars, state.charPoints]);
   
-  // Next character to send
-  const nextSendQuestion = useCallback(() => {
+  // Show next character
+  const showNextChar = useCallback(() => {
     const nextChar = pickNextChar();
+    console.log('Next character:', nextChar);
+    
     setSendCurrentChar(nextChar);
-    setSendCurrentMistakes(0);
-    setSendStatus('');
-    setKeyerOutput('');
-    setCodeBuffer('');
+    setMorseOutput('');
+    setFeedbackState('none');
     
     // Set the start time for response time tracking
     charStartTimeRef.current = Date.now();
   }, [pickNextChar]);
   
-  // Start Send Test
-  const startSendTest = useCallback(() => {
-    startTest();
-    setSendingActive(true);
-    setGuidedSendActive(true);
-    setSendCurrentChar('');
-    setSendCurrentMistakes(0);
-    setSendStatus('');
-    setSendResults('');
-    setKeyerOutput('');
-    setDecodedOutput('');
-    setCodeBuffer('');
-    setWordBuffer('');
-    setResponseTimes([]);
-    setShowResults(false);
-    setMistakesMap({});
-    setStrikeCount(0);
-    setCompleted(true);
+  // Handle an element (dot/dash) from the keyer
+  const handleElement = useCallback((symbol: '.' | '-') => {
+    if (!sendingActive) return;
     
-    // Initialize test time tracking
-    testStartTimeRef.current = Date.now();
-    
-    // Clear the send queue and key state
-    sendQueueRef.current = [];
-    keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
-    
-    // Need a slight delay to ensure state is updated
-    setTimeout(nextSendQuestion, 100);
-  }, [startTest, nextSendQuestion]);
+    setMorseOutput(prev => prev + symbol);
+  }, [sendingActive]);
   
-  // Finish send test
-  const finishSendTest = useCallback((isCompleted = true) => {
-    console.log('Finishing send test, completed:', isCompleted);
-    setSendingActive(false);
-    setGuidedSendActive(false);
-    setCompleted(isCompleted);
+  // Handle a character from the keyer
+  const handleCharacter = useCallback((char: string) => {
+    if (!sendingActive || !sendCurrentChar) return;
     
-    // Clear any remaining state
-    sendQueueRef.current = [];
-    keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
-    console.log('Reset key state and queue');
-    
-    // Calculate total elapsed time
-    const endTime = Date.now();
-    const totalTime = (endTime - testStartTimeRef.current) / 1000;
-    setElapsedTime(totalTime);
-    
-    // Save response times to database
-    if (responseTimes.length > 0) {
-      saveResponseTimes(responseTimes);
-    }
-    
-    // Only mark as completed if not failed
-    endTest(isCompleted);
-    
-    // Display results
-    const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
-    const totalCount = state.chars.length;
-    const avgTime = responseTimes.length > 0 
-      ? (responseTimes.reduce((sum, item) => sum + item.time, 0) / responseTimes.length).toFixed(2)
-      : '0';
-      
-    setSendResults(`You've mastered ${masteredCount}/${totalCount} characters. Average response time: ${avgTime}s`);
-    
-    // Show the results component
-    setShowResults(true);
-  }, [state.chars, state.charPoints, endTest, responseTimes, saveResponseTimes]);
-  
-  // Make sure we're using the same timing as the original application
-  useEffect(() => {
-    if (audioContextInstance) {
-      audioContextInstance.setWpm(state.sendWpm);
-    }
-  }, [audioContextInstance, state.sendWpm]);
-  
-  // Play sound for dot or dash - Match original implementation exactly
-  const playSendSymbol = useCallback(async (symbol: string) => {
-    if (!audioContextInstance) return;
-    const sendUnit = 1200 / state.sendWpm;
-    const duration = symbol === '.' ? sendUnit : sendUnit * 3;
-    
-    console.log(`Playing ${symbol} with duration ${duration}ms`);
-    
-    // Match original implementation behavior directly
-    return new Promise<void>((resolve) => {
-      // Use the WebAudio API directly as in the original code
-      /* eslint-disable @typescript-eslint/no-explicit-any */
-      if (window.AudioContext || (window as any).webkitAudioContext) {
-      /* eslint-enable @typescript-eslint/no-explicit-any */
-        const tmpContext = audioContextInstance.getRawContext();
-        const osc = tmpContext.createOscillator();
-        osc.frequency.value = 600; 
-        osc.type = 'sine';
-        osc.connect(tmpContext.destination);
-        osc.start();
-        setTimeout(() => {
-          osc.stop();
-          resolve();
-        }, duration);
-      } else {
-        setTimeout(resolve, duration);
-      }
-    });
-  }, [audioContextInstance, state.sendWpm]);
-  
-  // Play error sound for incorrect inputs
-  const playErrorSound = useCallback(async () => {
-    if (!audioContextInstance) return;
-    await audioContextInstance.playTone(300, 150, 0.5); // Lower frequency, shorter duration, reduced volume
-  }, [audioContextInstance]);
-  
-  // Calculate response time points
-  const calculatePointsForTime = useCallback((responseTime: number) => {
-    const seconds = responseTime / 1000;
-    if (seconds <= MIN_RESPONSE_TIME) return 1;
-    if (seconds >= MAX_RESPONSE_TIME) return 0;
-    
-    // Linear scale between min and max response times
-    return 1 - ((seconds - MIN_RESPONSE_TIME) / (MAX_RESPONSE_TIME - MIN_RESPONSE_TIME));
-  }, []);
-  
-  // Check if all characters are mastered (function not used but kept for future reference)
-  /* eslint-disable @typescript-eslint/no-unused-vars */
-  const checkAllMastered = useCallback(() => {
-    return state.chars.every(c => (state.charPoints[c] || 0) >= TARGET_POINTS);
-  }, [state.chars, state.charPoints]);
-  /* eslint-enable @typescript-eslint/no-unused-vars */
-  
-  // Handle when a word/character is completed
-  const handleWordComplete = useCallback((word: string) => {
-    if (!guidedSendActive) return;
+    console.log(`Keyer decoded: "${char}", target: "${sendCurrentChar}"`);
     
     // Calculate response time
     const responseTime = Date.now() - charStartTimeRef.current;
     
-    // Check if the sent word matches the current character
-    if (word.toLowerCase() === sendCurrentChar.toLowerCase()) {
-      // Set feedback to correct
+    // Check if character matches
+    if (char.toLowerCase() === sendCurrentChar.toLowerCase()) {
+      // Correct character!
       setFeedbackState('correct');
-      setErrorMessage('');
-      setIncorrectChar('');
       
-      // Points based on response time
-      const responsePoints = calculatePointsForTime(responseTime);
+      // Calculate points based on response time
+      const points = calculatePointsForTime(responseTime);
       
       // Add to response times log
       setResponseTimes(prev => [...prev, { char: sendCurrentChar, time: responseTime / 1000 }]);
       
-      // Check if this will be the final character that completes mastery
+      // Update character points
       const currentPoints = state.charPoints[sendCurrentChar] || 0;
-      const newPoints = currentPoints + responsePoints;
-      const willCompleteMastery = newPoints >= TARGET_POINTS;
+      const newPoints = currentPoints + points;
+      updateCharPoints(sendCurrentChar, newPoints);
       
-      // Check if all other characters are already mastered
-      const otherCharsMastered = state.chars
+      // Check if this completes mastery
+      const willComplete = newPoints >= TARGET_POINTS;
+      const othersMastered = state.chars
         .filter(c => c !== sendCurrentChar)
         .every(c => (state.charPoints[c] || 0) >= TARGET_POINTS);
       
-      // Correct!
-      updateCharPoints(sendCurrentChar, newPoints);
-      
-      // If this was the last character needed for mastery, finish the test
-      if (willCompleteMastery && otherCharsMastered) {
-        setTimeout(() => {
-          finishSendTest(true);
-        }, 750);
+      if (willComplete && othersMastered) {
+        // Level complete!
+        setTimeout(() => finishTest(true), 750);
         return;
       }
       
-      // Clear the current character to indicate a successful completion
-      setSendCurrentChar('');
-      
-      // Reset feedback after a delay
+      // Show next character after delay
       setTimeout(() => {
         setFeedbackState('none');
+        showNextChar();
       }, 750);
-      
-      // Go to next character after a delay - match original feedbackDelay of 750ms
-      setTimeout(nextSendQuestion, 750);
     } else {
-      // Incorrect
-      setSendCurrentMistakes(prev => prev + 1);
+      // Incorrect character
+      setFeedbackState('incorrect');
+      setIncorrectChar(char);
       
-      // Update mistakes map for results
+      // Update mistakes map
       setMistakesMap(prev => {
-        const currentCount = prev[sendCurrentChar] || 0;
-        return {
-          ...prev,
-          [sendCurrentChar]: currentCount + 1
-        };
+        const count = prev[sendCurrentChar] || 0;
+        return { ...prev, [sendCurrentChar]: count + 1 };
       });
       
-      // Set feedback to incorrect
-      setFeedbackState('incorrect');
-      setIncorrectChar(word);
-      
-      // Reduce points for mistakes - now 30% reduction
+      // Reduce points
       const currentPoints = state.charPoints[sendCurrentChar] || 0;
       const newPoints = Math.max(0, currentPoints * INCORRECT_PENALTY);
       updateCharPoints(sendCurrentChar, newPoints);
       
-      // For checkpoint levels, count strikes
+      // Handle checkpoint strikes
       if (isCheckpoint && strikeLimit) {
         const newStrikeCount = strikeCount + 1;
         setStrikeCount(newStrikeCount);
         
-        // If we've reached the strike limit, fail the test
         if (newStrikeCount >= strikeLimit) {
-          setTimeout(() => {
-            finishSendTest(false); // Failed
-          }, 1000);
+          setTimeout(() => finishTest(false), 1000);
           return;
         }
       }
@@ -330,304 +279,169 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Play error sound
       playErrorSound();
       
-      // Reset feedback after delay
+      // Show next character after longer delay
       setTimeout(() => {
         setFeedbackState('none');
+        showNextChar();
       }, 2000);
     }
     
-    // Clear the keyer display
-    setKeyerOutput('');
-    setCodeBuffer('');
-    setWordBuffer('');
-  }, [guidedSendActive, sendCurrentChar, state.chars, state.charPoints, updateCharPoints, nextSendQuestion, finishSendTest, playErrorSound, calculatePointsForTime, isCheckpoint, strikeLimit, strikeCount]);
+    // Clear morse output
+    setMorseOutput('');
+  }, [
+    sendingActive,
+    sendCurrentChar,
+    calculatePointsForTime,
+    state.charPoints,
+    state.chars,
+    updateCharPoints,
+    isCheckpoint,
+    strikeLimit,
+    strikeCount,
+    playErrorSound,
+    showNextChar
+  ]);
   
-  // Queue of user-triggered symbols to support taps during play
-  // In the original implementation, sendQueue was a mutable array 
-  // We'll use a ref to match that mutable behavior
-  const sendQueueRef = useRef<string[]>([]);
+  // Create the keyer
+  const keyer = useIambicKeyer({
+    wpm: state.sendWpm,
+    minWpm: 5,
+    maxWpm: 40,
+    onElement: handleElement,
+    playElement: playElement,
+    onCharacter: handleCharacter,
+    onWpmChange: (newWpm) => {
+      console.log('WPM changed to', newWpm);
+    }
+  });
   
-  // Main sending loop - Exactly following original implementation for consistent behavior
-  // Uses wait function with setTimeout instead of requestAnimationFrame for more consistent timing
+  // Start test 
+  const startSendingTest = useCallback(() => {
+    console.log('Starting sending test');
+    
+    // Reset UI state
+    setSendingActive(true);
+    setSendCurrentChar('');
+    setMorseOutput('');
+    setFeedbackState('none');
+    setIncorrectChar('');
+    setStrikeCount(0);
+    
+    // Reset performance tracking
+    setResponseTimes([]);
+    setMistakesMap({});
+    setCompleted(true);
+    setShowResults(false);
+    
+    // Start app test
+    startTest();
+    
+    // Set start time
+    testStartTimeRef.current = Date.now();
+    
+    // Clear any pending keyer state
+    keyer.clear();
+    
+    // Show first character after a short delay
+    setTimeout(showNextChar, 100);
+  }, [startTest, showNextChar, keyer]);
+  
+  // Finish test
+  const finishTest = useCallback((isCompleted = true) => {
+    console.log('Finishing test, completed:', isCompleted);
+    
+    // Update UI state
+    setSendingActive(false);
+    setCompleted(isCompleted);
+    
+    // Calculate elapsed time
+    const endTime = Date.now();
+    const totalTime = (endTime - testStartTimeRef.current) / 1000;
+    setElapsedTime(totalTime);
+    
+    // Save response times
+    if (responseTimes.length > 0) {
+      saveResponseTimes(responseTimes);
+    }
+    
+    // End app test
+    endTest(isCompleted);
+    
+    // Create results summary
+    const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
+    const totalCount = state.chars.length;
+    const avgTime = responseTimes.length > 0 
+      ? (responseTimes.reduce((sum, item) => sum + item.time, 0) / responseTimes.length).toFixed(2)
+      : '0';
+    
+    setTestResults(`You've mastered ${masteredCount}/${totalCount} characters. Average response time: ${avgTime}s`);
+    
+    // Show results
+    setShowResults(true);
+  }, [state.chars, responseTimes, saveResponseTimes, endTest]);
+  
+  // Install keyer once on mount
   useEffect(() => {
-    if (!sendingActive || !isBrowser) return;
-    
-    let lastSymbol: string | null = null;
-    let lastTime = Date.now();
-    let timeoutId: NodeJS.Timeout | null = null;
-    let active = true;
-    // Using local variables to track state to avoid closure issues
-    let localCodeBuffer = '';
-    let localWordBuffer = '';
-    
-    const wait = (ms: number): Promise<void> => {
-      return new Promise(resolve => {
-        timeoutId = setTimeout(() => {
-          resolve();
-        }, ms);
-      });
-    };
-    
-    const sendLoop = async () => {
-      while (active && sendingActive) {
-        const now = Date.now();
-        const gap = now - lastTime;
-        const sendUnit = 1200 / state.sendWpm;
-        
-        // Word gap detection: >=7 units
-        if (gap >= sendUnit * 7 && (localCodeBuffer || localWordBuffer)) {
-          // decode pending letter
-          if (localCodeBuffer) {
-            const letter = invMorseMap[localCodeBuffer] || "?";
-            setDecodedOutput(prev => prev + letter);
-            setWordBuffer(prev => prev + letter);
-            localWordBuffer += letter;
-            localCodeBuffer = '';
-            setCodeBuffer('');
-          }
-          
-          // Word complete: evaluate and clear displays
-          if (localWordBuffer) {
-            handleWordComplete(localWordBuffer);
-          }
-          
-          // Clear displays
-          setKeyerOutput('');
-          setDecodedOutput('');
-          setWordBuffer('');
-          localWordBuffer = '';
-          
-          lastTime = now;
-          await wait(10);
-          continue;
-        }
-        
-        // Letter gap detection: >=3 units
-        if (gap >= sendUnit * 3 && localCodeBuffer) {
-          const letter = invMorseMap[localCodeBuffer] || "?";
-          setDecodedOutput(prev => prev + letter);
-          setWordBuffer(prev => prev + letter);
-          localWordBuffer += letter;
-          localCodeBuffer = '';
-          setCodeBuffer('');
-          lastTime = now;
-        }
-        
-        // determine next symbol: queued taps first
-        let symbol: string | undefined;
-        
-        // Exactly match original implementation using shift() to remove and return the first element
-        if (sendQueueRef.current.length > 0) {
-          symbol = sendQueueRef.current.shift();
-          console.log(`Dequeued symbol: ${symbol}, queue length now: ${sendQueueRef.current.length}`);
-        } else {
-          // Use the ref for immediate access to current key state
-          const left = keyStateRef.current.ArrowLeft;
-          const right = keyStateRef.current.ArrowRight;
-          console.log(`Checking key states (from ref) - left: ${left}, right: ${right}`);
-          
-          if (!left && !right) {
-            await wait(10);
-            continue;
-          } else if (left && right) {
-            // Iambic keying - alternate between dot and dash exactly like the original
-            symbol = lastSymbol === "." ? "-" : ".";
-          } else if (left) {
-            symbol = ".";
-          } else {
-            symbol = "-";
-          }
-        }
-        
-        if (symbol) {
-          // play and display symbol
-          await playSendSymbol(symbol);
-          setKeyerOutput(prev => prev + symbol);
-          setCodeBuffer(prev => prev + symbol);
-          localCodeBuffer += symbol;
-          lastSymbol = symbol;
-          
-          // inter-element gap
-          await wait(sendUnit);
-          lastTime = Date.now();
-        }
-      }
-    };
-    
-    // Start the send loop
-    sendLoop();
+    if (isBrowser) {
+      console.log('Installing keyer');
+      keyer.install();
+    }
     
     return () => {
-      active = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      console.log('Uninstalling keyer');
+      keyer.uninstall();
     };
-  }, [sendingActive, state.sendWpm, handleWordComplete, playSendSymbol]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
-  // Attach and detach event listeners with proper handlers
-  useEffect(() => {
-    if (!isBrowser) return;
-    
-    // Create stable handler references that won't change between renders
-    const keyDownHandler = (e: KeyboardEvent) => {
-      // Only handle events during active sending
-      if (!sendingActive) return;
-      
-      // Log the raw event
-      console.log(`[RAW] keydown: ${e.key}, repeat: ${e.repeat}`);
-      
-      // Ignore key repeats
-      if (e.repeat) return;
-      
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        endTest(false);
-        setSendingActive(false);
-        setGuidedSendActive(false);
-        return;
-      }
-      
-      // Handle paddle key presses
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        console.log(`ArrowLeft DOWN (ref state: ${JSON.stringify(keyStateRef.current)})`);
-        
-        // Only queue a dot if key wasn't already pressed
-        if (!keyStateRef.current.ArrowLeft) {
-          console.log('Queueing a DOT');
-          sendQueueRef.current.push('.');
-        }
-        
-        // Update ref state immediately
-        keyStateRef.current.ArrowLeft = true;
-        
-        // Update React state for UI rendering
-        setKeyState(prev => ({ ...prev, ArrowLeft: true }));
-      } 
-      else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        console.log(`ArrowRight DOWN (ref state: ${JSON.stringify(keyStateRef.current)})`);
-        
-        // Only queue a dash if key wasn't already pressed
-        if (!keyStateRef.current.ArrowRight) {
-          console.log('Queueing a DASH');
-          sendQueueRef.current.push('-');
-        }
-        
-        // Update ref state immediately
-        keyStateRef.current.ArrowRight = true;
-        
-        // Update React state for UI rendering
-        setKeyState(prev => ({ ...prev, ArrowRight: true }));
-      }
-    };
-    
-    const keyUpHandler = (e: KeyboardEvent) => {
-      // Only handle events during active sending
-      if (!sendingActive) return;
-      
-      // Log the raw event
-      console.log(`[RAW] keyup: ${e.key}`);
-      
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        console.log(`${e.key} UP (ref state: ${JSON.stringify(keyStateRef.current)})`);
-        
-        // Update ref state immediately
-        keyStateRef.current[e.key as 'ArrowLeft' | 'ArrowRight'] = false;
-        
-        // Update React state for UI rendering
-        setKeyState(prev => ({ ...prev, [e.key]: false }));
-      }
-    };
-    
-    // Add event listeners
-    document.addEventListener('keydown', keyDownHandler);
-    document.addEventListener('keyup', keyUpHandler);
-    
-    // Clean up on component unmount
-    return () => {
-      console.log('Cleaning up keyboard event listeners');
-      document.removeEventListener('keydown', keyDownHandler);
-      document.removeEventListener('keyup', keyUpHandler);
-    };
-  }, [sendingActive, endTest]);
-  
-  // Calculate progress
+  // Update progress display
   useEffect(() => {
     if (sendingActive) {
       const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
-      setSendProgress(`Mastered: ${masteredCount}/${state.chars.length}`);
+      setLevelProgress(`Mastered: ${masteredCount}/${state.chars.length}`);
     }
   }, [sendingActive, state.chars, state.charPoints]);
   
-  // Handle repeat and next level functions for TestResultsSummary
+  // Handle escape key
+  useEffect(() => {
+    if (!isBrowser) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && sendingActive) {
+        e.preventDefault();
+        finishTest(false);
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [sendingActive, finishTest]);
+  
+  // Handle repeat level
   const handleRepeatLevel = useCallback(() => {
     setShowResults(false);
-    startSendTest();
-  }, [startSendTest]);
+    startSendingTest();
+  }, [startSendingTest]);
   
+  // Handle next level
   const handleNextLevel = useCallback(() => {
     setShowResults(false);
     
-    // Get current level index
+    // Find next level
     const currentLevelIndex = trainingLevels.findIndex(l => l.id === state.selectedLevelId);
-    console.log('Moving from level index:', currentLevelIndex);
     
     if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
       // Move to next level
       const nextLevel = trainingLevels[currentLevelIndex + 1];
-      console.log('Moving to next level:', nextLevel.id);
-      
-      // Set the next level and start a new test
       selectLevel(nextLevel.id);
       
-      // Start a new test with the new level after a short delay to ensure state is updated
-      setTimeout(() => {
-        startSendTest();
-      }, 300);
+      // Start with new level
+      setTimeout(startSendingTest, 300);
     } else {
-      // If we're at the last level, just restart the current level
-      startSendTest();
+      // Restart current level if at end
+      startSendingTest();
     }
-  }, [state.selectedLevelId, startSendTest, selectLevel]);
-  
-  // Add a new effect to handle level changes
-  useEffect(() => {
-    // When the level ID changes and we're in an active sending session, reset local state
-    if (sendingActive) {
-      console.log('Level changed during active sending session - resetting local state');
-      setSendingActive(false);
-      setGuidedSendActive(false);
-      setResponseTimes([]);
-      setMistakesMap({});
-      setStrikeCount(0);
-      setShowResults(false);
-      
-      // Clear any remaining keyer state
-      sendQueueRef.current = [];
-      keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
-    }
-  }, [state.selectedLevelId]);
-  
-  // Monitor global testActive state
-  useEffect(() => {
-    // If global test is not active but our local sending is still active, reset it
-    if (!state.testActive && sendingActive) {
-      console.log('Global test inactive but local sending still active - resetting local state');
-      setSendingActive(false);
-      setGuidedSendActive(false);
-      setResponseTimes([]);
-      setMistakesMap({});
-      setStrikeCount(0);
-      setShowResults(false);
-      
-      // Clear any remaining keyer state
-      sendQueueRef.current = [];
-      keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
-    }
-  }, [state.testActive, sendingActive]);
+  }, [state.selectedLevelId, selectLevel, startSendingTest]);
   
   return (
     <div className={styles.sendingTrainer}>
@@ -645,7 +459,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       ) : sendingActive ? (
         <>
           <div className={styles.sendCurrentMeta}>
-            <div className={styles.sendCurrentLevel}>{sendProgress}</div>
+            <div className={styles.sendCurrentLevel}>{levelProgress}</div>
           </div>
           
           <MasteryDisplay targetPoints={TARGET_POINTS} />
@@ -683,7 +497,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           </div>
           
           <div className={styles.keyerDisplay}>
-            <div className={styles.keyerOutput}>{keyerOutput}</div>
+            <div className={styles.keyerOutput}>{morseOutput}</div>
           </div>
           
           <div className={styles.actionHints}>
@@ -697,14 +511,14 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           </div>
           <button 
             className="shared-start-button"
-            onClick={startSendTest}
+            onClick={startSendingTest}
           >
             Start {currentLevel ? currentLevel.name.split(':')[0] : 'Test'}
           </button>
           
-          {sendResults && (
+          {testResults && (
             <div className={styles.results}>
-              {sendResults}
+              {testResults}
             </div>
           )}
         </div>

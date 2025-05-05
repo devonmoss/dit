@@ -171,4 +171,11 @@
   text-align: center;
   color: var(--accent-color, #00a0e4);
   max-width: 600px;
+}
+
+.decodedChar {
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  color: #666;
+  font-style: italic;
 } 
