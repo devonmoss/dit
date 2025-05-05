@@ -211,7 +211,12 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
         console.log(`[IAMBIC KEYER] CHARACTER DETECTED: '${char}' from Morse code '${code}'`);
         if (opts.onCharacter) {
           console.log(`[IAMBIC KEYER] Calling onCharacter callback with character: '${char}'`);
-          opts.onCharacter(char);
+          try {
+            opts.onCharacter(char);
+            console.log(`[IAMBIC KEYER] onCharacter callback executed successfully for '${char}'`);
+          } catch (err) {
+            console.error(`[IAMBIC KEYER] Error in onCharacter callback:`, err);
+          }
         } else {
           console.log(`[IAMBIC KEYER] No onCharacter callback provided`);
         }
@@ -220,7 +225,12 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
         console.log(`[IAMBIC KEYER] INVALID CODE: No character found for '${code}'`);
         if (opts.onInvalidCharacter) {
           console.log(`[IAMBIC KEYER] Calling onInvalidCharacter callback with code: '${code}'`);
-          opts.onInvalidCharacter(code);
+          try {
+            opts.onInvalidCharacter(code);
+            console.log(`[IAMBIC KEYER] onInvalidCharacter callback executed successfully for '${code}'`);
+          } catch (err) {
+            console.error(`[IAMBIC KEYER] Error in onInvalidCharacter callback:`, err);
+          }
         } else {
           console.log(`[IAMBIC KEYER] No onInvalidCharacter callback provided`);
         }
@@ -242,7 +252,12 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       console.log(`[IAMBIC KEYER] WORD BOUNDARY DETECTED: After ${unit.current * 7}ms gap`);
       if (opts.onWord) {
         console.log(`[IAMBIC KEYER] Calling onWord callback`);
-        opts.onWord();
+        try {
+          opts.onWord();
+          console.log(`[IAMBIC KEYER] onWord callback executed successfully`);
+        } catch (err) {
+          console.error(`[IAMBIC KEYER] Error in onWord callback:`, err);
+        }
       } else {
         console.log(`[IAMBIC KEYER] No onWord callback provided`);
       }
@@ -291,7 +306,12 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
               console.log(`[IAMBIC KEYER] IMMEDIATE CHARACTER: '${char}' from '${code}' (new user action)`);
               if (opts.onCharacter) {
                 console.log(`[IAMBIC KEYER] Calling onCharacter callback with immediate character: '${char}'`);
-                opts.onCharacter(char);
+                try {
+                  opts.onCharacter(char);
+                  console.log(`[IAMBIC KEYER] Immediate onCharacter callback executed successfully for '${char}'`);
+                } catch (err) {
+                  console.error(`[IAMBIC KEYER] Error in immediate onCharacter callback:`, err);
+                }
               } else {
                 console.log(`[IAMBIC KEYER] No onCharacter callback provided`);
               }
@@ -339,7 +359,12 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
               console.log(`[IAMBIC KEYER] IMMEDIATE CHARACTER: '${char}' from '${code}' (new user action)`);
               if (opts.onCharacter) {
                 console.log(`[IAMBIC KEYER] Calling onCharacter callback with immediate character: '${char}'`);
-                opts.onCharacter(char);
+                try {
+                  opts.onCharacter(char);
+                  console.log(`[IAMBIC KEYER] Immediate onCharacter callback executed successfully for '${char}'`);
+                } catch (err) {
+                  console.error(`[IAMBIC KEYER] Error in immediate onCharacter callback:`, err);
+                }
               } else {
                 console.log(`[IAMBIC KEYER] No onCharacter callback provided`);
               }

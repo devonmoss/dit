@@ -15,7 +15,7 @@ interface SendModeRaceStageProps {
   currentUserId: string;
   raceLength: number;
   onlineUserIds: string[];
-  onCharacterCorrect: (currentIndex: number) => void;
+  onCharacterCorrect: (currentIndex?: number) => void;
   onError: () => void;
   onComplete: () => void;
   audioContext: any | null;
