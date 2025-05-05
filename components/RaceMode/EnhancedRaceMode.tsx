@@ -949,11 +949,24 @@ const EnhancedRaceMode: React.FC = () => {
           currentUserId={getUserIdForDisplay(getCurrentUser()?.id || '')}
           raceLength={raceText.length}
           onlineUserIds={onlineUsers.map(user => user.user_id)}
-          onCharacterCorrect={(index) => {
+          onCharacterCorrect={(actualIndex) => {
             const currentUser = getCurrentUser();
             if (!currentUser) return;
             const userId = getMappedUserId(currentUser.id, raceId || undefined);
-            incrementProgress(index, userId);
+            
+            // Use the index passed from the component instead of our own state
+            console.log(`SendMode: onCharacterCorrect called with actualIndex=${actualIndex}, currentCharIndex=${currentCharIndex}`);
+            console.log(`SendMode: Moving to next character index ${actualIndex + 1}`);
+            
+            // Log the current character and next character for clarity
+            const currentChar = raceText[actualIndex];
+            const nextChar = raceText[actualIndex + 1];
+            console.log(`SendMode: Current char='${currentChar}', next char='${nextChar}'`);
+            
+            // Pass the actual index WITHOUT adding 1 - incrementProgress will add 1 internally
+            incrementProgress(actualIndex, userId);
+            
+            console.log(`SendMode: After incrementProgress call with index ${actualIndex}`);
           }}
           onError={incrementErrorCount}
           onComplete={finishRace}

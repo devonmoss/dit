@@ -100,21 +100,27 @@ export function useRaceProgress({
 
   // Increment progress at a specific character index
   const incrementProgress = useCallback((characterIndex: number, userId: string) => {
+    console.log(`useRaceProgress: incrementProgress called with characterIndex=${characterIndex}`);
+    console.log(`useRaceProgress: current state before update: currentCharIndex=${currentCharIndex}, progress=${userProgress}%`);
+    
     // Calculate new progress percentage
     const newProgress = Math.round(((characterIndex + 1) / raceText.length) * 100);
+    console.log(`useRaceProgress: setting new progress to ${newProgress}%`);
     setUserProgress(newProgress);
     
     // Update latest progress reference for database syncing
     latestProgressRef.current = characterIndex + 1;
     
-    // Move to next character
-    setCurrentCharIndex(characterIndex + 1);
+    // Move to next character - adding 1 to move to the next character
+    const nextCharIndex = characterIndex + 1;
+    console.log(`useRaceProgress: updating currentCharIndex from ${currentCharIndex} to ${nextCharIndex} (adding 1 to move to next character)`);
+    setCurrentCharIndex(nextCharIndex);
     
     // Mark that we have a new update, but let the throttling handle when to actually send it
     pendingUpdateRef.current = true;
     
     // Try to update, but the throttle mechanism will decide if it happens now or later
-    updateProgress(characterIndex + 1, userId);
+    updateProgress(nextCharIndex, userId);
     
     // Reset activity time
     lastActivityTimeRef.current = Date.now();
