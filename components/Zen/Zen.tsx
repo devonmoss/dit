@@ -4,10 +4,33 @@ import { useIambicKeyer } from '../../hooks/useIambicKeyer';
 import { createAudioContext } from '../../utils/morse';
 import styles from './Zen.module.css';
 
+// Emoji options for invalid characters
+const INVALID_EMOJIS = [
+  '🤷‍♂️', // man shrugging
+  '🪦', // grave headstone
+  '😵', // face with x for eyes
+  '💀', // skull
+  '🤔', // thinking face
+  '🫠', // melting face
+  '🫨', // shaking face
+  '🤪', // zany face
+  '🙃', // upside-down face
+  '❓', // question mark
+  '⚠️', // warning
+  '🔥', // fire
+];
+
 const Zen: React.FC = () => {
   const { state, setSendWpm } = useAppState();
   const [text, setText] = useState('');
   const audio = useMemo(() => createAudioContext(), []);
+  
+  // Function to get a random emoji from our list
+  const getRandomEmoji = () => {
+    const randomIndex = Math.floor(Math.random() * INVALID_EMOJIS.length);
+    return INVALID_EMOJIS[randomIndex];
+  };
+  
   const keyer = useIambicKeyer({
     wpm: state.sendWpm,
     onElement: () => {},
@@ -15,6 +38,11 @@ const Zen: React.FC = () => {
     onCharacter: (char) => setText(t => t + char),
     onWord: () => setText(t => t + ' '),
     onWpmChange: (newWpm) => setSendWpm(newWpm),
+    onInvalidCharacter: (code) => {
+      console.log(`Zen received invalid code: ${code}`);
+      const emoji = getRandomEmoji();
+      setText(t => t + emoji);
+    },
   });
 
   useEffect(() => {

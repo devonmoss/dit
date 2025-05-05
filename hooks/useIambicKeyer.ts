@@ -15,6 +15,8 @@ export interface IambicKeyerOptions {
   onCharacter?: (char: string) => void;
   onWord?: () => void;
   onWpmChange?: (newWpm: number) => void;
+  /** Called when invalid Morse code is detected */
+  onInvalidCharacter?: (code: string) => void;
 }
 
 export interface IambicKeyer {
@@ -216,6 +218,12 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       } else {
         log(`No character found for code: ${code}`);
         console.log(`[IAMBIC KEYER] INVALID CODE: No character found for '${code}'`);
+        if (opts.onInvalidCharacter) {
+          console.log(`[IAMBIC KEYER] Calling onInvalidCharacter callback with code: '${code}'`);
+          opts.onInvalidCharacter(code);
+        } else {
+          console.log(`[IAMBIC KEYER] No onInvalidCharacter callback provided`);
+        }
       }
     }, unit.current * 3);
   };
