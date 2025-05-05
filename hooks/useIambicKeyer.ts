@@ -206,9 +206,16 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       if (char) {
         addEvent('char', char);
         log(`Decoded character: ${char} from ${code}`);
-        opts.onCharacter?.(char);
+        console.log(`[IAMBIC KEYER] CHARACTER DETECTED: '${char}' from Morse code '${code}'`);
+        if (opts.onCharacter) {
+          console.log(`[IAMBIC KEYER] Calling onCharacter callback with character: '${char}'`);
+          opts.onCharacter(char);
+        } else {
+          console.log(`[IAMBIC KEYER] No onCharacter callback provided`);
+        }
       } else {
         log(`No character found for code: ${code}`);
+        console.log(`[IAMBIC KEYER] INVALID CODE: No character found for '${code}'`);
       }
     }, unit.current * 3);
   };
@@ -224,7 +231,13 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     // Schedule word after 7 unit gap
     wordTimer.current = window.setTimeout(() => {
       wordTimer.current = null;
-      opts.onWord?.();
+      console.log(`[IAMBIC KEYER] WORD BOUNDARY DETECTED: After ${unit.current * 7}ms gap`);
+      if (opts.onWord) {
+        console.log(`[IAMBIC KEYER] Calling onWord callback`);
+        opts.onWord();
+      } else {
+        console.log(`[IAMBIC KEYER] No onWord callback provided`);
+      }
       addEvent('word');
     }, unit.current * 7);
   };
@@ -267,7 +280,13 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
             if (char) {
               addEvent('immediate_char', char);
               log(`Immediate character: ${char} from ${code}`);
-              opts.onCharacter?.(char);
+              console.log(`[IAMBIC KEYER] IMMEDIATE CHARACTER: '${char}' from '${code}' (new user action)`);
+              if (opts.onCharacter) {
+                console.log(`[IAMBIC KEYER] Calling onCharacter callback with immediate character: '${char}'`);
+                opts.onCharacter(char);
+              } else {
+                console.log(`[IAMBIC KEYER] No onCharacter callback provided`);
+              }
             }
           }
         }
@@ -309,7 +328,13 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
             if (char) {
               addEvent('immediate_char', char);
               log(`Immediate character: ${char} from ${code}`);
-              opts.onCharacter?.(char);
+              console.log(`[IAMBIC KEYER] IMMEDIATE CHARACTER: '${char}' from '${code}' (new user action)`);
+              if (opts.onCharacter) {
+                console.log(`[IAMBIC KEYER] Calling onCharacter callback with immediate character: '${char}'`);
+                opts.onCharacter(char);
+              } else {
+                console.log(`[IAMBIC KEYER] No onCharacter callback provided`);
+              }
             }
           }
         }
