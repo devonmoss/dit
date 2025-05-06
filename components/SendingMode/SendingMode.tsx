@@ -10,7 +10,8 @@ import { selectNextCharacter } from '../../utils/characterSelection';
 
 // Constants
 const TARGET_POINTS = 3;
-const COMPLETED_WEIGHT = 0.2;
+const FEEDBACK_DELAY = 750; // ms
+const COMPLETED_WEIGHT = 0.2; // Weight for already mastered characters
 const MIN_RESPONSE_TIME = 0.8; // seconds
 const MAX_RESPONSE_TIME = 7; // seconds
 const INCORRECT_PENALTY = 0.7; // 30% reduction
@@ -27,47 +28,34 @@ interface CharTiming {
 }
 
 const SendingMode: React.FC<SendingModeProps> = () => {
-  // App state
   const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel, startTestWithLevelId } = useAppState();
   
-  // UI state
-  const [sendCurrentChar, setSendCurrentChar] = useState('');
+  // Local UI state - align with TrainingMode approach
+  const [currentChar, setCurrentChar] = useState('');
   const [morseOutput, setMorseOutput] = useState('');
   const [feedbackState, setFeedbackState] = useState<'none' | 'correct' | 'incorrect'>('none');
   const [incorrectChar, setIncorrectChar] = useState('');
-  const [sendingActive, setSendingActive] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [levelProgress, setLevelProgress] = useState('');
-  
-  // Performance tracking
+  const [strikeCount, setStrikeCount] = useState(0);
   const [responseTimes, setResponseTimes] = useState<CharTiming[]>([]);
   const [mistakesMap, setMistakesMap] = useState<Record<string, number>>({});
-  const [strikeCount, setStrikeCount] = useState(0);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [completed, setCompleted] = useState(true);
-  const [testResults, setTestResults] = useState('');
+  const [testResults, setTestResults] = useState<{
+    completed: boolean;
+    elapsedTime: number;
+  } | null>(null);
   
-  // Timing refs
-  const charStartTimeRef = useRef<number>(0);
-  const testStartTimeRef = useRef<number>(0);
+  // Timing state
+  const [charStartTime, setCharStartTime] = useState<number | null>(null);
+  const [testStartTime, setTestStartTime] = useState<number | null>(null);
   
-  // Audio refs
+  // Audio refs - these need to be refs due to how Web Audio works
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const oscillatorRef = useRef<OscillatorNode | null>(null);
   
-  // Component state
-  const activeRef = useRef(false);
-  const currentCharRef = useRef('');
-  const strikeCountRef = useRef(0);  // Add a ref to track strikes
-  
-  // Add a ref to store points between updates since the context isn't working correctly
-  const charPointsRef = useRef<Record<string, number>>({});
-
   // Reference to track recently mastered character
   const recentlyMasteredCharRef = useRef<string | null>(null);
   
-  // Track current environment
+  // Client/development detection
   const isClientRef = useRef(false);
   const isDevelopmentRef = useRef(false);
   
@@ -101,6 +89,40 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       }
     };
   }, []);
+  
+  // Ensure level characters are correctly loaded on mount - from TrainingMode
+  useEffect(() => {
+    if (currentLevel && state.chars.length > 0) {
+      // Check if current state.chars matches the expected level's chars
+      const levelChars = currentLevel.chars;
+      const stateChars = state.chars;
+      
+      // Compare arrays to see if they have the same characters
+      const sameLength = levelChars.length === stateChars.length;
+      const allCharsPresent = levelChars.every(c => stateChars.includes(c));
+      const noExtraChars = stateChars.every(c => levelChars.includes(c));
+      
+      if (!(sameLength && allCharsPresent && noExtraChars)) {
+        console.log('Characters mismatch detected:');
+        console.log('Current level:', state.selectedLevelId);
+        console.log('Expected chars:', levelChars);
+        console.log('Actual chars:', stateChars);
+        
+        // Re-select the level to fix characters
+        selectLevel(state.selectedLevelId);
+      }
+    }
+  }, [currentLevel, state.chars, state.selectedLevelId, selectLevel]);
+  
+  // Debug logging - from TrainingMode
+  useEffect(() => {
+    console.log('---------------------------------------');
+    console.log(`[${new Date().toISOString()}] State Update`);
+    console.log('Level ID:', state.selectedLevelId);
+    console.log('Characters in state:', JSON.stringify(state.chars));
+    console.log('testActive:', state.testActive);
+    console.log('---------------------------------------');
+  }, [state.selectedLevelId, state.chars, state.testActive]);
   
   // Stop any current sound
   const stopSound = useCallback(() => {
@@ -184,12 +206,15 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     return 1 - ((seconds - MIN_RESPONSE_TIME) / (MAX_RESPONSE_TIME - MIN_RESPONSE_TIME));
   }, []);
   
-  // Pick next character to practice sending - prioritize unmastered characters
+  // Pick next character based on mastery weights - using TrainingMode approach
   const pickNextChar = useCallback(() => {
-    // Use the shared utility function
+    console.log(`SendingMode: Selecting next character from ${state.chars.length} characters:`, state.chars);
+    console.log(`SendingMode: Current points:`, state.charPoints);
+    console.log(`SendingMode: Recently mastered char:`, recentlyMasteredCharRef.current);
+    
     return selectNextCharacter(
       state.chars,
-      state.charPoints, 
+      state.charPoints,
       TARGET_POINTS,
       recentlyMasteredCharRef.current
     );
@@ -197,63 +222,37 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Show next character
   const showNextChar = useCallback(() => {
-    if (!activeRef.current) {
-      console.log(`SendingMode: showNextChar called but activeRef is false - ignoring`);
+    if (!state.testActive) {
+      console.log('Cannot show next character - test not active');
       return;
     }
     
     const nextChar = pickNextChar();
-    console.log(`SendingMode: Showing next character: "${nextChar}" (activeRef: true)`);
+    console.log(`SendingMode: Showing next character: "${nextChar}"`);
     
-    // Update both the state and the ref
-    setSendCurrentChar(nextChar);
-    currentCharRef.current = nextChar;
-    
+    setCurrentChar(nextChar);
     setMorseOutput('');
     setFeedbackState('none');
     
-    // Do NOT reset recently mastered reference here
-    // Let it persist until the next mastery event
-    
     // Set the start time for response time tracking
-    charStartTimeRef.current = Date.now();
-  }, [pickNextChar]);
+    setCharStartTime(Date.now());
+  }, [pickNextChar, state.testActive]);
   
   // Handle an element (dot/dash) from the keyer
   const handleElement = useCallback((symbol: '.' | '-') => {
-    if (!activeRef.current) {
-      console.log(`SendingMode: Element ${symbol} detected but activeRef is false - ignoring`);
+    if (!state.testActive) {
+      console.log(`Element ${symbol} detected but test not active - ignoring`);
       return;
     }
     
     setMorseOutput(prev => prev + symbol);
-  }, []);
+  }, [state.testActive]);
   
-  // Finish test
-  const finishTest = useCallback((isCompleted = true) => {
-    console.log(`SendingMode: Finishing test, completed: ${isCompleted}, current state: sendingActive=${sendingActive}`);
-    
-    // Set active ref to false immediately - this affects callbacks
-    activeRef.current = false;
-    currentCharRef.current = '';  // Clear current character ref
-    
-    // Check if we need to force completing the test (for strike limit)
-    const isStrikeOut = isCheckpoint && strikeLimit && strikeCountRef.current >= strikeLimit;
-    
-    // Only check sendingActive if this isn't from a strike-out
-    if (!sendingActive && !isStrikeOut) {
-      console.log(`SendingMode: finishTest called but sendingActive is already false - ignoring`);
-      return;
-    }
-    
-    // Update UI state
-    setSendingActive(false);
-    setCompleted(isCompleted);
-    
+  // Finish test - aligned with TrainingMode
+  const finishTest = useCallback((completed = true) => {
     // Calculate elapsed time
     const endTime = Date.now();
-    const totalTime = (endTime - testStartTimeRef.current) / 1000;
-    setElapsedTime(totalTime);
+    const elapsedSec = testStartTime ? (endTime - testStartTime) / 1000 : 0;
     
     // Save response times
     if (responseTimes.length > 0) {
@@ -262,54 +261,36 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     }
     
     // End app test
-    endTest(isCompleted);
+    endTest(completed);
     
-    // Create results summary using our ref as source of truth
-    const masteredCount = state.chars.filter(c => (charPointsRef.current[c] || 0) >= TARGET_POINTS).length;
-    const totalCount = state.chars.length;
-    const avgTime = responseTimes.length > 0 
-      ? (responseTimes.reduce((sum, item) => sum + item.time, 0) / responseTimes.length).toFixed(2)
-      : '0';
-    
-    const results = `You've mastered ${masteredCount}/${totalCount} characters. Average response time: ${avgTime}s`;
-    console.log(`SendingMode: Test results: ${results}`);
-    setTestResults(results);
-    
-    // Show results
-    console.log(`SendingMode: Showing results summary page - explicitly setting showResults=true`);
-    setShowResults(true);
-  }, [state.chars, responseTimes, saveResponseTimes, endTest, sendingActive, isCheckpoint, strikeLimit]);
+    // Set test results
+    console.log(`SendingMode: Test ${completed ? 'completed' : 'ended'}, elapsed time: ${elapsedSec}s`);
+    setTestResults({
+      completed,
+      elapsedTime: elapsedSec
+    });
+  }, [testStartTime, responseTimes, saveResponseTimes, endTest]);
   
   // Handle a character from the keyer
   const handleCharacter = useCallback((char: string) => {
-    // Use the ref to check if we're active - this will always be current
-    console.log(`SendingMode: Character detected "${char}" - activeRef: ${activeRef.current}, currentChar: ${currentCharRef.current || '(empty)'}`);
-    
-    if (!activeRef.current) {
-      console.log(`SendingMode: Character detected but ignored - activeRef is false`);
+    if (!state.testActive || !currentChar) {
+      console.log(`SendingMode: Character detected but test not active or no current character - ignoring`);
       return;
     }
     
-    if (!currentCharRef.current) {
-      console.log(`SendingMode: Character detected but ignored - no current character to match against`);
-      return;
-    }
-    
-    console.log(`SendingMode: Keyer decoded: "${char}", target: "${currentCharRef.current}"`);
-    console.log(`SendingMode: Comparing ${char.toLowerCase()} === ${currentCharRef.current.toLowerCase()}: ${char.toLowerCase() === currentCharRef.current.toLowerCase()}`);
+    console.log(`SendingMode: Keyer decoded: "${char}", target: "${currentChar}"`);
+    console.log(`SendingMode: Comparing ${char.toLowerCase()} === ${currentChar.toLowerCase()}: ${char.toLowerCase() === currentChar.toLowerCase()}`);
     
     // Calculate response time
-    const responseTime = Date.now() - charStartTimeRef.current;
+    const responseTime = charStartTime ? (Date.now() - charStartTime) : 0;
     
     // Check if character matches
-    if (char.toLowerCase() === currentCharRef.current.toLowerCase()) {
-      console.log(`SendingMode: CORRECT match - "${char}" matches "${currentCharRef.current}"`);
+    if (char.toLowerCase() === currentChar.toLowerCase()) {
+      console.log(`SendingMode: CORRECT match - "${char}" matches "${currentChar}"`);
       
       // Clear the current character from the display
-      setSendCurrentChar('');
-      // Also clear the ref for consistency
-      const successChar = currentCharRef.current;
-      currentCharRef.current = '';
+      const successChar = currentChar;
+      setCurrentChar('');
       
       // Correct character!
       setFeedbackState('correct');
@@ -321,16 +302,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Add to response times log
       setResponseTimes(prev => [...prev, { char: successChar, time: responseTime / 1000 }]);
       
-      // Update character points with better tracking
-      // First get points from our ref (which tracks correctly between calls)
-      const currentPoints = charPointsRef.current[successChar] || 0;
-      console.log(`SendingMode: Current points for "${successChar}" (from ref): ${currentPoints}`);
-      console.log(`SendingMode: Current points for "${successChar}" (from state): ${state.charPoints[successChar] || 0}`);
+      // Update character points - consistent with TrainingMode
+      const currentPoints = state.charPoints[successChar] || 0;
+      const newPoints = currentPoints + points;
       
-      const newPoints = currentPoints + points; // Add to existing points
-      console.log(`SendingMode: Updating points for "${successChar}" from ${currentPoints} to ${newPoints} (adding ${points})`);
-      
-      // Check if this character will now be mastered and wasn't before
+      // Check if character will reach mastery with this addition
       const willCompleteMastery = newPoints >= TARGET_POINTS && currentPoints < TARGET_POINTS;
       
       // If this character will now be mastered, track it to avoid immediate reselection
@@ -338,126 +314,60 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         recentlyMasteredCharRef.current = successChar;
       }
       
-      // Update both our ref and the app state
-      charPointsRef.current[successChar] = newPoints;
       updateCharPoints(successChar, newPoints);
       
-      // Log the update
-      console.log(`SendingMode: Updated points ref for "${successChar}" to ${charPointsRef.current[successChar]}`);
+      console.log(`Character ${successChar} updated: ${currentPoints} → ${newPoints} points (${points} added, response time: ${(responseTime / 1000).toFixed(2)}s)`);
       
-      // Create a simulated updated charPoints object for mastery checks
-      // Use our ref as the source of truth
-      const updatedCharPoints = { ...charPointsRef.current };
-      
-      // Check if this completes mastery using our ref
-      const willComplete = newPoints >= TARGET_POINTS;
-      const othersMastered = state.chars
-        .filter(c => c !== successChar)
-        .every(c => (updatedCharPoints[c] || 0) >= TARGET_POINTS);
-      
-      if (willComplete && othersMastered) {
-        // Level complete!
-        console.log(`SendingMode: Level complete! All characters mastered.`);
-        console.log(`SendingMode: Mastery status (from ref):`, charPointsRef.current);
-        
-        // Handle completion directly here instead of using the delayed finishTest
-        // Set active ref to false immediately - this affects callbacks
-        activeRef.current = false;
-        currentCharRef.current = '';  // Clear current character ref
-        
-        // Make sure we show the "Correct!" feedback before finishing
-        setTimeout(() => {
-          console.log(`SendingMode: Handling level completion directly`);
-          
-          // Update UI state
-          setSendingActive(false);
-          setCompleted(true);
-          
-          // Calculate elapsed time
-          const endTime = Date.now();
-          const totalTime = (endTime - testStartTimeRef.current) / 1000;
-          setElapsedTime(totalTime);
-          
-          // Save response times
-          if (responseTimes.length > 0) {
-            console.log(`SendingMode: Saving ${responseTimes.length} response times`);
-            saveResponseTimes(responseTimes);
-          }
-          
-          // End app test
-          endTest(true);
-          
-          // Create results summary using our ref as source of truth
-          const masteredCount = state.chars.filter(c => (charPointsRef.current[c] || 0) >= TARGET_POINTS).length;
-          const totalCount = state.chars.length;
-          const avgTime = responseTimes.length > 0 
-            ? (responseTimes.reduce((sum, item) => sum + item.time, 0) / responseTimes.length).toFixed(2)
-            : '0';
-          
-          const results = `You've mastered ${masteredCount}/${totalCount} characters. Average response time: ${avgTime}s`;
-          console.log(`SendingMode: Test results: ${results}`);
-          setTestResults(results);
-          
-          // Show results explicitly
-          console.log(`SendingMode: DIRECTLY setting showResults=true`);
-          setShowResults(true);
-        }, 750);
-        
-        return;
-      }
-      
-      // Show next character after delay
-      console.log(`SendingMode: Correct match - showing next character in 750ms`);
+      // Delay before next question or finishing
       setTimeout(() => {
-        setFeedbackState('none');
-        showNextChar();
-      }, 750);
+        // Create a simulated updated charPoints object that includes the most recent update
+        const updatedCharPoints = { ...state.charPoints, [successChar]: newPoints };
+        
+        // Check if all characters are mastered using the updated points
+        const allMastered = state.chars.every(c => (updatedCharPoints[c] || 0) >= TARGET_POINTS);
+        
+        console.log('Completion check:', { 
+          updatedCharPoints,
+          allMastered
+        });
+        
+        if (allMastered) {
+          finishTest(true);
+        } else {
+          setFeedbackState('none');
+          showNextChar();
+        }
+      }, FEEDBACK_DELAY);
     } else {
       // Incorrect character
-      console.log(`SendingMode: INCORRECT match - "${char}" does not match "${currentCharRef.current}"`);
+      console.log(`SendingMode: INCORRECT match - "${char}" does not match "${currentChar}"`);
       
       // Store the character that was incorrectly entered for display
-      const errorChar = char;
-      // Store the target character (but keep it visible)
-      const targetChar = currentCharRef.current;
+      setIncorrectChar(char);
       
       // Show the incorrect character feedback
       setFeedbackState('incorrect');
-      setIncorrectChar(errorChar);
       
       // Update mistakes map
       setMistakesMap(prev => {
-        const count = prev[targetChar] || 0;
-        console.log(`SendingMode: Increasing mistake count for "${targetChar}" from ${count} to ${count + 1}`);
-        return { ...prev, [targetChar]: count + 1 };
+        const count = prev[currentChar] || 0;
+        console.log(`SendingMode: Increasing mistake count for "${currentChar}" from ${count} to ${count + 1}`);
+        return { ...prev, [currentChar]: count + 1 };
       });
       
-      // Reduce points using our ref as the source of truth
-      const currentPoints = charPointsRef.current[targetChar] || 0;
-      console.log(`SendingMode: Current points for "${targetChar}" (from ref): ${currentPoints}`);
-      console.log(`SendingMode: Current points for "${targetChar}" (from state): ${state.charPoints[targetChar] || 0}`);
-      
+      // Reduce points with the penalty
+      const currentPoints = state.charPoints[currentChar] || 0;
       const newPoints = Math.max(0, currentPoints * INCORRECT_PENALTY);
-      console.log(`SendingMode: Reducing points for "${targetChar}" from ${currentPoints} to ${newPoints} (30% reduction)`);
-      
-      // Update both our ref and the app state
-      charPointsRef.current[targetChar] = newPoints;
-      updateCharPoints(targetChar, newPoints);
-      
-      // Log the update
-      console.log(`SendingMode: Updated points ref for "${targetChar}" to ${charPointsRef.current[targetChar]}`);
+      updateCharPoints(currentChar, newPoints);
       
       // Properly enforce the checkpoint strike rule
       if (isCheckpoint && strikeLimit) {
-        strikeCountRef.current += 1;  // Use the ref to track the actual count
-        const newStrikeCount = strikeCountRef.current;
+        const newStrikeCount = strikeCount + 1;
         console.log(`SendingMode: Increasing strike count to ${newStrikeCount} (limit: ${strikeLimit})`);
         setStrikeCount(newStrikeCount);
         
         if (newStrikeCount >= strikeLimit) {
           console.log(`SendingMode: Strike limit reached (${newStrikeCount}/${strikeLimit}) - ending test`);
-          // Call finishTest directly rather than using setTimeout
-          // This ensures the function runs before any other state updates
           finishTest(false);
           return;
         }
@@ -472,22 +382,25 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         setFeedbackState('none');
         // Reset morse output so they can try again
         setMorseOutput('');
-      }, 2000);
+      }, FEEDBACK_DELAY);
     }
     
     // Clear morse output
     setMorseOutput('');
   }, [
-    calculatePointsForTime,
+    currentChar,
+    state.testActive,
+    state.charPoints,
     state.chars,
+    charStartTime,
+    calculatePointsForTime,
     updateCharPoints,
     isCheckpoint,
     strikeLimit,
     strikeCount,
     playErrorSound,
     showNextChar,
-    finishTest,
-    state.charPoints
+    finishTest
   ]);
   
   // Create the keyer
@@ -503,58 +416,75 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     }
   });
   
-  // Start test 
-  const startSendingTest = useCallback(() => {
-    console.log('SendingMode: Starting sending test - initializing state');
+  // Start test - aligned with TrainingMode's handleStartTest
+  const handleStartTest = useCallback(() => {
+    console.log('SendingMode: Starting test - initializing state');
     
-    // Set active ref to true immediately - this will be available to callbacks
-    activeRef.current = true;
-    
-    // Clear any pending keyer state
-    console.log(`SendingMode: Clearing keyer state`);
-    keyer.clear();
-    
-    // Reset UI state
-    setSendingActive(true);
+    // Reset all state
+    setCurrentChar('');
     setMorseOutput('');
     setFeedbackState('none');
     setIncorrectChar('');
-    
-    // Explicitly reset strike count to 0
-    console.log('SendingMode: Resetting strike count to 0');
     setStrikeCount(0);
-    strikeCountRef.current = 0;  // Reset the ref too
-    
-    // Reset performance tracking
     setResponseTimes([]);
     setMistakesMap({});
-    setCompleted(true);
-    setShowResults(false);
+    setTestResults(null);
     
-    // Initialize our points tracking ref
-    charPointsRef.current = {};
+    // Reset recently mastered character
+    recentlyMasteredCharRef.current = null;
     
-    // Start app test with the current level ID
-    // This is critical - we need to use startTestWithLevelId instead of startTest
-    // to ensure charPoints are properly initialized
-    console.log('SendingMode: Starting test with level ID:', state.selectedLevelId);
-    startTestWithLevelId(state.selectedLevelId);
+    // Clear any pending keyer state
+    keyer.clear();
     
-    // Pick and set the first character after a short delay
+    // Start the test in the AppState
+    startTest();
+    
+    // Set test start time
+    setTestStartTime(Date.now());
+    
+    // Show first character after a short delay
     setTimeout(() => {
-      const firstChar = pickNextChar();
-      console.log(`SendingMode: Setting first character: "${firstChar}"`);
-      setSendCurrentChar(firstChar);
-      currentCharRef.current = firstChar;  // Set the ref immediately
-      
-      // Set start time
-      testStartTimeRef.current = Date.now();
-      charStartTimeRef.current = Date.now();  // Set start time for the first character
-      
-      console.log(`SendingMode: Test started, first character is "${firstChar}", waiting for input`);
-    }, 100); // Small delay to ensure state is updated
+      showNextChar();
+    }, 100);
+  }, [startTest, showNextChar, keyer]);
+  
+  // Clean restart with time recording
+  const startTestAndRecordTime = useCallback(() => {
+    setTestStartTime(Date.now());
+    handleStartTest();
+  }, [handleStartTest]);
+  
+  // Handle test starting with level ID
+  const startTestWithExplicitLevel = useCallback((levelId: string) => {
+    console.log(`SendingMode: Starting test with explicit level ID: ${levelId}`);
     
-  }, [startTestWithLevelId, state.selectedLevelId, pickNextChar, keyer]);
+    // Reset all state
+    setCurrentChar('');
+    setMorseOutput('');
+    setFeedbackState('none');
+    setIncorrectChar('');
+    setStrikeCount(0);
+    setResponseTimes([]);
+    setMistakesMap({});
+    setTestResults(null);
+    
+    // Reset recently mastered character
+    recentlyMasteredCharRef.current = null;
+    
+    // Clear any pending keyer state
+    keyer.clear();
+    
+    // Set test start time
+    setTestStartTime(Date.now());
+    
+    // Start test with the level ID
+    startTestWithLevelId(levelId);
+    
+    // Show first character after a short delay
+    setTimeout(() => {
+      showNextChar();
+    }, 100);
+  }, [startTestWithLevelId, showNextChar, keyer]);
   
   // Install keyer once on mount
   useEffect(() => {
@@ -567,30 +497,14 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       console.log('Uninstalling keyer');
       keyer.uninstall();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [keyer]);
   
-  // Update progress display using our ref
+  // Add escape key handler
   useEffect(() => {
-    if (sendingActive) {
-      // Use our ref as the source of truth, but fall back to state
-      const masteredCount = state.chars.filter(c => {
-        const points = charPointsRef.current[c] !== undefined ? 
-                       charPointsRef.current[c] : 
-                       (state.charPoints[c] || 0);
-        return points >= TARGET_POINTS;
-      }).length;
-      
-      setLevelProgress(`Mastered: ${masteredCount}/${state.chars.length}`);
-    }
-  }, [sendingActive, state.chars, state.charPoints]);
-  
-  // Handle escape key
-  useEffect(() => {
-    if (!isBrowser) return;
+    if (!isBrowser || !state.testActive) return;
     
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && sendingActive) {
+      if (e.key === 'Escape') {
         e.preventDefault();
         finishTest(false);
       }
@@ -598,20 +512,29 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [sendingActive, finishTest]);
+  }, [state.testActive, finishTest]);
   
   // Handle repeat level
   const handleRepeatLevel = useCallback(() => {
-    setShowResults(false);
-    startSendingTest();
-  }, [startSendingTest]);
+    setTestResults(null);
+    startTestAndRecordTime();
+  }, [startTestAndRecordTime]);
   
-  // Handle next level
+  // Handle next level - aligned with TrainingMode
   const handleNextLevel = useCallback(() => {
     console.log("🔄 onNext triggered in SendingMode");
-    setShowResults(false);
+    setTestResults(null);
     
-    // Find next level
+    // Reset state
+    setCurrentChar('');
+    setMorseOutput('');
+    setFeedbackState('none');
+    setIncorrectChar('');
+    setStrikeCount(0);
+    setResponseTimes([]);
+    setMistakesMap({});
+    
+    // Get current level index
     const currentLevelIndex = trainingLevels.findIndex(l => l.id === state.selectedLevelId);
     console.log('Moving from level index:', currentLevelIndex);
     
@@ -624,64 +547,22 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       
       // Use the function that takes the level ID directly
       console.log("🔄 Starting test with explicit level ID:", nextLevel.id);
-      
-      // Reset relevant state (this will happen in startSendingTest too, but we're doing it early)
-      setSendingActive(false);
-      setMorseOutput('');
-      setFeedbackState('none');
-      setIncorrectChar('');
-      setStrikeCount(0);
-      strikeCountRef.current = 0;
-      setResponseTimes([]);
-      setMistakesMap({});
-      
-      // Set timing
-      testStartTimeRef.current = Date.now();
-      
-      // IMPORTANT: Start the test with the explicit next level ID
-      // This is the key difference - we don't call selectLevel first
-      startTestWithLevelId(nextLevel.id);
-      
-      // Then start our test with a slight delay
-      setTimeout(() => {
-        // Set active ref to true immediately - this will be available to callbacks
-        activeRef.current = true;
-        
-        // Clear any pending keyer state
-        console.log(`SendingMode: Clearing keyer state`);
-        keyer.clear();
-        
-        // Reset UI state
-        setSendingActive(true);
-        
-        // Reset performance tracking
-        setCompleted(true);
-        
-        // Initialize our points tracking ref
-        charPointsRef.current = {};
-        
-        // Pick and set the first character
-        const firstChar = pickNextChar();
-        console.log(`SendingMode: Setting first character: "${firstChar}"`);
-        setSendCurrentChar(firstChar);
-        currentCharRef.current = firstChar;  // Set the ref immediately
-        
-        // Set start time for the first character
-        charStartTimeRef.current = Date.now();
-        
-        console.log(`SendingMode: Test started, first character is "${firstChar}", waiting for input`);
-      }, 300);
+      startTestWithExplicitLevel(nextLevel.id);
     } else {
       // Restart current level if at end
-      startSendingTest();
+      startTestAndRecordTime();
     }
-  }, [state.selectedLevelId, startTestWithLevelId, keyer, pickNextChar, startSendingTest]);
+  }, [state.selectedLevelId, startTestWithExplicitLevel, startTestAndRecordTime]);
+  
+  // Calculate progress - mastered characters
+  const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
+  const progress = state.chars.length > 0 ? `Mastered: ${masteredCount}/${state.chars.length}` : '';
   
   // Using useRef for client detection to avoid hydration mismatches
   useEffect(() => {
     isClientRef.current = true;
     
-    // Check if we're in a development environment (localhost or 127.0.0.1)
+    // Check if we're in a development environment
     if (isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       isDevelopmentRef.current = true;
     }
@@ -689,7 +570,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   return (
     <div className={styles.sendingTrainer}>
-      {/* Debug state information - only visible on client in development */}
+      {/* Debug state information - only visible in development */}
       {isClientRef.current && isDevelopmentRef.current && (
         <div style={{ 
           position: 'fixed', 
@@ -700,22 +581,17 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           padding: '10px',
           fontSize: '12px',
           zIndex: 9999,
-          maxWidth: '300px',
-          maxHeight: '200px',
+          maxWidth: '350px',
+          maxHeight: '300px',
           overflow: 'auto'
         }}>
           <div>Level ID: {state.selectedLevelId}</div>
+          <div>Level Name: {currentLevel?.name || 'Unknown'}</div>
           <div>Characters: {state.chars.join(', ')}</div>
-          <div>Mastery: <small>(ref values)</small>
-            <ul style={{margin: '5px 0', paddingLeft: '20px'}}>
-              {state.chars.map(c => (
-                <li key={c}>
-                  {c}: {charPointsRef.current[c] || 0}/{TARGET_POINTS}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>State Mastery: <small>(context values)</small>
+          <div>Test Active: {state.testActive ? 'Yes' : 'No'}</div>
+          <div>Current Char: {currentChar || '(none)'}</div>
+          <div>
+            <div>Mastery:</div>
             <ul style={{margin: '5px 0', paddingLeft: '20px'}}>
               {state.chars.map(c => (
                 <li key={c}>
@@ -727,10 +603,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         </div>
       )}
       
-      {showResults ? (
+      {testResults ? (
         <TestResultsSummary
-          completed={completed}
-          elapsedTime={elapsedTime}
+          completed={testResults.completed}
+          elapsedTime={testResults.elapsedTime}
           replayCount={0} // Not applicable for sending mode
           mistakesMap={mistakesMap}
           responseTimes={responseTimes}
@@ -738,10 +614,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           onRepeat={handleRepeatLevel}
           onNext={handleNextLevel}
         />
-      ) : sendingActive ? (
+      ) : state.testActive ? (
         <>
           <div className={styles.sendCurrentMeta}>
-            <div className={styles.sendCurrentLevel}>{levelProgress}</div>
+            <div className={styles.sendCurrentLevel}>{progress}</div>
           </div>
           
           <MasteryDisplay targetPoints={TARGET_POINTS} />
@@ -760,8 +636,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           )}
           
           <div className={styles.currentCharDisplay}>
-            {sendCurrentChar && (
-              <div className={styles.bigCharacter}>{sendCurrentChar.toUpperCase()}</div>
+            {currentChar && (
+              <div className={styles.bigCharacter}>{currentChar.toUpperCase()}</div>
             )}
           </div>
           
@@ -793,16 +669,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           </div>
           <button 
             className="shared-start-button"
-            onClick={startSendingTest}
+            onClick={startTestAndRecordTime}
           >
             Start {currentLevel ? currentLevel.name.split(':')[0] : 'Test'}
           </button>
-          
-          {testResults && (
-            <div className={styles.results}>
-              {testResults}
-            </div>
-          )}
         </div>
       )}
     </div>
