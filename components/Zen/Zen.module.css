@@ -19,6 +19,12 @@
   resize: none;
   background-color: var(--primary-bg);
   color: var(--accent-color);
+  outline: none; /* Remove the focus outline */
+}
+
+.textarea:focus {
+  border-color: var(--border-color); /* Keep the same border on focus */
+  box-shadow: none; /* Remove any focus shadow */
 }
 
 .hint {
