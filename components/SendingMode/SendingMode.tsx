@@ -353,6 +353,46 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       return state.chars[0] || '';
     }
     
+    // CRITICAL FIX: Double-check that we have the correct level
+    console.log(`🔎 VALIDATING LEVEL SELECTION:`);
+    console.log(`- Selected level ID from state: ${state.selectedLevelId}`);
+    console.log(`- Found level ID: ${levelDefinition.id}`);
+    
+    // Ensure we're using the correct level - level ID should match the one in state
+    if (levelDefinition.id !== state.selectedLevelId) {
+      console.error(`🚨 CRITICAL: Level mismatch in pickNextChar - requested ${state.selectedLevelId} but got ${levelDefinition.id}`);
+      
+      // Force get the correct level to avoid character selection from wrong level
+      const correctLevel = trainingLevels.find(l => l.id === state.selectedLevelId);
+      if (!correctLevel) {
+        console.error(`Unable to find correct level with ID: ${state.selectedLevelId}`);
+        return state.chars[0] || '';
+      }
+      
+      console.log(`🛠️ Fixing by explicitly using level ${correctLevel.id} (${correctLevel.name})`);
+      
+      // Use the correct level chars
+      const levelChars = correctLevel.chars;
+      
+      // Store debugging info with corrected level
+      setLastPickerInputs({
+        levelId: correctLevel.id,
+        levelName: correctLevel.name,
+        levelChars: [...levelChars],
+        stateChars: [...state.chars],
+        pointsSnapshot: {...state.charPoints},
+        recentlyMasteredChar: recentlyMasteredCharRef.current
+      });
+      
+      // Use the corrected level's character list
+      return selectNextCharacter(
+        levelChars,
+        state.charPoints,
+        TARGET_POINTS,
+        recentlyMasteredCharRef.current
+      );
+    }
+    
     // Use the level's character list directly rather than relying on state.chars
     const levelChars = levelDefinition.chars;
     
@@ -1045,7 +1085,19 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         allMastered: currentLevel?.chars.every(c => 
           Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
         ) || false
-      }
+      },
+      // Add the new character selection debug info
+      characterSelectionDebug: lastPickerInputs ? {
+        levelId: lastPickerInputs.levelId,
+        levelName: lastPickerInputs.levelName,
+        levelChars: lastPickerInputs.levelChars,
+        stateChars: lastPickerInputs.stateChars,
+        recentlyMasteredChar: lastPickerInputs.recentlyMasteredChar,
+        mismatchDetected: lastPickerInputs.levelChars.join(',') !== lastPickerInputs.stateChars.join(','),
+        invalidCharsInState: lastPickerInputs.stateChars.filter(c => !lastPickerInputs.levelChars.includes(c)),
+        currentCharInvalid: currentChar ? !lastPickerInputs.levelChars.includes(currentChar) : false,
+        pointsSnapshot: lastPickerInputs.pointsSnapshot
+      } : null
     };
     
     // Format as JSON with pretty printing
@@ -1106,7 +1158,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     recentlyMasteredCharRef,
     responseTimes,
     mistakesMap,
-    localCharPointsRef
+    localCharPointsRef,
+    lastPickerInputs // Add lastPickerInputs to the dependency array
   ]);
   
   // State for copy button status
