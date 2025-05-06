@@ -75,6 +75,19 @@ const Zen: React.FC = () => {
     };
   }, []); // Empty dependency array = only run on mount and unmount
 
+  // Add a keyboard event handler for Tab to clear
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        setText('');
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className={styles.container}>
       <textarea
@@ -83,6 +96,7 @@ const Zen: React.FC = () => {
         readOnly
         placeholder="Freestyle here..."
       />
+      <div className={styles.hint}>Press Tab to clear</div>
     </div>
   );
 };
