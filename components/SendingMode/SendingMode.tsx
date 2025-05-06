@@ -29,7 +29,10 @@ const SendingMode: React.FC = () => {
   const [morseOutput, setMorseOutput] = useState('');
   const [feedbackState, setFeedbackState] = useState<'none' | 'correct' | 'incorrect'>('none');
   const [incorrectChar, setIncorrectChar] = useState('');
+  
+  // Use both state and ref for strike count to ensure consistency
   const [strikeCount, setStrikeCount] = useState(0);
+  const strikeCountRef = useRef(0);
   const [responseTimes, setResponseTimes] = useState<CharTiming[]>([]);
   const [mistakesMap, setMistakesMap] = useState<Record<string, number>>({});
   const [testResults, setTestResults] = useState<{
@@ -70,8 +73,33 @@ const SendingMode: React.FC = () => {
   
   // Get current level (directly using the find result, like TrainingMode)
   const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
+  
+  // Use refs for checkpoint info to ensure consistency
+  const isCheckpointRef = useRef<boolean>(false);
+  const strikeLimitRef = useRef<number | undefined>(undefined);
+  
+  // Set isCheckpointRef and strikeLimitRef when level changes
+  useEffect(() => {
+    if (currentLevel) {
+      isCheckpointRef.current = currentLevel.type === 'checkpoint';
+      strikeLimitRef.current = isCheckpointRef.current ? currentLevel.strikeLimit : undefined;
+      console.log(`[DEBUG] Level ${currentLevel.id} loaded: isCheckpoint=${isCheckpointRef.current}, strikeLimit=${strikeLimitRef.current}`);
+    }
+  }, [currentLevel]);
+  
+  // Also keep the non-ref versions for React rendering
   const isCheckpoint = currentLevel?.type === 'checkpoint';
   const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
+  
+  // Log information about the current level for debugging
+  useEffect(() => {
+    if (currentLevel) {
+      console.log('[DEBUG] Current level loaded:', currentLevel.id);
+      console.log('[DEBUG] Level type:', currentLevel.type);
+      console.log('[DEBUG] Is checkpoint:', isCheckpoint);
+      console.log('[DEBUG] Strike limit:', strikeLimit);
+    }
+  }, [currentLevel, isCheckpoint, strikeLimit]);
   
   // Debug logging to monitor character points in refs and state
   useEffect(() => {
@@ -448,13 +476,32 @@ const SendingMode: React.FC = () => {
       updateLocalPoints(targetChar, newPoints);
       
       // Properly enforce the checkpoint strike rule
-      if (isCheckpoint && strikeLimit) {
-        const newStrikeCount = strikeCount + 1;
+      console.log(`[DEBUG] Checking checkpoint - isCheckpoint: ${isCheckpoint}, strikeLimit: ${strikeLimit}`);
+      console.log(`[DEBUG] Checking checkpoint REFS - isCheckpointRef: ${isCheckpointRef.current}, strikeLimitRef: ${strikeLimitRef.current}`);
+      
+      // Use ref values for more reliable checking
+      if (isCheckpointRef.current && strikeLimitRef.current) {
+        console.log(`[DEBUG] We are in a checkpoint level with strike limit of ${strikeLimitRef.current}`);
+        
+        // Use ref for immediate access and increment both ref and state
+        const newStrikeCount = strikeCountRef.current + 1;
+        strikeCountRef.current = newStrikeCount;
+        
+        console.log(`[SendingMode] Incorrect answer in checkpoint level. Strike ${newStrikeCount}/${strikeLimitRef.current}`);
         setStrikeCount(newStrikeCount);
         
-        if (newStrikeCount >= strikeLimit) {
+        if (newStrikeCount >= strikeLimitRef.current) {
           console.log('[SendingMode] Strike limit reached! Failing test.');
-          finishTest(false);
+          
+          // Clear any existing feedback timer before finishing
+          if (feedbackTimerRef.current !== null) {
+            clearTimeout(feedbackTimerRef.current);
+          }
+          
+          // Show the incorrect feedback for a moment before finishing
+          feedbackTimerRef.current = window.setTimeout(() => {
+            finishTest(false);
+          }, 1000);
           return;
         }
       }
@@ -533,6 +580,7 @@ const SendingMode: React.FC = () => {
     setFeedbackState('none');
     setIncorrectChar('');
     setStrikeCount(0);
+    strikeCountRef.current = 0; // Reset strike count ref
     setResponseTimes([]);
     setMistakesMap({});
     setTestResults(null);
@@ -546,11 +594,16 @@ const SendingMode: React.FC = () => {
     // Start the test in the AppState
     startTest();
     
+    // Log if this is a checkpoint level with strikes
+    if (isCheckpoint && strikeLimit) {
+      console.log(`[SendingMode] Starting checkpoint level with ${strikeLimit} strikes allowed`);
+    }
+    
     // Need a slight delay to ensure state is updated
     setTimeout(() => {
       nextQuestion();
     }, 100);
-  }, [startTest, nextQuestion]);
+  }, [startTest, nextQuestion, isCheckpoint, strikeLimit]);
   
   // Clean restart with time recording
   const startTestAndRecordTime = useCallback(() => {
@@ -569,6 +622,7 @@ const SendingMode: React.FC = () => {
     setFeedbackState('none');
     setIncorrectChar('');
     setStrikeCount(0);
+    strikeCountRef.current = 0; // Reset strike count ref
     setResponseTimes([]);
     setMistakesMap({});
     setTestResults(null);
@@ -669,6 +723,7 @@ const SendingMode: React.FC = () => {
     setFeedbackState('none');
     setIncorrectChar('');
     setStrikeCount(0);
+    strikeCountRef.current = 0; // Reset strike count ref
     setResponseTimes([]);
     setMistakesMap({});
     
@@ -768,11 +823,20 @@ const SendingMode: React.FC = () => {
               {Array.from({ length: strikeLimit }).map((_, i) => (
                 <span 
                   key={i} 
-                  className={`${styles.strike} ${i < strikeCount ? styles.used : ''}`}
+                  className={`${styles.strike} ${i < strikeCountRef.current ? styles.used : ''}`}
                 >
                   ✕
                 </span>
               ))}
+            </div>
+          )}
+          
+          {/* Debug indicator for checkpoint status */}
+          {isDevelopmentRef.current && (
+            <div style={{ position: 'absolute', top: 0, right: 0, background: 'black', color: 'white', padding: '3px', fontSize: '10px' }}>
+              Checkpoint: {isCheckpointRef.current ? 'YES' : 'no'}<br />
+              Strike Limit: {strikeLimitRef.current || 'none'}<br />
+              Current Strikes: {strikeCountRef.current}
             </div>
           )}
           
