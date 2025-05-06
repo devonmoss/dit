@@ -5,6 +5,45 @@ import { AppStateProvider } from '../../contexts/AppStateContext';
 import { selectNextCharacter } from '../../utils/characterSelection';
 import { trainingLevels } from '../../utils/levels';
 
+// Mock Supabase client
+jest.mock('../../utils/supabase', () => ({
+  supabaseClient: {
+    auth: {
+      getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: jest.fn().mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } })
+    },
+    from: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      upsert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      then: jest.fn().mockImplementation(cb => cb({ data: [], error: null }))
+    })
+  }
+}));
+
+// Mock AuthContext
+jest.mock('../../contexts/AuthContext', () => {
+  const React = require('react');
+  
+  return {
+    ...jest.requireActual('../../contexts/AuthContext'),
+    useAuth: () => ({
+      user: null,
+      session: null,
+      isLoading: false,
+      signInWithPassword: jest.fn(),
+      signOut: jest.fn(),
+      signUp: jest.fn()
+    }),
+    AuthProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+  };
+});
+
 // Mock useIambicKeyer hook
 jest.mock('../../hooks/useIambicKeyer', () => {
   return {
@@ -115,7 +154,7 @@ jest.mock('../../contexts/AppStateContext', () => {
       setMode: jest.fn(),
       setTestType: jest.fn()
     }),
-    AppStateProvider: ({ children }) => <div>{children}</div>
+    AppStateProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
   };
 });
 
@@ -214,7 +253,7 @@ describe('SendingMode Component', () => {
     // Check results
     expect(screen.getByTestId('very_fast').textContent).toBe('1');
     expect(screen.getByTestId('right_at_min').textContent).toBe('1');
-    expect(parseFloat(screen.getByTestId('middle').textContent)).toBeCloseTo(0.5, 1);
+    expect(parseFloat(screen.getByTestId('middle').textContent || '0')).toBeCloseTo(0.5, 1);
     expect(screen.getByTestId('right_at_max').textContent).toBe('0');
     expect(screen.getByTestId('very_slow').textContent).toBe('0');
   });
@@ -298,17 +337,17 @@ describe('SendingMode Component', () => {
     // Wait for results
     waitFor(() => {
       // Check that only level 1 characters (e, t) appear in level 1 results
-      const level1Chars = screen.getByTestId('level1-chars').textContent.split(',');
+      const level1Chars = screen.getByTestId('level1-chars').textContent?.split(',') || [];
       expect(level1Chars.every(c => ['e', 't'].includes(c))).toBe(true);
       
       // Check that only level 2 characters appear in level 2 results
-      const level2Chars = screen.getByTestId('level2-chars').textContent.split(',');
-      const level2Set = new Set(trainingLevels.find(l => l.id === 'level-2').chars);
+      const level2Chars = screen.getByTestId('level2-chars').textContent?.split(',') || [];
+      const level2Set = new Set(trainingLevels.find(l => l.id === 'level-2')?.chars || []);
       expect(level2Chars.every(c => level2Set.has(c))).toBe(true);
       
       // Check that only level 4 characters appear in level 4 results
-      const level4Chars = screen.getByTestId('level4-chars').textContent.split(',');
-      const level4Set = new Set(trainingLevels.find(l => l.id === 'level-4').chars);
+      const level4Chars = screen.getByTestId('level4-chars').textContent?.split(',') || [];
+      const level4Set = new Set(trainingLevels.find(l => l.id === 'level-4')?.chars || []);
       expect(level4Chars.every(c => level4Set.has(c))).toBe(true);
     });
   });
@@ -316,15 +355,15 @@ describe('SendingMode Component', () => {
   // Test for level switching behavior
   test('updates character set when level changes', async () => {
     // Create a context wrapper with controllable state
-    const TestWrapper = ({ children }) => {
+    const TestWrapper = ({ children }: { children: React.ReactNode }) => {
       const [state, setState] = React.useState({
         selectedLevelId: 'level-1',
-        chars: trainingLevels.find(l => l.id === 'level-1').chars,
+        chars: trainingLevels.find(l => l.id === 'level-1')?.chars || [],
         testActive: false,
-        charPoints: {}
+        charPoints: {} as Record<string, number>
       });
       
-      const selectLevel = (id) => {
+      const selectLevel = (id: string) => {
         const level = trainingLevels.find(l => l.id === id);
         if (level) {
           setState({
@@ -385,7 +424,7 @@ describe('SendingMode Component', () => {
     };
     
     // Create a simplified SendingMode-like component for testing
-    const SimplifiedSendingMode = ({ appState }) => {
+    const SimplifiedSendingMode = ({ appState }: { appState: any }) => {
       const [currentChar, setCurrentChar] = React.useState('');
       
       // Mock the pickNextChar function similarly to SendingMode
@@ -399,7 +438,7 @@ describe('SendingMode Component', () => {
       };
       
       // Handle level change - similar to SendingMode
-      const changeLevel = (levelId) => {
+      const changeLevel = (levelId: string) => {
         appState.selectLevel(levelId);
       };
       
@@ -429,10 +468,34 @@ describe('SendingMode Component', () => {
       );
     };
     
+    // Create a context mock value
+    const mockContextValue = {
+      state: {
+        selectedLevelId: 'level-1',
+        chars: trainingLevels.find(l => l.id === 'level-1')?.chars || [],
+        testActive: false,
+        charPoints: {} as Record<string, number>
+      },
+      selectLevel: jest.fn(),
+      startTest: jest.fn(),
+      startTestWithLevelId: jest.fn(),
+      endTest: jest.fn(),
+      updateCharPoints: jest.fn(),
+      saveResponseTimes: jest.fn(),
+      getCurrentLevel: jest.fn(),
+      markLevelCompleted: jest.fn(),
+      setWpm: jest.fn(),
+      setVolume: jest.fn(),
+      setSendWpm: jest.fn(),
+      setTheme: jest.fn(),
+      setMode: jest.fn(),
+      setTestType: jest.fn()
+    };
+
     // Render with test wrapper
     render(
       <TestWrapper>
-        <SimplifiedSendingMode />
+        <SimplifiedSendingMode appState={mockContextValue} />
       </TestWrapper>
     );
     
@@ -448,8 +511,8 @@ describe('SendingMode Component', () => {
     expect(screen.getByTestId('level-id').textContent).toBe('level-2');
     
     // Character set should include level 2 chars
-    const level2Chars = trainingLevels.find(l => l.id === 'level-2').chars;
-    const displayedChars = screen.getByTestId('chars').textContent.split(',');
+    const level2Chars = trainingLevels.find(l => l.id === 'level-2')?.chars || [];
+    const displayedChars = screen.getByTestId('chars').textContent?.split(',') || [];
     expect(displayedChars.length).toBe(level2Chars.length);
     expect(displayedChars.every(c => level2Chars.includes(c))).toBe(true);
     
@@ -460,7 +523,7 @@ describe('SendingMode Component', () => {
     
     // Current char should be from level 2
     await waitFor(() => {
-      const currentChar = screen.getByTestId('current-char').textContent;
+      const currentChar = screen.getByTestId('current-char').textContent || '';
       expect(level2Chars.includes(currentChar)).toBe(true);
     });
     
@@ -473,8 +536,8 @@ describe('SendingMode Component', () => {
     expect(screen.getByTestId('level-id').textContent).toBe('level-4');
     
     // Character set should include level 4 chars
-    const level4Chars = trainingLevels.find(l => l.id === 'level-4').chars;
-    const updatedChars = screen.getByTestId('chars').textContent.split(',');
+    const level4Chars = trainingLevels.find(l => l.id === 'level-4')?.chars || [];
+    const updatedChars = screen.getByTestId('chars').textContent?.split(',') || [];
     expect(updatedChars.length).toBe(level4Chars.length);
     expect(updatedChars.every(c => level4Chars.includes(c))).toBe(true);
   });
