@@ -918,24 +918,179 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           padding: '10px',
           fontSize: '12px',
           zIndex: 9999,
-          maxWidth: '350px',
-          maxHeight: '300px',
-          overflow: 'auto'
+          maxWidth: '500px',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          border: '1px solid #666'
         }}>
-          <div>Level ID: {state.selectedLevelId}</div>
-          <div>Level Name: {currentLevel?.name || 'Unknown'}</div>
-          <div>Characters: {state.chars.join(', ')}</div>
-          <div>Test Active: {state.testActive ? 'Yes' : 'No'}</div>
-          <div>Current Char: {currentChar || '(none)'}</div>
-          <div>
-            <div>Mastery:</div>
-            <ul style={{margin: '5px 0', paddingLeft: '20px'}}>
-              {state.chars.map(c => (
-                <li key={c}>
-                  {c}: {state.charPoints[c] || 0}/{TARGET_POINTS}
-                </li>
-              ))}
-            </ul>
+          <div style={{fontWeight: 'bold', marginBottom: '5px', fontSize: '14px', borderBottom: '1px solid #555', paddingBottom: '5px'}}>
+            COMPLETE STATE DIAGNOSTICS
+          </div>
+          
+          <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+            <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(0,50,0,0.2)'}}>
+              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>AppState Context</div>
+              <div>Level ID: <span style={{color: '#8fff8f'}}>{state.selectedLevelId}</span></div>
+              <div>Level Name: <span style={{color: '#8fff8f'}}>{currentLevel?.name || 'Unknown'}</span></div>
+              <div>Test Active: <span style={{color: '#8fff8f'}}>{state.testActive ? 'Yes' : 'No'}</span></div>
+              <div style={{marginTop: '5px'}}>
+                <div style={{fontWeight: 'bold'}}>Chars from AppState:</div>
+                <div style={{color: '#8fff8f'}}>{state.chars.join(', ')}</div>
+              </div>
+              <div style={{marginTop: '5px'}}>
+                <div style={{fontWeight: 'bold'}}>Points from AppState:</div>
+                <div>
+                  {Object.entries(state.charPoints).length > 0 ? (
+                    <table style={{borderCollapse: 'collapse', width: '100%'}}>
+                      <thead>
+                        <tr>
+                          <th style={{textAlign: 'left', padding: '2px', borderBottom: '1px solid #444'}}>Char</th>
+                          <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>Points</th>
+                          <th style={{textAlign: 'center', padding: '2px', borderBottom: '1px solid #444'}}>Mastered</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(state.charPoints).map(([char, points]) => (
+                          <tr key={char}>
+                            <td style={{padding: '1px'}}>{char}</td>
+                            <td style={{textAlign: 'right', padding: '1px'}}>{points.toFixed(2)}</td>
+                            <td style={{textAlign: 'center', padding: '1px'}}>{points >= TARGET_POINTS ? '✅' : '❌'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <span style={{color: '#aaa', fontStyle: 'italic'}}>No points recorded</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(50,0,0,0.2)'}}>
+              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>Local Component State</div>
+              <div>Current Char: <span style={{color: '#ff8f8f'}}>{currentChar || '(none)'}</span></div>
+              <div>Current Char Ref: <span style={{color: '#ff8f8f'}}>{currentCharRef.current || '(none)'}</span></div>
+              <div>Feedback State: <span style={{color: '#ff8f8f'}}>{feedbackState}</span></div>
+              <div>Test Start Time: <span style={{color: '#ff8f8f'}}>{testStartTime ? new Date(testStartTime).toISOString() : 'Not started'}</span></div>
+              <div>Char Start Time: <span style={{color: '#ff8f8f'}}>{charStartTime ? new Date(charStartTime).toISOString() : 'Not started'}</span></div>
+              <div>Char Start Time Ref: <span style={{color: '#ff8f8f'}}>{charStartTimeRef.current ? new Date(charStartTimeRef.current).toISOString() : 'Not set'}</span></div>
+              <div>Recently Mastered: <span style={{color: '#ff8f8f'}}>{recentlyMasteredCharRef.current || 'None'}</span></div>
+              <div>Response Times: <span style={{color: '#ff8f8f'}}>{responseTimes.length} records</span></div>
+              
+              <div style={{marginTop: '5px'}}>
+                <div style={{fontWeight: 'bold'}}>Local Points Tracking:</div>
+                <div>
+                  {Object.keys(localCharPointsRef.current).length > 0 ? (
+                    <table style={{borderCollapse: 'collapse', width: '100%'}}>
+                      <thead>
+                        <tr>
+                          <th style={{textAlign: 'left', padding: '2px', borderBottom: '1px solid #444'}}>Char</th>
+                          <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>Local</th>
+                          <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>AppState</th>
+                          <th style={{textAlign: 'center', padding: '2px', borderBottom: '1px solid #444'}}>Match?</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(localCharPointsRef.current).map(([char, points]) => {
+                          const appPoints = state.charPoints[char] || 0;
+                          const match = Math.abs(points - appPoints) < 0.001; // Float comparison
+                          return (
+                            <tr key={char}>
+                              <td style={{padding: '1px'}}>{char}</td>
+                              <td style={{textAlign: 'right', padding: '1px'}}>{points.toFixed(2)}</td>
+                              <td style={{textAlign: 'right', padding: '1px'}}>{appPoints.toFixed(2)}</td>
+                              <td style={{textAlign: 'center', padding: '1px', color: match ? 'green' : 'red'}}>{match ? '✓' : '✗'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <span style={{color: '#aaa', fontStyle: 'italic'}}>No local points recorded</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(0,0,50,0.2)'}}>
+              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>Response History</div>
+              <div>
+                {responseTimes.length > 0 ? (
+                  <table style={{borderCollapse: 'collapse', width: '100%'}}>
+                    <thead>
+                      <tr>
+                        <th style={{textAlign: 'left', padding: '2px', borderBottom: '1px solid #444'}}>#</th>
+                        <th style={{textAlign: 'left', padding: '2px', borderBottom: '1px solid #444'}}>Char</th>
+                        <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>Time (s)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {responseTimes.map((rt, idx) => (
+                        <tr key={idx}>
+                          <td style={{padding: '1px'}}>{idx + 1}</td>
+                          <td style={{padding: '1px'}}>{rt.char}</td>
+                          <td style={{textAlign: 'right', padding: '1px'}}>{rt.time.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <span style={{color: '#aaa', fontStyle: 'italic'}}>No responses recorded</span>
+                )}
+              </div>
+            </div>
+            
+            <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(50,50,0,0.2)'}}>
+              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>Level Definition</div>
+              {currentLevel ? (
+                <>
+                  <div>ID: <span style={{color: '#ffff8f'}}>{currentLevel.id}</span></div>
+                  <div>Name: <span style={{color: '#ffff8f'}}>{currentLevel.name}</span></div>
+                  <div>Type: <span style={{color: '#ffff8f'}}>{currentLevel.type}</span></div>
+                  <div>Chars from level definition: <span style={{color: '#ffff8f'}}>{currentLevel.chars.join(', ')}</span></div>
+                  {isCheckpoint && (
+                    <div>Strike Limit: <span style={{color: '#ffff8f'}}>{strikeLimit}</span></div>
+                  )}
+                </>
+              ) : (
+                <span style={{color: '#aaa', fontStyle: 'italic'}}>No level definition found</span>
+              )}
+            </div>
+            
+            {/* Mismatch detection */}
+            {currentLevel && (
+              (() => {
+                const levelChars = currentLevel.chars;
+                const stateChars = state.chars;
+                const sameLength = levelChars.length === stateChars.length;
+                const allPresent = levelChars.every(c => stateChars.includes(c));
+                const noExtras = stateChars.every(c => levelChars.includes(c));
+                const match = sameLength && allPresent && noExtras;
+                
+                if (!match) {
+                  return (
+                    <div style={{
+                      border: '2px solid #f00', 
+                      padding: '5px', 
+                      backgroundColor: 'rgba(100,0,0,0.5)',
+                      marginTop: '10px',
+                      color: '#faa'
+                    }}>
+                      <div style={{fontWeight: 'bold', color: '#f55'}}>⚠️ CHARACTER MISMATCH DETECTED!</div>
+                      <div>Level chars: {levelChars.join(', ')}</div>
+                      <div>State chars: {stateChars.join(', ')}</div>
+                      <div>Same length: {sameLength ? 'Yes' : 'No'}</div>
+                      <div>All present: {allPresent ? 'Yes' : 'No'}</div>
+                      <div>No extras: {noExtras ? 'Yes' : 'No'}</div>
+                      <div style={{marginTop: '5px', fontStyle: 'italic', color: '#fcc'}}>
+                        This indicates a state synchronization problem
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()
+            )}
           </div>
         </div>
       )}
