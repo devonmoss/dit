@@ -213,8 +213,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     };
   }, []);
   
-  // Ensure level characters are correctly loaded on mount
+  // Ensure level characters are correctly loaded on mount - with recursion protection
+  const levelCheckRef = useRef(false);
   useEffect(() => {
+    // Skip validation if we've already corrected character set
+    if (levelCheckRef.current) return;
+    
     if (currentLevel && state.chars.length > 0) {
       // Check if current state.chars matches the expected level's chars
       const { valid, missing, extra } = validateLevelCharacters(
@@ -235,9 +239,17 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           logger.warn(`Extra characters present: ${extra.join(', ')}`);
         }
         
+        // Set flag to prevent recursion
+        levelCheckRef.current = true;
+        
         // Re-select the level to fix characters
         logger.info(`Calling selectLevel with ID: ${state.selectedLevelId}`);
         selectLevel(state.selectedLevelId);
+        
+        // Reset flag after a delay
+        setTimeout(() => {
+          levelCheckRef.current = false;
+        }, 1000);
       } else {
         logger.debug('Characters match correctly');
       }
@@ -253,8 +265,17 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     );
   }, [state.selectedLevelId, state.chars, state.testActive]);
   
-  // Monitor level changes
+  // Monitor level changes - with recursion protection
+  const levelChangeRef = useRef<string | null>(null);
   useEffect(() => {
+    // Skip if we're already handling this level change
+    if (levelChangeRef.current === state.selectedLevelId) {
+      return;
+    }
+    
+    // Track current level to prevent recursive handling
+    levelChangeRef.current = state.selectedLevelId;
+    
     // This effect runs whenever the level ID changes
     logger.info(`Level changed to: ${state.selectedLevelId}`);
     
@@ -267,11 +288,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     logger.debug(`Level change: ${level.name} (${level.id})`);
     
-    // Check if we need to force a level selection
+    // Just log if characters don't match (we handle fixing in other useEffect)
     const { valid } = validateLevelCharacters(state.selectedLevelId, state.chars);
-    
     if (!valid) {
-      logger.warn(`Level change detected but characters don't match - may need forced reselection`);
+      logger.warn(`Level change detected but characters don't match`);
     }
     
     // Always reset localCharPoints when level changes to prevent state carryover
@@ -279,23 +299,23 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     logger.debug('Reset localCharPoints due to level change');
   }, [state.selectedLevelId, state.chars, charPoints]);
     
-  // Synchronization effect to force consistent level ID on mount
+  // Synchronization effect to force consistent level ID on mount (once only)
+  const initialSyncRef = useRef(false);
   useEffect(() => {
-    // This is a critical synchronization check that runs on mount
-    if (!state.selectedLevelId) return;
+    // Only run this synchronization once on component mount
+    if (initialSyncRef.current || !state.selectedLevelId) return;
     
-    logger.info(`Critical level sync check on mount: ${state.selectedLevelId}`);
+    // Mark as initialized to prevent future calls
+    initialSyncRef.current = true;
     
-    // This ensures the level is properly registered with the app state
-    // and all internal state is consistent
-    selectLevel(state.selectedLevelId);
+    logger.info(`One-time level sync on mount: ${state.selectedLevelId}`);
     
     // Reset any local state that could cause problems
     charPoints.resetLocalCharPoints();
     charPoints.setRecentlyMasteredChar(null);
     
-    logger.debug('Performed critical level sync to ensure consistency');
-  }, [selectLevel, charPoints, state.selectedLevelId]); 
+    logger.debug('Performed one-time level sync to ensure consistency');
+  }, [charPoints, state.selectedLevelId]); 
   
   // Keep currentCharRef in sync with currentChar state
   useEffect(() => {
@@ -395,28 +415,44 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Pick next character based on mastery weights
   const pickNextChar = useCallback(() => {
-    // Get level characters using utility function
-    const levelChars = getLevelChars(state.selectedLevelId);
-    logger.debug(`Using ${levelChars.length} characters for level ${state.selectedLevelId}`);
+    // CRITICALLY IMPORTANT: Use currentLevel?.chars directly to ensure we're using the right character set
+    // This ensures we're using the current displayed level's characters, not just what's in state
+    if (!currentLevel) {
+      logger.error('Cannot pick next character: currentLevel is null');
+      return 'e'; // Fallback to a safe default
+    }
+    
+    const levelChars = currentLevel.chars;
+    const levelId = currentLevel.id;
+    
+    logger.debug(`Using ${levelChars.length} characters for level ${levelId}`);
+    
+    // Special validation: ensure we don't present characters not in the current level
+    // This is critical to prevent level-4 characters appearing in level-1
+    const validatedStateChars = state.chars.filter(c => levelChars.includes(c));
+    
+    if (validatedStateChars.length !== state.chars.length) {
+      logger.warn(`State chars mismatch! Filtered ${state.chars.length} to ${validatedStateChars.length}`);
+    }
     
     // Store the inputs for debugging
     setLastPickerInputs({
-      levelId: state.selectedLevelId,
-      levelName: currentLevel?.name || "Direct Lookup",
+      levelId: levelId,
+      levelName: currentLevel.name || "Direct Lookup",
       levelChars: [...levelChars],
-      stateChars: [...state.chars],
+      stateChars: [...validatedStateChars],
       pointsSnapshot: {...state.charPoints},
       recentlyMasteredChar: charPoints.recentlyMasteredChar
     });
     
-    // Use the level character list
+    // Use the current level's character list - NOT the state.selectedLevelId
     return selectNextCharacter(
       levelChars,
       state.charPoints,
       TARGET_POINTS,
       charPoints.recentlyMasteredChar
     );
-  }, [state.selectedLevelId, state.chars, state.charPoints, charPoints.recentlyMasteredChar, currentLevel]);
+  }, [state.chars, state.charPoints, charPoints.recentlyMasteredChar, currentLevel]);
   
   // Finish the test - similar to TrainingMode's finishTest
   const finishTest = useCallback((completed = true) => {
@@ -442,26 +478,46 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   }, [testStartTime, responseTimes, saveResponseTimes, endTest]);
   
   // Present next question - similar to TrainingMode's nextQuestion
+  const verifyRecursionRef = useRef(false);
   const nextQuestion = useCallback(() => {
-    // First verify character set is correct
-    if (!verifyAndFixCharacterSet()) {
-      logger.warn('Character set mismatch detected - fixing before proceeding');
-      // Wait a moment for the fix to apply, then try again
-      setTimeout(() => {
-        nextQuestion();
-      }, 100);
+    // Add recursion protection
+    if (verifyRecursionRef.current) {
+      logger.warn('Avoiding recursive character verification');
       return Promise.resolve();
     }
     
+    // First verify character set is correct
+    if (!verifyAndFixCharacterSet()) {
+      logger.warn('Character set mismatch detected - fixing before proceeding');
+      
+      // Set recursion guard
+      verifyRecursionRef.current = true;
+      
+      // Wait a moment for the fix to apply, then try again
+      setTimeout(() => {
+        verifyRecursionRef.current = false;
+        nextQuestion();
+      }, 500);
+      return Promise.resolve();
+    }
+    
+    // Ensure we have a valid currentLevel
+    if (!currentLevel) {
+      logger.error(`Cannot continue: currentLevel is null`);
+      return Promise.resolve();
+    }
+    
+    // Get the next character using the character selection logic
     const nextChar = pickNextChar();
     logger.debug(`Next question with character: "${nextChar}"`);
     
-    // SAFETY CHECK: Validate the nextChar is actually in the current level's character set
-    const currentLevelChars = getLevelChars(state.selectedLevelId);
+    // CRITICAL SAFETY CHECK: Validate against the current level object's chars
+    // This is the most direct source of truth for what characters should be in this level
+    const currentLevelChars = currentLevel.chars;
     
-    // Check if the selected character is valid for this level
+    // Check if the selected character is valid for the current level
     if (!currentLevelChars.includes(nextChar)) {
-      logger.error(`Character "${nextChar}" not in current level (${state.selectedLevelId}) character set`);
+      logger.error(`Character "${nextChar}" not in current level (${currentLevel.id}) character set`);
       
       // Force select a valid character from the current level
       const validChar = currentLevelChars[0]; // fallback to first char
@@ -512,6 +568,17 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     }
     
     const currentChar = currentCharRef.current;
+    
+    // SAFETY CHECK: Make sure the current character is valid for this level
+    if (currentLevel && !currentLevel.chars.includes(currentChar)) {
+      logger.error(`Current character "${currentChar}" is invalid for level ${currentLevel.id} - resetting`);
+      // Force a valid character selection
+      setCurrentChar('');
+      currentCharRef.current = '';
+      nextQuestion();
+      return;
+    }
+    
     logger.debug(`Keyer decoded: "${char}", target: "${currentChar}"`);
     
     // Calculate response time - use the ref value for reliability
@@ -700,7 +767,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     playErrorSound,
     nextQuestion,
     finishTest,
-    charPoints
+    charPoints,
+    currentLevel
   ]);
   
   // Handle an element (dot/dash) from the keyer
