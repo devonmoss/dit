@@ -103,21 +103,25 @@ const SendingMode: React.FC = () => {
   
   // Debug logging to monitor character points in refs and state
   useEffect(() => {
-    console.log('[DEBUG] Character Points Changed:');
-    console.log('[DEBUG] - In State:', localCharPoints);
-    console.log('[DEBUG] - In Ref:', charPointsRef.current);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[DEBUG] Character Points Changed:');
+      console.log('[DEBUG] - In State:', localCharPoints);
+      console.log('[DEBUG] - In Ref:', charPointsRef.current);
+    }
   }, [localCharPoints]);
   
   // Debug logging for troubleshooting
   useEffect(() => {
-    console.log('---------------------------------------');
-    console.log(`[${new Date().toISOString()}] State Update`);
-    console.log('Level ID:', state.selectedLevelId);
-    console.log('Current Level:', currentLevel);
-    console.log('Level Characters:', currentLevel?.chars);
-    console.log('Local Character Points:', localCharPoints);
-    console.log('testActive:', state.testActive);
-    console.log('---------------------------------------');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('---------------------------------------');
+      console.log(`[${new Date().toISOString()}] State Update`);
+      console.log('Level ID:', state.selectedLevelId);
+      console.log('Current Level:', currentLevel);
+      console.log('Level Characters:', currentLevel?.chars);
+      console.log('Local Character Points:', localCharPoints);
+      console.log('testActive:', state.testActive);
+      console.log('---------------------------------------');
+    }
   }, [state.selectedLevelId, currentLevel, localCharPoints, state.testActive]);
   
   // Initialize local character points from app state when level changes
@@ -348,6 +352,10 @@ const SendingMode: React.FC = () => {
     if (responseTimes.length > 0) {
       saveResponseTimes(responseTimes);
     }
+    
+    // Uninstall keyer to disable key listening
+    console.log('[SendingMode] Uninstalling keyer at end of test');
+    keyerRef.current.uninstall();
     
     // End test
     endTest(completed);
@@ -639,6 +647,10 @@ const SendingMode: React.FC = () => {
     // Clear any pending keyer state
     keyerRef.current.clear();
     
+    // Make sure the keyer is installed and listening for key events
+    console.log('[SendingMode] Installing keyer for new test');
+    keyerRef.current.install();
+    
     // Start the test in the AppState
     startTest();
     
@@ -680,6 +692,10 @@ const SendingMode: React.FC = () => {
     
     // Clear any pending keyer state
     keyerRef.current.clear();
+    
+    // Make sure the keyer is installed and listening for key events
+    console.log('[SendingMode] Installing keyer for new test with level:', levelId);
+    keyerRef.current.install();
     
     // Set test start time
     setTestStartTime(Date.now());
