@@ -70,6 +70,18 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   // Reference to track character points locally
   const localCharPointsRef = useRef<Record<string, number>>({});
   
+  // Pre-declare handleLevelSelection
+  const handleLevelSelection = useCallback((levelId: string) => {
+    console.log(`SendingMode: Explicitly selecting level ${levelId}`);
+    
+    // Reset local state first
+    localCharPointsRef.current = {};
+    recentlyMasteredCharRef.current = null;
+    
+    // Then select the level
+    selectLevel(levelId);
+  }, [selectLevel]);
+  
   // Utility function to verify and fix character sets
   const verifyAndFixCharacterSet = useCallback(() => {
     const level = trainingLevels.find(l => l.id === state.selectedLevelId);
@@ -99,9 +111,14 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Attempt to fix by re-selecting the level
     console.log('🔧 Fixing by re-selecting level:', level.id);
-    selectLevel(level.id);
+    
+    // Reset local character points to ensure clean slate
+    localCharPointsRef.current = {};
+    
+    // Use our custom handler for proper reset
+    handleLevelSelection(level.id);
     return false;
-  }, [state.selectedLevelId, state.chars, selectLevel]);
+  }, [state.selectedLevelId, state.chars, handleLevelSelection]);
   
   // Get current level info
   const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
@@ -518,6 +535,23 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           return;
         }
 
+        // CRITICAL FIX: Double-check that we're using the correct level
+        console.log(`🔍 LEVEL VERIFICATION FOR COMPLETION CHECK:`);
+        console.log(`- Selected level ID: ${state.selectedLevelId}`);
+        console.log(`- Level found: ${currentLevelDef.id} (${currentLevelDef.name})`);
+        
+        // Ensure we're using the correct level - use the CURRENT level ID from state
+        const verifiedLevelDef = trainingLevels.find(level => level.id === state.selectedLevelId);
+        if (!verifiedLevelDef) {
+          console.error(`CRITICAL ERROR: Could not find current level with ID ${state.selectedLevelId}`);
+          nextQuestion();
+          return;
+        }
+        
+        // ALWAYS use the verified level definition from here
+        const levelChars = verifiedLevelDef.chars;
+        console.log(`- Using verified level chars: ${levelChars.join(', ')}`);
+
         // Create a simulated updated charPoints object that includes the most recent update
         const updatedCharPoints = { ...state.charPoints, [successChar]: newPoints };
         
@@ -527,10 +561,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           mergedPoints[char] = Math.max(mergedPoints[char] || 0, points);
         });
         
-        // Use the level definition's character list directly
-        const levelChars = currentLevelDef.chars;
-        
-        // Debug point tracking
+        // Debug point tracking ONLY for characters in THIS level
         console.log('🧮 Mastery points for completion check:');
         levelChars.forEach(char => {
           const statePoints = updatedCharPoints[char] || 0;
@@ -557,15 +588,37 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           allMastered
         });
         
-        // Only finish the test if ALL characters are mastered AND we've been running
-        // for a sufficient amount of time/iterations to ensure it's not just a glitch
-        if (allMastered && responseTimes.length >= levelChars.length) {
-          console.log(`All characters mastered after ${responseTimes.length} responses - completing level`);
+        // Only finish the test if:
+        // 1. All characters are mastered using the merged points
+        // 2. We've had at least 2x the number of characters in responses (to ensure we've practiced each char multiple times)
+        // 3. We've practiced each character at least once (use response times to check)
+        const minRequiredResponses = levelChars.length * 2;
+        const hasEnoughResponses = responseTimes.length >= minRequiredResponses;
+        
+        // Check if we've encountered each character at least once
+        const encounteredChars = new Set(responseTimes.map(rt => rt.char));
+        const allCharsEncountered = levelChars.every(c => encounteredChars.has(c));
+        
+        console.log(`Level completion diagnostics:`, {
+          allMastered,
+          responseCount: responseTimes.length,
+          minRequiredResponses,
+          hasEnoughResponses,
+          encounteredChars: Array.from(encounteredChars),
+          allCharsEncountered
+        });
+        
+        if (allMastered && hasEnoughResponses && allCharsEncountered) {
+          console.log(`✅ All requirements met - completing level:
+            - All ${levelChars.length} characters mastered
+            - ${responseTimes.length}/${minRequiredResponses} responses received
+            - All characters encountered at least once`);
           finishTest(true);
         } else {
-          if (allMastered) {
-            console.log(`All characters appear mastered but only have ${responseTimes.length} responses - continuing`);
-          }
+          console.log(`⏳ Continuing test - completion requirements not yet met:
+            - All mastered: ${allMastered ? 'Yes' : 'No'}
+            - Enough responses: ${hasEnoughResponses ? 'Yes' : 'No'} (${responseTimes.length}/${minRequiredResponses})
+            - All chars practiced: ${allCharsEncountered ? 'Yes' : 'No'}`);
           nextQuestion();
         }
       }, FEEDBACK_DELAY);
@@ -720,18 +773,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     handleStartTest();
   }, [handleStartTest]);
   
-  // Handle level selection with explicit reset
-  const handleLevelSelection = useCallback((levelId: string) => {
-    console.log(`SendingMode: Explicitly selecting level ${levelId}`);
-    
-    // Reset local state first
-    localCharPointsRef.current = {};
-    recentlyMasteredCharRef.current = null;
-    
-    // Then select the level
-    selectLevel(levelId);
-  }, [selectLevel]);
-  
   // Handle test starting with level ID
   const startTestWithExplicitLevel = useCallback((levelId: string) => {
     console.log(`SendingMode: Starting test with explicit level ID: ${levelId}`);
@@ -772,7 +813,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Start the first question after a short delay to ensure state is updated
       setTimeout(() => {
         nextQuestion();
-      }, 100);
+      }, 50);
     }, 50); // Small delay to ensure level selection completes
   }, [selectLevel, startTestWithLevelId, nextQuestion]);
   
