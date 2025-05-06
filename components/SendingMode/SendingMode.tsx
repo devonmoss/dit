@@ -608,23 +608,74 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Handle next level
   const handleNextLevel = useCallback(() => {
+    console.log("🔄 onNext triggered in SendingMode");
     setShowResults(false);
     
     // Find next level
     const currentLevelIndex = trainingLevels.findIndex(l => l.id === state.selectedLevelId);
+    console.log('Moving from level index:', currentLevelIndex);
     
     if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
       // Move to next level
       const nextLevel = trainingLevels[currentLevelIndex + 1];
-      selectLevel(nextLevel.id);
+      console.log('Current level chars:', trainingLevels[currentLevelIndex].chars);
+      console.log('Next level chars:', nextLevel.chars);
+      console.log('New characters:', nextLevel.chars.filter(c => !trainingLevels[currentLevelIndex].chars.includes(c)));
       
-      // Start with new level
-      setTimeout(startSendingTest, 300);
+      // Use the function that takes the level ID directly
+      console.log("🔄 Starting test with explicit level ID:", nextLevel.id);
+      
+      // Reset relevant state (this will happen in startSendingTest too, but we're doing it early)
+      setSendingActive(false);
+      setMorseOutput('');
+      setFeedbackState('none');
+      setIncorrectChar('');
+      setStrikeCount(0);
+      strikeCountRef.current = 0;
+      setResponseTimes([]);
+      setMistakesMap({});
+      
+      // Set timing
+      testStartTimeRef.current = Date.now();
+      
+      // IMPORTANT: Start the test with the explicit next level ID
+      // This is the key difference - we don't call selectLevel first
+      startTestWithLevelId(nextLevel.id);
+      
+      // Then start our test with a slight delay
+      setTimeout(() => {
+        // Set active ref to true immediately - this will be available to callbacks
+        activeRef.current = true;
+        
+        // Clear any pending keyer state
+        console.log(`SendingMode: Clearing keyer state`);
+        keyer.clear();
+        
+        // Reset UI state
+        setSendingActive(true);
+        
+        // Reset performance tracking
+        setCompleted(true);
+        
+        // Initialize our points tracking ref
+        charPointsRef.current = {};
+        
+        // Pick and set the first character
+        const firstChar = pickNextChar();
+        console.log(`SendingMode: Setting first character: "${firstChar}"`);
+        setSendCurrentChar(firstChar);
+        currentCharRef.current = firstChar;  // Set the ref immediately
+        
+        // Set start time for the first character
+        charStartTimeRef.current = Date.now();
+        
+        console.log(`SendingMode: Test started, first character is "${firstChar}", waiting for input`);
+      }, 300);
     } else {
       // Restart current level if at end
       startSendingTest();
     }
-  }, [state.selectedLevelId, selectLevel, startSendingTest]);
+  }, [state.selectedLevelId, startTestWithLevelId, keyer, pickNextChar, startSendingTest]);
   
   // Using useRef for client detection to avoid hydration mismatches
   useEffect(() => {
@@ -724,7 +775,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           </div>
           
           <div className={styles.sendingInstructions}>
-            Use ← key or Left Ctrl for <span className={styles.dot}>·</span> and → key or Right Ctrl for <span className={styles.dash}>–</span>
+            Use ← key for <span className={styles.dot}>·</span> and → key for <span className={styles.dash}>–</span>
           </div>
           
           <div className={styles.keyerDisplay}>
@@ -738,7 +789,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       ) : (
         <div className={styles.startContainer}>
           <div className={styles.modeDescription}>
-            Use left and right arrow keys or left and right Ctrl keys to mimic an iambic paddle and send morse code characters.
+            Use left and right arrow keys to mimic an iambic paddle and send morse code characters.
           </div>
           <button 
             className="shared-start-button"

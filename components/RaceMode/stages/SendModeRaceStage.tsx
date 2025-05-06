@@ -257,7 +257,7 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
             {!showCorrectIndicator ? currentChar : ''}
           </div>
           <div className={styles.typingInstructions}>
-            Use ← key or Left Ctrl for · (dot) and → key or Right Ctrl for – (dash) to send the character displayed
+            Use ← key for · (dit) and → key for – (dah) to send the character displayed
           </div>
         </div>
         
@@ -268,7 +268,7 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
               <div className={styles.keyerOutput}>{keyerOutput}</div>
             </div>
             <div className={styles.hint}>
-              Left arrow (←) or Left Ctrl = DOT, Right arrow (→) or Right Ctrl = DASH
+              Left arrow (←) = dit, Right arrow (→) = dah
             </div>
           </div>
         </div>
