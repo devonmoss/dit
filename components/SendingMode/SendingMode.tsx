@@ -8,6 +8,15 @@ import { trainingLevels } from '../../utils/levels';
 import { useIambicKeyer } from '../../hooks/useIambicKeyer';
 import { selectNextCharacter } from '../../utils/characterSelection';
 
+// Debug logger that only logs in development mode
+const DEBUG_MODE = process.env.NODE_ENV === 'development';
+const logger = {
+  info: (...args: any[]) => DEBUG_MODE && console.log(...args),
+  warn: (...args: any[]) => DEBUG_MODE && console.warn(...args),
+  error: (...args: any[]) => console.error(...args), // Always log errors
+  debug: (...args: any[]) => DEBUG_MODE && console.debug(...args),
+};
+
 // Constants
 const TARGET_POINTS = 3;
 const FEEDBACK_DELAY = 750; // ms
@@ -44,16 +53,16 @@ const LEVEL_CHAR_MAP: Record<string, string[]> = {
   'level-13': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l', 'p', 'j', 'b', 'x', 'c', 'y', 'z', 'q']
 };
 
-// NEW: Function to get level characters without relying on find()
+// Function to get level characters without relying on find()
 const getLevelChars = (levelId: string): string[] => {
   // Use our direct map first
   if (LEVEL_CHAR_MAP[levelId]) {
-    console.log(`🔐 Using DIRECT LEVEL CHAR MAP for ${levelId}: ${LEVEL_CHAR_MAP[levelId].join(', ')}`);
+    logger.debug(`Using direct level char map for ${levelId}`);
     return LEVEL_CHAR_MAP[levelId];
   }
   
-  // Fallback to finding in trainingLevels (but log a warning)
-  console.warn(`⚠️ No direct mapping for level ${levelId} - falling back to find()`);
+  // Fallback to finding in trainingLevels
+  logger.warn(`No direct mapping for level ${levelId} - falling back to find()`);
   const level = trainingLevels.find(l => l.id === levelId);
   return level ? level.chars : [];
 };
@@ -113,7 +122,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Pre-declare handleLevelSelection
   const handleLevelSelection = useCallback((levelId: string) => {
-    console.log(`SendingMode: Explicitly selecting level ${levelId}`);
+    logger.info(`Explicitly selecting level ${levelId}`);
     
     // Reset local state first
     localCharPointsRef.current = {};
@@ -125,10 +134,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Utility function to verify and fix character sets
   const verifyAndFixCharacterSet = useCallback(() => {
-    // CRITICAL FIX: Use direct character mapping instead of find()
+    // Use direct character mapping instead of find()
     const levelChars = getLevelChars(state.selectedLevelId);
     if (levelChars.length === 0) {
-      console.error(`🛑 Could not find characters for level ID: ${state.selectedLevelId}`);
+      logger.error(`Could not find characters for level ID: ${state.selectedLevelId}`);
       return false;
     }
     
@@ -140,18 +149,18 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     const noExtras = stateChars.every(c => levelChars.includes(c));
     
     if (sameLength && allPresent && noExtras) {
-      console.log('✅ Character sets match, no fix needed');
+      logger.debug('Character sets match, no fix needed');
       return true;
     }
     
     // Log the mismatch
-    console.warn('⚠️ Character set mismatch detected:');
-    console.warn(`- Level: ${state.selectedLevelId}`);
-    console.warn(`- Level chars (${levelChars.length}): ${levelChars.join(', ')}`);
-    console.warn(`- State chars (${stateChars.length}): ${stateChars.join(', ')}`);
+    logger.warn('Character set mismatch detected:');
+    logger.warn(`- Level: ${state.selectedLevelId}`);
+    logger.warn(`- Level chars (${levelChars.length}): ${levelChars.join(', ')}`);
+    logger.warn(`- State chars (${stateChars.length}): ${stateChars.join(', ')}`);
     
     // Attempt to fix by re-selecting the level
-    console.log('🔧 Fixing by re-selecting level:', state.selectedLevelId);
+    logger.info(`Fixing by re-selecting level: ${state.selectedLevelId}`);
     
     // Reset local character points to ensure clean slate
     localCharPointsRef.current = {};
@@ -178,16 +187,16 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         gain.connect(ctx.destination);
         gainNodeRef.current = gain;
         
-        console.log('Audio context initialized successfully');
+        logger.debug('Audio context initialized successfully');
       } catch (e) {
-        console.error('Failed to initialize audio context:', e);
+        logger.error('Failed to initialize audio context:', e);
       }
     }
     
     return () => {
       stopSound();
       if (audioContextRef.current) {
-        audioContextRef.current.close().catch(e => console.error('Error closing audio context:', e));
+        audioContextRef.current.close().catch(e => logger.error('Error closing audio context:', e));
       }
     };
   }, []);
@@ -204,65 +213,54 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       const allCharsPresent = levelChars.every(c => stateChars.includes(c));
       const noExtraChars = stateChars.every(c => levelChars.includes(c));
       
-      console.log('🔍 LEVEL CHARS CHECK:');
-      console.log('- Level ID:', state.selectedLevelId);
-      console.log('- Level name:', currentLevel.name);
-      console.log('- Expected chars:', levelChars);
-      console.log('- Actual chars:', stateChars);
-      console.log('- Same length?', sameLength);
-      console.log('- All present?', allCharsPresent);
-      console.log('- No extras?', noExtraChars);
+      logger.debug(`Level chars check: Level ID: ${state.selectedLevelId}`);
       
       if (!(sameLength && allCharsPresent && noExtraChars)) {
-        console.warn('⚠️ Characters mismatch detected - reselecting level');
+        logger.warn('Characters mismatch detected - reselecting level');
         
         // Find missing characters
         const missing = levelChars.filter(c => !stateChars.includes(c));
         if (missing.length > 0) {
-          console.error("❌ Missing characters:", missing);
+          logger.error(`Missing characters: ${missing.join(', ')}`);
         }
         
         // Find extra characters
         const extra = stateChars.filter(c => !levelChars.includes(c));
         if (extra.length > 0) {
-          console.warn("⚠️ Extra characters present:", extra);
+          logger.warn(`Extra characters present: ${extra.join(', ')}`);
         }
         
         // Re-select the level to fix characters
-        console.log('📢 Calling selectLevel with ID:', state.selectedLevelId);
+        logger.info(`Calling selectLevel with ID: ${state.selectedLevelId}`);
         selectLevel(state.selectedLevelId);
       } else {
-        console.log('✅ Characters match correctly');
+        logger.debug('Characters match correctly');
       }
     }
   }, [currentLevel, state.chars, state.selectedLevelId, selectLevel]);
   
-  // Debug logging
+  // Debug logging for state changes
   useEffect(() => {
-    console.log('---------------------------------------');
-    console.log(`[${new Date().toISOString()}] State Update`);
-    console.log('Level ID:', state.selectedLevelId);
-    console.log('Characters in state:', JSON.stringify(state.chars));
-    console.log('testActive:', state.testActive);
-    console.log('---------------------------------------');
+    logger.debug(
+      `State Update - Level: ${state.selectedLevelId}, ` +
+      `Chars: [${state.chars.join(',')}], ` +
+      `TestActive: ${state.testActive}`
+    );
   }, [state.selectedLevelId, state.chars, state.testActive]);
   
   // Monitor level changes
   useEffect(() => {
     // This effect runs whenever the level ID changes
-    console.log(`🔄 LEVEL CHANGED to: ${state.selectedLevelId}`);
+    logger.info(`Level changed to: ${state.selectedLevelId}`);
     
     // Find the level object
     const level = trainingLevels.find(l => l.id === state.selectedLevelId);
     if (!level) {
-      console.error(`❌ Could not find level with ID: ${state.selectedLevelId}`);
+      logger.error(`Could not find level with ID: ${state.selectedLevelId}`);
       return;
     }
     
-    console.log(`📊 Level change diagnostics:`);
-    console.log(`- New level: ${level.name} (${level.id})`);
-    console.log(`- Level characters: ${level.chars.join(', ')}`);
-    console.log(`- Current state.chars: ${state.chars.join(', ')}`);
+    logger.debug(`Level change: ${level.name} (${level.id})`);
     
     // Check if we need to force a level selection
     const needsReselection = 
@@ -271,21 +269,20 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       !state.chars.every(c => level.chars.includes(c));
     
     if (needsReselection) {
-      console.warn(`⚠️ Level change detected but characters don't match - may need forced reselection`);
+      logger.warn(`Level change detected but characters don't match - may need forced reselection`);
     }
     
     // Always reset localCharPointsRef when level changes to prevent state carryover
     localCharPointsRef.current = {};
-    console.log('Reset localCharPointsRef due to level change');
+    logger.debug('Reset localCharPointsRef due to level change');
   }, [state.selectedLevelId, state.chars]);
     
-  // NEW: Add a synchronization effect to force consistent level ID
+  // Synchronization effect to force consistent level ID on mount
   useEffect(() => {
     // This is a critical synchronization check that runs on mount
     if (!state.selectedLevelId) return;
     
-    console.log(`🔐 CRITICAL LEVEL SYNC CHECK ON MOUNT`);
-    console.log(`Current level ID: ${state.selectedLevelId}`);
+    logger.info(`Critical level sync check on mount: ${state.selectedLevelId}`);
     
     // This ensures the level is properly registered with the app state
     // and all internal state is consistent
@@ -295,20 +292,20 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     localCharPointsRef.current = {};
     recentlyMasteredCharRef.current = null;
     
-    console.log(`🔒 Performed critical level sync to ensure consistency`);
+    logger.debug('Performed critical level sync to ensure consistency');
   }, []); // Empty dependency array - only runs once on mount
   
   // Keep currentCharRef in sync with currentChar state
   useEffect(() => {
     currentCharRef.current = currentChar;
-    console.log(`Updated currentCharRef to: "${currentChar}"`);
+    logger.debug(`Updated currentCharRef to: "${currentChar}"`);
   }, [currentChar]);
   
   // Keep charStartTimeRef in sync with charStartTime state
   useEffect(() => {
     if (charStartTime) {
       charStartTimeRef.current = charStartTime;
-      console.log(`Synced charStartTimeRef with state: ${charStartTime}`);
+      logger.debug(`Synced charStartTimeRef: ${charStartTime}`);
     }
   }, [charStartTime]);
   
@@ -351,7 +348,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         }
       }, 150);
     } catch (e) {
-      console.error('Error playing error sound:', e);
+      logger.error('Error playing error sound:', e);
     }
   }, [stopSound]);
   
@@ -380,7 +377,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         }
       }, duration);
     } catch (e) {
-      console.error('Error playing element:', e);
+      logger.error('Error playing element:', e);
     }
   }, [state.sendWpm, stopSound]);
   
@@ -396,9 +393,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Pick next character based on mastery weights
   const pickNextChar = useCallback(() => {
-    // CRITICAL FIX: Bypass the problematic trainingLevels.find() and use direct map
+    // Bypass the problematic trainingLevels.find() and use direct map
     const levelChars = getLevelChars(state.selectedLevelId);
-    console.log(`🛡️ DIRECT LEVEL LOOKUP: Using ${levelChars.length} characters for level ${state.selectedLevelId}: ${levelChars.join(', ')}`);
+    logger.debug(`Using ${levelChars.length} characters for level ${state.selectedLevelId}`);
     
     // Store the inputs for debugging
     setLastPickerInputs({
@@ -410,7 +407,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       recentlyMasteredChar: recentlyMasteredCharRef.current
     });
     
-    // IMPORTANT: Use the DIRECT level character list
+    // Use the direct level character list
     return selectNextCharacter(
       levelChars,
       state.charPoints,
@@ -427,7 +424,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Save response times
     if (responseTimes.length > 0) {
-      console.log(`SendingMode: Saving ${responseTimes.length} response times`);
+      logger.debug(`Saving ${responseTimes.length} response times`);
       saveResponseTimes(responseTimes);
     }
     
@@ -435,7 +432,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     endTest(completed);
     
     // Set test results
-    console.log(`SendingMode: Test ${completed ? 'completed' : 'ended'}, elapsed time: ${elapsedSec}s`);
+    logger.info(`Test ${completed ? 'completed' : 'ended'}, elapsed time: ${elapsedSec.toFixed(1)}s`);
     setTestResults({
       completed,
       elapsedTime: elapsedSec
@@ -444,12 +441,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Monitor charPoints updates
   useEffect(() => {
-    console.log('💾 Syncing character points with local tracking');
+    logger.debug('Syncing character points with local tracking');
     
     // Get the current level definition
     const currentLevelDef = trainingLevels.find(level => level.id === state.selectedLevelId);
     if (!currentLevelDef) {
-      console.error(`Couldn't find level with ID: ${state.selectedLevelId} for points sync`);
+      logger.error(`Couldn't find level with ID: ${state.selectedLevelId} for points sync`);
       return;
     }
     
@@ -460,7 +457,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       
       // Only update if there's a difference and state has higher points
       if (statePoints > localPoints) {
-        console.log(`Syncing points for "${char}": local ${localPoints} → state ${statePoints}`);
+        logger.debug(`Syncing points for "${char}": local ${localPoints} → state ${statePoints}`);
         localCharPointsRef.current[char] = statePoints;
       }
     });
@@ -470,7 +467,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const nextQuestion = useCallback(() => {
     // First verify character set is correct
     if (!verifyAndFixCharacterSet()) {
-      console.log('⚠️ Character set mismatch detected - fixing before proceeding');
+      logger.warn('Character set mismatch detected - fixing before proceeding');
       // Wait a moment for the fix to apply, then try again
       setTimeout(() => {
         nextQuestion();
@@ -479,28 +476,28 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     }
     
     const nextChar = pickNextChar();
-    console.log(`SendingMode: Next question with character: "${nextChar}"`);
+    logger.debug(`Next question with character: "${nextChar}"`);
     
     // SAFETY CHECK: Validate the nextChar is actually in the current level's character set
     const currentLevelChars = getLevelChars(state.selectedLevelId);
     
     // Check if the selected character is valid for this level
     if (!currentLevelChars.includes(nextChar)) {
-      console.error(`🚨 ERROR: Character "${nextChar}" not in current level (${state.selectedLevelId}) character set: ${currentLevelChars.join(', ')}`);
+      logger.error(`Character "${nextChar}" not in current level (${state.selectedLevelId}) character set`);
       
       // Force select a valid character from the current level
       const validChar = currentLevelChars[0]; // fallback to first char
-      console.log(`🛠️ CORRECTION: Replacing invalid character "${nextChar}" with valid character "${validChar}"`);
+      logger.warn(`Replacing invalid character "${nextChar}" with valid character "${validChar}"`);
       
       // Set the corrected character
       setCurrentChar(validChar);
       currentCharRef.current = validChar;
-      console.log(`Directly set currentCharRef to corrected character: "${validChar}"`);
+      logger.debug(`Set currentCharRef to corrected character: "${validChar}"`);
     } else {
       // Normal flow for valid character
       setCurrentChar(nextChar);
       currentCharRef.current = nextChar;
-      console.log(`Directly set currentCharRef to: "${nextChar}"`);
+      logger.debug(`Set currentCharRef to: "${nextChar}"`);
     }
     
     setMorseOutput('');
@@ -510,12 +507,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     const now = Date.now();
     setCharStartTime(now);
     charStartTimeRef.current = now; // Set the ref value too
-    console.log(`Setting character start time: ${now} (also set in ref)`);
+    logger.debug(`Setting character start time: ${now}`);
     
     // Log point information for this character for debugging
     const currentStatePoints = state.charPoints[currentChar] || 0;
     const currentLocalPoints = localCharPointsRef.current[currentChar] || 0;
-    console.log(`Current character "${currentChar}" points - state: ${currentStatePoints}, local: ${currentLocalPoints}`);
+    logger.debug(`Character "${currentChar}" points - state: ${currentStatePoints}, local: ${currentLocalPoints}`);
     
     // Return a promise that resolves immediately to match TrainingMode's flow
     return Promise.resolve();
@@ -525,21 +522,20 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const handleCharacter = useCallback((char: string) => {
     // Skip if no current char to match against
     if (!currentCharRef.current) {
-      console.log(`SendingMode: Character "${char}" detected but currentCharRef is empty - ignoring`);
+      logger.debug(`Character "${char}" detected but currentCharRef is empty - ignoring`);
       return;
     }
     
     const currentChar = currentCharRef.current;
-    console.log(`SendingMode: Keyer decoded: "${char}", target: "${currentChar}"`);
-    console.log(`SendingMode: Comparing ${char.toLowerCase()} === ${currentChar.toLowerCase()}: ${char.toLowerCase() === currentChar.toLowerCase()}`);
+    logger.debug(`Keyer decoded: "${char}", target: "${currentChar}"`);
     
     // Calculate response time - use the ref value for reliability
     const responseTime = charStartTimeRef.current ? (Date.now() - charStartTimeRef.current) : 0;
-    console.log(`Response time calculation: ${Date.now()} - ${charStartTimeRef.current} = ${responseTime}ms`);
+    logger.debug(`Response time: ${responseTime}ms`);
     
     // Check if character matches
     if (char.toLowerCase() === currentChar.toLowerCase()) {
-      console.log(`SendingMode: CORRECT match - "${char}" matches "${currentChar}"`);
+      logger.debug(`CORRECT match - "${char}" matches "${currentChar}"`);
       
       // Store the successful character
       const successChar = currentChar;
@@ -551,7 +547,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       
       // Calculate points based on response time
       const points = calculatePointsForTime(responseTime);
-      console.log(`SendingMode: Awarding ${points.toFixed(2)} points for response time: ${responseTime}ms`);
+      logger.debug(`Awarding ${points.toFixed(2)} points for response time: ${responseTime}ms`);
       
       // Add to response times log
       setResponseTimes(prev => [...prev, { char: successChar, time: responseTime / 1000 }]);
@@ -565,17 +561,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       
       // If there's a mismatch, log a warning
       if (currentPoints !== localPoints) {
-        console.warn(`⚠️ Point mismatch for "${successChar}": state=${currentPoints}, local=${localPoints}. Using ${effectiveCurrentPoints}.`);
+        logger.warn(`Point mismatch for "${successChar}": state=${currentPoints}, local=${localPoints}. Using ${effectiveCurrentPoints}.`);
       }
       
       const newPoints = effectiveCurrentPoints + points;
       
-      console.log(`[POINTS DEBUG] Updating points for ${successChar}:`);
-      console.log(`  - Current points from state: ${currentPoints}`);
-      console.log(`  - Current points from local: ${localPoints}`);
-      console.log(`  - Using effective points: ${effectiveCurrentPoints}`);
-      console.log(`  - Points being added: ${points}`);
-      console.log(`  - New total points: ${newPoints}`);
+      logger.debug(`Updating points for ${successChar}: ${effectiveCurrentPoints} → ${newPoints}`);
       
       // Check if character will reach mastery with this addition
       const willCompleteMastery = newPoints >= TARGET_POINTS && effectiveCurrentPoints < TARGET_POINTS;
@@ -583,11 +574,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // If this character will now be mastered, track it to avoid immediate reselection
       if (willCompleteMastery) {
         recentlyMasteredCharRef.current = successChar;
+        logger.info(`Character "${successChar}" mastered!`);
       }
-      
-      console.log(`🔢 CALLING updateCharPoints for "${successChar}":`);
-      console.log(`  - Before: state.charPoints["${successChar}"] = ${state.charPoints[successChar] || 0}`);
-      console.log(`  - Setting to: ${newPoints}`);
       
       // Update our local state
       localCharPointsRef.current[successChar] = newPoints;
@@ -595,38 +583,29 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Call the context function
       updateCharPoints(successChar, newPoints);
       
-      // Log immediately after (though state won't update immediately)
-      console.log(`  - After call: state.charPoints["${successChar}"] = ${state.charPoints[successChar] || 0}`);
-      console.log(`  - Local tracking: localCharPointsRef.current["${successChar}"] = ${localCharPointsRef.current[successChar]}`);
-      
-      console.log(`Character ${successChar} updated: ${effectiveCurrentPoints} → ${newPoints} points (${points} added, response time: ${(responseTime / 1000).toFixed(2)}s)`);
-      
       // Delay before next question or finishing - like TrainingMode
       setTimeout(() => {
         // Get the current level definition for accurate character list
         const currentLevelDef = trainingLevels.find(level => level.id === state.selectedLevelId);
         if (!currentLevelDef) {
-          console.error(`SendingMode: Couldn't find level with ID: ${state.selectedLevelId} for completion check`);
+          logger.error(`Couldn't find level with ID: ${state.selectedLevelId} for completion check`);
           nextQuestion();
           return;
         }
 
-        // CRITICAL FIX: Double-check that we're using the correct level
-        console.log(`🔍 LEVEL VERIFICATION FOR COMPLETION CHECK:`);
-        console.log(`- Selected level ID: ${state.selectedLevelId}`);
-        console.log(`- Level found: ${currentLevelDef.id} (${currentLevelDef.name})`);
+        // Double-check that we're using the correct level
+        logger.debug(`Verifying level for completion check: ${state.selectedLevelId}`);
         
         // Ensure we're using the correct level - use the CURRENT level ID from state
         const verifiedLevelDef = trainingLevels.find(level => level.id === state.selectedLevelId);
         if (!verifiedLevelDef) {
-          console.error(`CRITICAL ERROR: Could not find current level with ID ${state.selectedLevelId}`);
+          logger.error(`Could not find current level with ID ${state.selectedLevelId}`);
           nextQuestion();
           return;
         }
         
-        // ALWAYS use the verified level definition from here
+        // Use the verified level definition
         const levelChars = verifiedLevelDef.chars;
-        console.log(`- Using verified level chars: ${levelChars.join(', ')}`);
 
         // Create a simulated updated charPoints object that includes the most recent update
         const updatedCharPoints = { ...state.charPoints, [successChar]: newPoints };
@@ -637,21 +616,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           mergedPoints[char] = Math.max(mergedPoints[char] || 0, points);
         });
         
-        // Debug point tracking ONLY for characters in THIS level
-        console.log('🧮 Mastery points for completion check:');
-        levelChars.forEach(char => {
-          const statePoints = updatedCharPoints[char] || 0;
-          const localPoints = localCharPointsRef.current[char] || 0;
-          const mergedValue = mergedPoints[char] || 0;
-          const isMastered = mergedValue >= TARGET_POINTS;
-          console.log(`  - ${char}: ${statePoints}/${TARGET_POINTS} (state), ${localPoints}/${TARGET_POINTS} (local), ${mergedValue}/${TARGET_POINTS} (merged) ${isMastered ? '✅' : '❌'}`);
-        });
+        // Track mastery status for debug
+        logger.debug('Checking mastery status for completion');
         
         // Check if all characters are mastered using the merged points
         const allMastered = levelChars.every(c => {
           const points = mergedPoints[c] || 0;
-          const isMastered = points >= TARGET_POINTS;
-          return isMastered;
+          return points >= TARGET_POINTS;
         });
         
         // Check if only partial mastery (old Level 1 chars are mastered, but new Level 2 chars are not)
@@ -673,28 +644,15 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           return (mergedPoints[c] || 0) > 0;
         });
         
-        console.log('Completion check:', { 
-          levelId: state.selectedLevelId,
-          levelName: currentLevelDef.name,
-          levelChars,
-          oldChars,
-          newChars,
-          oldCharsMastered,
-          newCharsMastered,
-          newCharsAttempted,
-          statePointsSource: 'AppState',
-          localPointsSource: 'LocalRef',
-          mergedPoints,
-          allMastered
-        });
+        logger.debug(`Completion status: allMastered=${allMastered}, oldCharsMastered=${oldCharsMastered}, newCharsAttempted=${newCharsAttempted}`);
         
         // NEVER end the test unless all characters have been mastered
         // Also ensure at least one new character has been attempted before finishing
         if (allMastered) {
-          console.log(`✅ Level complete - all ${levelChars.length} characters are mastered`);
+          logger.info(`Level complete - all ${levelChars.length} characters are mastered`);
           finishTest(true);
         } else if (oldCharsMastered && !newCharsAttempted) {
-          console.log(`⚠️ Only old characters mastered but new characters not yet attempted - forcing new character selection`);
+          logger.info(`Only old characters mastered but new characters not attempted - forcing new character selection`);
           
           // Force selection of a new character by skipping the next question
           // Temporarily set recentlyMasteredCharRef to all old characters to force new char selection
@@ -705,7 +663,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
             
             // Force select a new character from the level
             const forceChar = newChars[0];
-            console.log(`🔄 Forcing selection of new character: "${forceChar}" for next question`);
+            logger.debug(`Forcing selection of new character: "${forceChar}" for next question`);
             
             // Set current character directly
             setCurrentChar(forceChar);
@@ -729,13 +687,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
             nextQuestion();
           }
         } else {
-          console.log(`⏳ Continuing test - not all characters mastered yet`);
+          logger.debug(`Continuing test - not all characters mastered yet`);
           nextQuestion();
         }
       }, FEEDBACK_DELAY);
     } else {
       // Incorrect character
-      console.log(`SendingMode: INCORRECT match - "${char}" does not match "${currentChar}"`);
+      logger.debug(`INCORRECT match - "${char}" does not match "${currentChar}"`);
       
       // Store the character that was incorrectly entered for display
       setIncorrectChar(char);
@@ -746,7 +704,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Update mistakes map
       setMistakesMap(prev => {
         const count = prev[currentChar] || 0;
-        console.log(`SendingMode: Increasing mistake count for "${currentChar}" from ${count} to ${count + 1}`);
+        logger.debug(`Increasing mistake count for "${currentChar}" from ${count} to ${count + 1}`);
         return { ...prev, [currentChar]: count + 1 };
       });
       
@@ -758,12 +716,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Calculate the new, reduced point value
       const newPoints = Math.max(0, effectiveCurrentPoints * INCORRECT_PENALTY);
       
-      console.log(`🔻 Reducing points for "${currentChar}":`);
-      console.log(`  - Current points from state: ${currentPoints}`);
-      console.log(`  - Current points from local: ${localPoints}`);
-      console.log(`  - Using effective points: ${effectiveCurrentPoints}`);
-      console.log(`  - Multiplier: ${INCORRECT_PENALTY}`);
-      console.log(`  - New total points: ${newPoints}`);
+      logger.debug(`Reducing points for "${currentChar}": ${effectiveCurrentPoints} → ${newPoints}`);
       
       // Update our local tracking
       localCharPointsRef.current[currentChar] = newPoints;
@@ -774,11 +727,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Properly enforce the checkpoint strike rule
       if (isCheckpoint && strikeLimit) {
         const newStrikeCount = strikeCount + 1;
-        console.log(`SendingMode: Increasing strike count to ${newStrikeCount} (limit: ${strikeLimit})`);
+        logger.debug(`Increasing strike count to ${newStrikeCount} (limit: ${strikeLimit})`);
         setStrikeCount(newStrikeCount);
         
         if (newStrikeCount >= strikeLimit) {
-          console.log(`SendingMode: Strike limit reached (${newStrikeCount}/${strikeLimit}) - ending test`);
+          logger.info(`Strike limit reached (${newStrikeCount}/${strikeLimit}) - ending test`);
           finishTest(false);
           return;
         }
@@ -788,7 +741,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       playErrorSound();
       
       // Clear feedback after delay but KEEP the same character
-      console.log(`SendingMode: Incorrect match - keeping same character, clearing feedback in ${FEEDBACK_DELAY}ms`);
+      logger.debug(`Incorrect match - keeping same character, clearing feedback after delay`);
       setTimeout(() => {
         setFeedbackState('none');
         // Reset morse output so they can try again
@@ -822,7 +775,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Create the keyer with stabilized callbacks
   const onWpmChange = useCallback((newWpm: number) => {
-    console.log('WPM changed to', newWpm);
+    logger.debug(`WPM changed to ${newWpm}`);
   }, []);
   
   // Create the keyer
@@ -844,11 +797,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Start test - similar to TrainingMode's handleStartTest
   const handleStartTest = useCallback(() => {
-    console.log('SendingMode: Starting test - initializing state');
+    logger.info('Starting test - initializing state');
     
-    // CRITICAL FIX: Force level consistency before starting
+    // Force level consistency before starting
     const currentLevelId = state.selectedLevelId;
-    console.log(`🔄 FORCING LEVEL SYNC before test start: ${currentLevelId}`);
+    logger.debug(`Forcing level sync before test start: ${currentLevelId}`);
     selectLevel(currentLevelId);
     
     // Reset all state
@@ -876,7 +829,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     // Set test start time
     const now = Date.now();
     setTestStartTime(now);
-    console.log(`Setting test start time: ${now}`);
+    logger.debug(`Setting test start time: ${now}`);
     
     // Start the first question after a short delay to ensure state is updated
     setTimeout(() => {
@@ -891,7 +844,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Handle test starting with level ID
   const startTestWithExplicitLevel = useCallback((levelId: string) => {
-    console.log(`SendingMode: Starting test with explicit level ID: ${levelId}`);
+    logger.info(`Starting test with explicit level ID: ${levelId}`);
     
     // Reset all state
     setCurrentChar('');
@@ -912,18 +865,18 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     // Clear any pending keyer state
     keyerRef.current.clear();
     
-    // IMPORTANT: First explicitly select the level to ensure characters are loaded correctly
-    console.log(`🔑 Explicitly selecting level ${levelId} before starting test`);
+    // First explicitly select the level to ensure characters are loaded correctly
+    logger.debug(`Explicitly selecting level ${levelId} before starting test`);
     handleLevelSelection(levelId);
     
     // Set test start time
     const now = Date.now();
     setTestStartTime(now);
-    console.log(`Setting test start time: ${now}`);
+    logger.debug(`Setting test start time: ${now}`);
     
-    // THEN start the test with the level ID
+    // Then start the test with the level ID
     setTimeout(() => {
-      console.log(`🚀 Now starting test with level ID: ${levelId}`);
+      logger.debug(`Starting test with level ID: ${levelId}`);
       startTestWithLevelId(levelId);
       
       // Start the first question after a short delay to ensure state is updated
@@ -931,17 +884,17 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         nextQuestion();
       }, 50);
     }, 50); // Small delay to ensure level selection completes
-  }, [selectLevel, startTestWithLevelId, nextQuestion]);
+  }, [selectLevel, startTestWithLevelId, nextQuestion, handleLevelSelection]);
   
   // Install keyer once on mount
   useEffect(() => {
     if (isBrowser) {
-      console.log('Installing keyer (on mount only)');
+      logger.debug('Installing keyer (on mount only)');
       keyer.install();
     }
     
     return () => {
-      console.log('Uninstalling keyer (on unmount only)');
+      logger.debug('Uninstalling keyer (on unmount only)');
       keyerRef.current.uninstall();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -970,15 +923,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Handle next level - aligned with TrainingMode
   const handleNextLevel = useCallback(() => {
-    console.log("🔄 onNext triggered in SendingMode");
+    logger.info("Moving to next level");
     setTestResults(null);
-    
-    // Log current character points before moving
-    console.log("🔢 Current character points before level change:");
-    const pointsArray = Object.entries(state.charPoints);
-    pointsArray.forEach(([char, points]) => {
-      console.log(`  - ${char}: ${points}`);
-    });
     
     // Reset state
     setCurrentChar('');
@@ -994,30 +940,24 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Get current level index
     const currentLevelIndex = trainingLevels.findIndex(l => l.id === state.selectedLevelId);
-    console.log('Moving from level index:', currentLevelIndex);
+    logger.debug(`Moving from level index: ${currentLevelIndex}`);
     
     if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
       // Move to next level
       const nextLevel = trainingLevels[currentLevelIndex + 1];
-      console.log('Current level chars:', trainingLevels[currentLevelIndex].chars);
-      console.log('Next level chars:', nextLevel.chars);
-      console.log('New characters:', nextLevel.chars.filter(c => !trainingLevels[currentLevelIndex].chars.includes(c)));
-      
-      // Use the function that takes the level ID directly
-      console.log(" Starting test with explicit level ID:", nextLevel.id);
+      logger.debug(`Moving to level: ${nextLevel.id} (${nextLevel.name})`);
       
       // Set the test start time
       const now = Date.now();
       setTestStartTime(now);
-      console.log(`Setting test start time for next level: ${now}`);
       
       // Following TrainingMode's approach: First select the level, then start test
-      console.log("🔑 First selecting level:", nextLevel.id);
+      logger.debug(`Selecting level: ${nextLevel.id}`);
       handleLevelSelection(nextLevel.id);
       
       // Then start the test with a delay
       setTimeout(() => {
-        console.log("🚀 Now starting test with level:", nextLevel.id);
+        logger.debug(`Starting test with level: ${nextLevel.id}`);
         startTestWithLevelId(nextLevel.id);
         
         // Then set up the first question
@@ -1027,10 +967,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       }, 100);
     } else {
       // Restart current level if at end
-      console.log("🔁 Restarting current level (at end of levels)");
+      logger.debug("Restarting current level (at end of levels)");
       startTestAndRecordTime();
     }
-  }, [state.selectedLevelId, selectLevel, startTestWithLevelId, nextQuestion, startTestAndRecordTime]);
+  }, [state.selectedLevelId, handleLevelSelection, startTestWithLevelId, nextQuestion, startTestAndRecordTime]);
   
   // Calculate progress - mastered characters
   const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
@@ -1116,7 +1056,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           setTimeout(() => setCopyStatus('idle'), 2000);
         })
         .catch(err => {
-          console.error('Failed to copy debug state:', err);
+          logger.error('Failed to copy debug state:', err);
           setCopyStatus('error');
           setTimeout(() => setCopyStatus('idle'), 2000);
         });
@@ -1139,7 +1079,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           setTimeout(() => setCopyStatus('idle'), 2000);
         }
       } catch (err: unknown) {
-        console.error('Failed to copy debug state:', err);
+        logger.error('Failed to copy debug state:', err);
         setCopyStatus('error');
         setTimeout(() => setCopyStatus('idle'), 2000);
       }
