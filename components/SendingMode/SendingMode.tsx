@@ -58,6 +58,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   // Component state
   const activeRef = useRef(false);
   const currentCharRef = useRef('');
+  const strikeCountRef = useRef(0);  // Add a ref to track strikes
   
   // Get current level info
   const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
@@ -232,8 +233,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     activeRef.current = false;
     currentCharRef.current = '';  // Clear current character ref
     
-    // Ensure we only process this once
-    if (!sendingActive) {
+    // Check if we need to force completing the test (for strike limit)
+    const isStrikeOut = isCheckpoint && strikeLimit && strikeCountRef.current >= strikeLimit;
+    
+    // Only check sendingActive if this isn't from a strike-out
+    if (!sendingActive && !isStrikeOut) {
       console.log(`SendingMode: finishTest called but sendingActive is already false - ignoring`);
       return;
     }
@@ -268,8 +272,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setTestResults(results);
     
     // Show results
+    console.log(`SendingMode: Showing results summary page`);
     setShowResults(true);
-  }, [state.chars, responseTimes, saveResponseTimes, endTest, sendingActive]);
+  }, [state.chars, responseTimes, saveResponseTimes, endTest, sendingActive, isCheckpoint, strikeLimit]);
   
   // Handle a character from the keyer
   const handleCharacter = useCallback((char: string) => {
@@ -295,6 +300,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     // Check if character matches
     if (char.toLowerCase() === currentCharRef.current.toLowerCase()) {
       console.log(`SendingMode: CORRECT match - "${char}" matches "${currentCharRef.current}"`);
+      
+      // Clear the current character from the display
+      setSendCurrentChar('');
+      // Also clear the ref for consistency
+      const successChar = currentCharRef.current;
+      currentCharRef.current = '';
+      
       // Correct character!
       setFeedbackState('correct');
       
@@ -303,17 +315,17 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       console.log(`SendingMode: Awarding ${points.toFixed(2)} points for response time: ${responseTime}ms`);
       
       // Add to response times log
-      setResponseTimes(prev => [...prev, { char: currentCharRef.current, time: responseTime / 1000 }]);
+      setResponseTimes(prev => [...prev, { char: successChar, time: responseTime / 1000 }]);
       
       // Update character points
-      const currentPoints = state.charPoints[currentCharRef.current] || 0;
+      const currentPoints = state.charPoints[successChar] || 0;
       const newPoints = currentPoints + points;
-      updateCharPoints(currentCharRef.current, newPoints);
+      updateCharPoints(successChar, newPoints);
       
       // Check if this completes mastery
       const willComplete = newPoints >= TARGET_POINTS;
       const othersMastered = state.chars
-        .filter(c => c !== currentCharRef.current)
+        .filter(c => c !== successChar)
         .every(c => (state.charPoints[c] || 0) >= TARGET_POINTS);
       
       if (willComplete && othersMastered) {
@@ -332,29 +344,44 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     } else {
       // Incorrect character
       console.log(`SendingMode: INCORRECT match - "${char}" does not match "${currentCharRef.current}"`);
+      
+      // Store the character that was incorrectly entered for display
+      const errorChar = char;
+      // Store the target character (but keep it visible)
+      const targetChar = currentCharRef.current;
+      
+      // Note: We're NOT clearing the current character as requested
+      // The character should remain visible on incorrect entry
+      
+      // Show the incorrect character feedback
       setFeedbackState('incorrect');
-      setIncorrectChar(char);
+      setIncorrectChar(errorChar);
       
       // Update mistakes map
       setMistakesMap(prev => {
-        const count = prev[currentCharRef.current] || 0;
-        console.log(`SendingMode: Increasing mistake count for "${currentCharRef.current}" from ${count} to ${count + 1}`);
-        return { ...prev, [currentCharRef.current]: count + 1 };
+        const count = prev[targetChar] || 0;
+        console.log(`SendingMode: Increasing mistake count for "${targetChar}" from ${count} to ${count + 1}`);
+        return { ...prev, [targetChar]: count + 1 };
       });
       
       // Reduce points
-      const currentPoints = state.charPoints[currentCharRef.current] || 0;
+      const currentPoints = state.charPoints[targetChar] || 0;
       const newPoints = Math.max(0, currentPoints * INCORRECT_PENALTY);
-      console.log(`SendingMode: Reducing points for "${currentCharRef.current}" from ${currentPoints} to ${newPoints}`);
-      updateCharPoints(currentCharRef.current, newPoints);
+      console.log(`SendingMode: Reducing points for "${targetChar}" from ${currentPoints} to ${newPoints}`);
+      updateCharPoints(targetChar, newPoints);
       
-      // Handle checkpoint strikes
+      // Properly enforce the checkpoint strike rule
       if (isCheckpoint && strikeLimit) {
-        const newStrikeCount = strikeCount + 1;
+        strikeCountRef.current += 1;  // Use the ref to track the actual count
+        const newStrikeCount = strikeCountRef.current;
+        console.log(`SendingMode: Increasing strike count to ${newStrikeCount} (limit: ${strikeLimit})`);
         setStrikeCount(newStrikeCount);
         
         if (newStrikeCount >= strikeLimit) {
-          setTimeout(() => finishTest(false), 1000);
+          console.log(`SendingMode: Strike limit reached (${newStrikeCount}/${strikeLimit}) - ending test`);
+          // Call finishTest directly rather than using setTimeout
+          // This ensures the function runs before any other state updates
+          finishTest(false);
           return;
         }
       }
@@ -363,6 +390,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       playErrorSound();
       
       // Show next character after longer delay
+      console.log(`SendingMode: Incorrect match - showing next character in 2000ms`);
       setTimeout(() => {
         setFeedbackState('none');
         showNextChar();
@@ -419,7 +447,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setMorseOutput('');
     setFeedbackState('none');
     setIncorrectChar('');
+    
+    // Explicitly reset strike count to 0
+    console.log('SendingMode: Resetting strike count to 0');
     setStrikeCount(0);
+    strikeCountRef.current = 0;  // Reset the ref too
     
     // Reset performance tracking
     setResponseTimes([]);
