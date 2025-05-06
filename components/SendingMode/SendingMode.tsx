@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, ErrorBoundary } from 'react';
 import styles from './SendingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
 import { isBrowser } from '../../utils/morse';
@@ -7,15 +7,16 @@ import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
 import { trainingLevels } from '../../utils/levels';
 import { useIambicKeyer } from '../../hooks/useIambicKeyer';
 import { selectNextCharacter } from '../../utils/characterSelection';
+import { CharPointsProvider, useCharPoints } from '../../contexts/CharPointsContext';
+import { createLogger } from '../../utils/logger';
+import { getLevelChars, validateLevelCharacters, areAllCharsMastered } from '../../utils/levelUtils';
+import SendingModeDebugPanel from './SendingModeDebugPanel';
+import FeedbackDisplay from './FeedbackDisplay';
+import KeyerDisplay from './KeyerDisplay';
+import CharacterDisplay from './CharacterDisplay';
 
-// Debug logger that only logs in development mode
-const DEBUG_MODE = process.env.NODE_ENV === 'development';
-const logger = {
-  info: (...args: any[]) => DEBUG_MODE && console.log(...args),
-  warn: (...args: any[]) => DEBUG_MODE && console.warn(...args),
-  error: (...args: any[]) => console.error(...args), // Always log errors
-  debug: (...args: any[]) => DEBUG_MODE && console.debug(...args),
-};
+// Create logger instance for this component
+const logger = createLogger('SendingMode');
 
 // Constants
 const TARGET_POINTS = 3;
@@ -36,39 +37,61 @@ interface CharTiming {
   time: number;
 }
 
-// NEW: Direct level mapping to bypass the problematic find() operation
-const LEVEL_CHAR_MAP: Record<string, string[]> = {
-  'level-1': ['e', 't'], 
-  'level-2': ['e', 't', 'a', 'n'],
-  'level-3': ['e', 't', 'a', 'n', 's', 'o'],
-  'level-4': ['e', 't', 'a', 'n', 'i', 'm'],
-  'level-5': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r'],
-  'level-6': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k'],
-  'level-7': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g'],
-  'level-8': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v'],
-  'level-9': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l'],
-  'level-10': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l', 'p', 'j'],
-  'level-11': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l', 'p', 'j', 'b', 'x'],
-  'level-12': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l', 'p', 'j', 'b', 'x', 'c', 'y'],
-  'level-13': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l', 'p', 'j', 'b', 'x', 'c', 'y', 'z', 'q']
+/**
+ * SendingMode component wrapper that provides CharPointsContext
+ */
+const SendingModeWithContext: React.FC<SendingModeProps> = (props) => {
+  return (
+    <CharPointsProvider>
+      <SendingMode {...props} />
+    </CharPointsProvider>
+  );
 };
 
-// Function to get level characters without relying on find()
-const getLevelChars = (levelId: string): string[] => {
-  // Use our direct map first
-  if (LEVEL_CHAR_MAP[levelId]) {
-    logger.debug(`Using direct level char map for ${levelId}`);
-    return LEVEL_CHAR_MAP[levelId];
+/**
+ * Error boundary component for SendingMode
+ */
+class SendingModeErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
   }
-  
-  // Fallback to finding in trainingLevels
-  logger.warn(`No direct mapping for level ${levelId} - falling back to find()`);
-  const level = trainingLevels.find(l => l.id === levelId);
-  return level ? level.chars : [];
-};
 
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    logger.error('SendingMode error boundary caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className={styles.errorContainer}>
+          <h3>Something went wrong with the Sending Mode component</h3>
+          <p>Please try refreshing the page or selecting a different level.</p>
+          <details>
+            <summary>Technical details</summary>
+            <pre>{this.state.error?.message}</pre>
+          </details>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+/**
+ * SendingMode component responsible for iambic keyer practice
+ */
 const SendingMode: React.FC<SendingModeProps> = () => {
   const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel, startTestWithLevelId } = useAppState();
+  const charPoints = useCharPoints();
   
   // Local UI state
   const [currentChar, setCurrentChar] = useState('');
@@ -94,9 +117,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const gainNodeRef = useRef<GainNode | null>(null);
   const oscillatorRef = useRef<OscillatorNode | null>(null);
   
-  // Reference to track recently mastered character
-  const recentlyMasteredCharRef = useRef<string | null>(null);
-  
   // Reference to track current character for callbacks
   const currentCharRef = useRef<string>('');
   
@@ -107,9 +127,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const isClientRef = useRef(false);
   const isDevelopmentRef = useRef(false);
   
-  // Reference to track character points locally
-  const localCharPointsRef = useRef<Record<string, number>>({});
-  
   // New state for character selection debugging
   const [lastPickerInputs, setLastPickerInputs] = useState<{
     levelId: string;
@@ -119,36 +136,36 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     pointsSnapshot: Record<string, number>;
     recentlyMasteredChar: string | null;
   } | null>(null);
+
+  // Get current level info - memoized to prevent recalculation
+  const currentLevel = useMemo(() => {
+    return trainingLevels.find(level => level.id === state.selectedLevelId);
+  }, [state.selectedLevelId]);
+  
+  const isCheckpoint = currentLevel?.type === 'checkpoint';
+  const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
   
   // Pre-declare handleLevelSelection
   const handleLevelSelection = useCallback((levelId: string) => {
     logger.info(`Explicitly selecting level ${levelId}`);
     
-    // Reset local state first
-    localCharPointsRef.current = {};
-    recentlyMasteredCharRef.current = null;
+    // Reset local character points tracking
+    charPoints.resetLocalCharPoints();
+    charPoints.setRecentlyMasteredChar(null);
     
     // Then select the level
     selectLevel(levelId);
-  }, [selectLevel]);
+  }, [selectLevel, charPoints]);
   
   // Utility function to verify and fix character sets
   const verifyAndFixCharacterSet = useCallback(() => {
-    // Use direct character mapping instead of find()
-    const levelChars = getLevelChars(state.selectedLevelId);
-    if (levelChars.length === 0) {
-      logger.error(`Could not find characters for level ID: ${state.selectedLevelId}`);
-      return false;
-    }
+    // Use character utility to validate character set
+    const { valid, missing, extra } = validateLevelCharacters(
+      state.selectedLevelId, 
+      state.chars
+    );
     
-    const stateChars = state.chars;
-    
-    // Check for match
-    const sameLength = levelChars.length === stateChars.length;
-    const allPresent = levelChars.every(c => stateChars.includes(c));
-    const noExtras = stateChars.every(c => levelChars.includes(c));
-    
-    if (sameLength && allPresent && noExtras) {
+    if (valid) {
       logger.debug('Character sets match, no fix needed');
       return true;
     }
@@ -156,24 +173,19 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     // Log the mismatch
     logger.warn('Character set mismatch detected:');
     logger.warn(`- Level: ${state.selectedLevelId}`);
-    logger.warn(`- Level chars (${levelChars.length}): ${levelChars.join(', ')}`);
-    logger.warn(`- State chars (${stateChars.length}): ${stateChars.join(', ')}`);
+    logger.warn(`- Missing chars: ${missing.join(', ')}`);
+    logger.warn(`- Extra chars: ${extra.join(', ')}`);
     
     // Attempt to fix by re-selecting the level
     logger.info(`Fixing by re-selecting level: ${state.selectedLevelId}`);
     
-    // Reset local character points to ensure clean slate
-    localCharPointsRef.current = {};
+    // Reset local character points
+    charPoints.resetLocalCharPoints();
     
     // Use our custom handler for proper reset
     handleLevelSelection(state.selectedLevelId);
     return false;
-  }, [state.selectedLevelId, state.chars, handleLevelSelection]);
-  
-  // Get current level info
-  const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
-  const isCheckpoint = currentLevel?.type === 'checkpoint';
-  const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
+  }, [state.selectedLevelId, state.chars, handleLevelSelection, charPoints]);
   
   // Initialize audio on first render
   useEffect(() => {
@@ -205,27 +217,20 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   useEffect(() => {
     if (currentLevel && state.chars.length > 0) {
       // Check if current state.chars matches the expected level's chars
-      const levelChars = currentLevel.chars;
-      const stateChars = state.chars;
-      
-      // Compare arrays to see if they have the same characters
-      const sameLength = levelChars.length === stateChars.length;
-      const allCharsPresent = levelChars.every(c => stateChars.includes(c));
-      const noExtraChars = stateChars.every(c => levelChars.includes(c));
+      const { valid, missing, extra } = validateLevelCharacters(
+        state.selectedLevelId, 
+        state.chars
+      );
       
       logger.debug(`Level chars check: Level ID: ${state.selectedLevelId}`);
       
-      if (!(sameLength && allCharsPresent && noExtraChars)) {
+      if (!valid) {
         logger.warn('Characters mismatch detected - reselecting level');
         
-        // Find missing characters
-        const missing = levelChars.filter(c => !stateChars.includes(c));
         if (missing.length > 0) {
           logger.error(`Missing characters: ${missing.join(', ')}`);
         }
         
-        // Find extra characters
-        const extra = stateChars.filter(c => !levelChars.includes(c));
         if (extra.length > 0) {
           logger.warn(`Extra characters present: ${extra.join(', ')}`);
         }
@@ -263,19 +268,16 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     logger.debug(`Level change: ${level.name} (${level.id})`);
     
     // Check if we need to force a level selection
-    const needsReselection = 
-      !state.chars.length || 
-      !level.chars.every(c => state.chars.includes(c)) ||
-      !state.chars.every(c => level.chars.includes(c));
+    const { valid } = validateLevelCharacters(state.selectedLevelId, state.chars);
     
-    if (needsReselection) {
+    if (!valid) {
       logger.warn(`Level change detected but characters don't match - may need forced reselection`);
     }
     
-    // Always reset localCharPointsRef when level changes to prevent state carryover
-    localCharPointsRef.current = {};
-    logger.debug('Reset localCharPointsRef due to level change');
-  }, [state.selectedLevelId, state.chars]);
+    // Always reset localCharPoints when level changes to prevent state carryover
+    charPoints.resetLocalCharPoints();
+    logger.debug('Reset localCharPoints due to level change');
+  }, [state.selectedLevelId, state.chars, charPoints]);
     
   // Synchronization effect to force consistent level ID on mount
   useEffect(() => {
@@ -289,11 +291,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     selectLevel(state.selectedLevelId);
     
     // Reset any local state that could cause problems
-    localCharPointsRef.current = {};
-    recentlyMasteredCharRef.current = null;
+    charPoints.resetLocalCharPoints();
+    charPoints.setRecentlyMasteredChar(null);
     
     logger.debug('Performed critical level sync to ensure consistency');
-  }, []); // Empty dependency array - only runs once on mount
+  }, [selectLevel, charPoints, state.selectedLevelId]); 
   
   // Keep currentCharRef in sync with currentChar state
   useEffect(() => {
@@ -393,28 +395,28 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Pick next character based on mastery weights
   const pickNextChar = useCallback(() => {
-    // Bypass the problematic trainingLevels.find() and use direct map
+    // Get level characters using utility function
     const levelChars = getLevelChars(state.selectedLevelId);
     logger.debug(`Using ${levelChars.length} characters for level ${state.selectedLevelId}`);
     
     // Store the inputs for debugging
     setLastPickerInputs({
       levelId: state.selectedLevelId,
-      levelName: "Direct Lookup", // We don't need the name
+      levelName: currentLevel?.name || "Direct Lookup",
       levelChars: [...levelChars],
       stateChars: [...state.chars],
       pointsSnapshot: {...state.charPoints},
-      recentlyMasteredChar: recentlyMasteredCharRef.current
+      recentlyMasteredChar: charPoints.recentlyMasteredChar
     });
     
-    // Use the direct level character list
+    // Use the level character list
     return selectNextCharacter(
       levelChars,
       state.charPoints,
       TARGET_POINTS,
-      recentlyMasteredCharRef.current
+      charPoints.recentlyMasteredChar
     );
-  }, [state.selectedLevelId, state.chars, state.charPoints]);
+  }, [state.selectedLevelId, state.chars, state.charPoints, charPoints.recentlyMasteredChar, currentLevel]);
   
   // Finish the test - similar to TrainingMode's finishTest
   const finishTest = useCallback((completed = true) => {
@@ -438,30 +440,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       elapsedTime: elapsedSec
     });
   }, [testStartTime, responseTimes, saveResponseTimes, endTest]);
-  
-  // Monitor charPoints updates
-  useEffect(() => {
-    logger.debug('Syncing character points with local tracking');
-    
-    // Get the current level definition
-    const currentLevelDef = trainingLevels.find(level => level.id === state.selectedLevelId);
-    if (!currentLevelDef) {
-      logger.error(`Couldn't find level with ID: ${state.selectedLevelId} for points sync`);
-      return;
-    }
-    
-    // Only sync points for the current level's characters
-    currentLevelDef.chars.forEach(char => {
-      const statePoints = state.charPoints[char] || 0;
-      const localPoints = localCharPointsRef.current[char] || 0;
-      
-      // Only update if there's a difference and state has higher points
-      if (statePoints > localPoints) {
-        logger.debug(`Syncing points for "${char}": local ${localPoints} → state ${statePoints}`);
-        localCharPointsRef.current[char] = statePoints;
-      }
-    });
-  }, [state.charPoints, state.selectedLevelId]);
   
   // Present next question - similar to TrainingMode's nextQuestion
   const nextQuestion = useCallback(() => {
@@ -511,12 +489,19 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Log point information for this character for debugging
     const currentStatePoints = state.charPoints[currentChar] || 0;
-    const currentLocalPoints = localCharPointsRef.current[currentChar] || 0;
+    const currentLocalPoints = charPoints.localCharPoints[currentChar] || 0;
     logger.debug(`Character "${currentChar}" points - state: ${currentStatePoints}, local: ${currentLocalPoints}`);
     
     // Return a promise that resolves immediately to match TrainingMode's flow
     return Promise.resolve();
-  }, [pickNextChar, verifyAndFixCharacterSet, state.charPoints, state.selectedLevelId, currentChar]);
+  }, [
+    pickNextChar, 
+    verifyAndFixCharacterSet, 
+    state.charPoints, 
+    state.selectedLevelId, 
+    currentChar, 
+    charPoints.localCharPoints
+  ]);
   
   // Handle character input from the keyer
   const handleCharacter = useCallback((char: string) => {
@@ -552,11 +537,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Add to response times log
       setResponseTimes(prev => [...prev, { char: successChar, time: responseTime / 1000 }]);
       
-      // Update character points
+      // Get current points from app state
       const currentPoints = state.charPoints[successChar] || 0;
       
-      // Always also check our local points record as a backup
-      const localPoints = localCharPointsRef.current[successChar] || 0;
+      // Get current points from our local tracker
+      const localPoints = charPoints.localCharPoints[successChar] || 0;
       const effectiveCurrentPoints = Math.max(currentPoints, localPoints);
       
       // If there's a mismatch, log a warning
@@ -573,69 +558,39 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       
       // If this character will now be mastered, track it to avoid immediate reselection
       if (willCompleteMastery) {
-        recentlyMasteredCharRef.current = successChar;
+        charPoints.setRecentlyMasteredChar(successChar);
         logger.info(`Character "${successChar}" mastered!`);
       }
       
-      // Update our local state
-      localCharPointsRef.current[successChar] = newPoints;
+      // Update our local context state
+      charPoints.updateLocalCharPoints(successChar, newPoints);
       
       // Call the context function
       updateCharPoints(successChar, newPoints);
       
       // Delay before next question or finishing - like TrainingMode
       setTimeout(() => {
-        // Get the current level definition for accurate character list
-        const currentLevelDef = trainingLevels.find(level => level.id === state.selectedLevelId);
-        if (!currentLevelDef) {
-          logger.error(`Couldn't find level with ID: ${state.selectedLevelId} for completion check`);
-          nextQuestion();
-          return;
-        }
-
-        // Double-check that we're using the correct level
-        logger.debug(`Verifying level for completion check: ${state.selectedLevelId}`);
+        // Check if all characters are mastered using the levelUtils helper
+        const allMastered = areAllCharsMastered(
+          state.selectedLevelId,
+          charPoints.localCharPoints,
+          TARGET_POINTS
+        );
         
-        // Ensure we're using the correct level - use the CURRENT level ID from state
-        const verifiedLevelDef = trainingLevels.find(level => level.id === state.selectedLevelId);
-        if (!verifiedLevelDef) {
-          logger.error(`Could not find current level with ID ${state.selectedLevelId}`);
-          nextQuestion();
-          return;
-        }
+        // Get new characters to make sure we have some to try
+        const levelChars = getLevelChars(state.selectedLevelId);
+        const oldChars = ['e', 't']; // Level 1 characters
+        const newChars = levelChars.filter(c => !oldChars.includes(c));
         
-        // Use the verified level definition
-        const levelChars = verifiedLevelDef.chars;
-
-        // Create a simulated updated charPoints object that includes the most recent update
-        const updatedCharPoints = { ...state.charPoints, [successChar]: newPoints };
-        
-        // Also create a merged points object that takes the maximum of state and local values
-        const mergedPoints = { ...updatedCharPoints };
-        Object.entries(localCharPointsRef.current).forEach(([char, points]) => {
+        // Create a merged points object that takes the maximum of state and local values
+        const mergedPoints: Record<string, number> = { ...state.charPoints };
+        Object.entries(charPoints.localCharPoints).forEach(([char, points]) => {
           mergedPoints[char] = Math.max(mergedPoints[char] || 0, points);
         });
         
-        // Track mastery status for debug
-        logger.debug('Checking mastery status for completion');
-        
-        // Check if all characters are mastered using the merged points
-        const allMastered = levelChars.every(c => {
-          const points = mergedPoints[c] || 0;
-          return points >= TARGET_POINTS;
-        });
-        
-        // Check if only partial mastery (old Level 1 chars are mastered, but new Level 2 chars are not)
-        const oldChars = ['e', 't']; // Level 1 characters
-        const newChars = levelChars.filter(c => !oldChars.includes(c)); // New characters in this level
-        
+        // Check specific character sets
         const oldCharsMastered = oldChars.every(c => {
           if (!levelChars.includes(c)) return true; // Skip if not in this level
-          const points = mergedPoints[c] || 0;
-          return points >= TARGET_POINTS;
-        });
-        
-        const newCharsMastered = newChars.every(c => {
           const points = mergedPoints[c] || 0;
           return points >= TARGET_POINTS;
         });
@@ -654,38 +609,22 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         } else if (oldCharsMastered && !newCharsAttempted) {
           logger.info(`Only old characters mastered but new characters not attempted - forcing new character selection`);
           
-          // Force selection of a new character by skipping the next question
-          // Temporarily set recentlyMasteredCharRef to all old characters to force new char selection
-          const oldMastered = oldChars.filter(c => levelChars.includes(c));
-          if (oldMastered.length > 0 && newChars.length > 0) {
-            // Store the original recently mastered char
-            const originalRecentlyMastered = recentlyMasteredCharRef.current;
-            
-            // Force select a new character from the level
-            const forceChar = newChars[0];
-            logger.debug(`Forcing selection of new character: "${forceChar}" for next question`);
-            
-            // Set current character directly
-            setCurrentChar(forceChar);
-            currentCharRef.current = forceChar;
-            
-            // Reset the morse output and feedback state
-            setMorseOutput('');
-            setFeedbackState('none');
-            
-            // Set the start time for response time tracking
-            const now = Date.now();
-            setCharStartTime(now);
-            charStartTimeRef.current = now;
-            
-            // Restore the original recently mastered character after forcing selection
-            setTimeout(() => {
-              recentlyMasteredCharRef.current = originalRecentlyMastered;
-            }, 100);
-          } else {
-            // If we can't force selection, just continue with normal flow
-            nextQuestion();
-          }
+          // Force selection of a new character from the level
+          const forceChar = newChars[0];
+          logger.debug(`Forcing selection of new character: "${forceChar}" for next question`);
+          
+          // Set current character directly
+          setCurrentChar(forceChar);
+          currentCharRef.current = forceChar;
+          
+          // Reset the morse output and feedback state
+          setMorseOutput('');
+          setFeedbackState('none');
+          
+          // Set the start time for response time tracking
+          const now = Date.now();
+          setCharStartTime(now);
+          charStartTimeRef.current = now;
         } else {
           logger.debug(`Continuing test - not all characters mastered yet`);
           nextQuestion();
@@ -710,7 +649,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       
       // Reduce points with the penalty
       const currentPoints = state.charPoints[currentChar] || 0;
-      const localPoints = localCharPointsRef.current[currentChar] || 0;
+      const localPoints = charPoints.localCharPoints[currentChar] || 0;
       const effectiveCurrentPoints = Math.max(currentPoints, localPoints);
       
       // Calculate the new, reduced point value
@@ -719,7 +658,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       logger.debug(`Reducing points for "${currentChar}": ${effectiveCurrentPoints} → ${newPoints}`);
       
       // Update our local tracking
-      localCharPointsRef.current[currentChar] = newPoints;
+      charPoints.updateLocalCharPoints(currentChar, newPoints);
       
       // Update the app state
       updateCharPoints(currentChar, newPoints);
@@ -752,18 +691,16 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     // Clear morse output after processing input
     setMorseOutput('');
   }, [
-    currentCharRef,
-    charStartTimeRef,
     calculatePointsForTime,
     updateCharPoints,
     state.charPoints, 
-    state.chars,
     isCheckpoint,
     strikeLimit,
     strikeCount,
     playErrorSound,
     nextQuestion,
-    finishTest
+    finishTest,
+    charPoints
   ]);
   
   // Handle an element (dot/dash) from the keyer
@@ -815,10 +752,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setTestResults(null);
     
     // Reset recently mastered character
-    recentlyMasteredCharRef.current = null;
+    charPoints.setRecentlyMasteredChar(null);
     
     // Reset local character points to prevent carryover between tests
-    localCharPointsRef.current = {};
+    charPoints.resetLocalCharPoints();
     
     // Clear any pending keyer state
     keyerRef.current.clear();
@@ -835,7 +772,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setTimeout(() => {
       nextQuestion();
     }, 100);
-  }, [startTest, nextQuestion, state.selectedLevelId, selectLevel]);
+  }, [startTest, nextQuestion, state.selectedLevelId, selectLevel, charPoints]);
   
   // Clean restart with time recording
   const startTestAndRecordTime = useCallback(() => {
@@ -857,10 +794,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setTestResults(null);
     
     // Reset recently mastered character
-    recentlyMasteredCharRef.current = null;
+    charPoints.setRecentlyMasteredChar(null);
     
     // Reset local character points to prevent carryover between levels
-    localCharPointsRef.current = {};
+    charPoints.resetLocalCharPoints();
     
     // Clear any pending keyer state
     keyerRef.current.clear();
@@ -884,7 +821,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         nextQuestion();
       }, 50);
     }, 50); // Small delay to ensure level selection completes
-  }, [selectLevel, startTestWithLevelId, nextQuestion, handleLevelSelection]);
+  }, [
+    selectLevel, 
+    startTestWithLevelId, 
+    nextQuestion, 
+    handleLevelSelection, 
+    charPoints
+  ]);
   
   // Install keyer once on mount
   useEffect(() => {
@@ -936,7 +879,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setMistakesMap({});
     
     // Reset local character points to prevent carryover between levels
-    localCharPointsRef.current = {};
+    charPoints.resetLocalCharPoints();
     
     // Get current level index
     const currentLevelIndex = trainingLevels.findIndex(l => l.id === state.selectedLevelId);
@@ -970,11 +913,28 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       logger.debug("Restarting current level (at end of levels)");
       startTestAndRecordTime();
     }
-  }, [state.selectedLevelId, handleLevelSelection, startTestWithLevelId, nextQuestion, startTestAndRecordTime]);
+  }, [
+    state.selectedLevelId, 
+    handleLevelSelection, 
+    startTestWithLevelId, 
+    nextQuestion, 
+    startTestAndRecordTime,
+    charPoints
+  ]);
   
   // Calculate progress - mastered characters
-  const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
-  const progress = state.chars.length > 0 ? `Mastered: ${masteredCount}/${state.chars.length}` : '';
+  const masteredCount = useMemo(() => {
+    return state.chars.filter(c => {
+      // Use effective points (max of local and app state)
+      const statePoints = state.charPoints[c] || 0;
+      const localPoints = charPoints.localCharPoints[c] || 0;
+      return Math.max(statePoints, localPoints) >= TARGET_POINTS;
+    }).length;
+  }, [state.chars, state.charPoints, charPoints.localCharPoints]);
+  
+  const progress = useMemo(() => {
+    return state.chars.length > 0 ? `Mastered: ${masteredCount}/${state.chars.length}` : '';
+  }, [masteredCount, state.chars.length]);
   
   // Using useRef for client detection to avoid hydration mismatches
   useEffect(() => {
@@ -986,686 +946,26 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     }
   }, []);
   
-  // Function to copy debug state to clipboard
-  const copyDebugStateToClipboard = useCallback(() => {
-    // Gather all the debug information
-    const debugInfo = {
-      timestamp: new Date().toISOString(),
-      currentLevel: {
-        id: state.selectedLevelId,
-        name: currentLevel?.name || 'Unknown',
-        levelChars: currentLevel?.chars || [],
-        type: currentLevel?.type || 'unknown'
-      },
-      testStatus: {
-        active: state.testActive,
-        testStartTime: testStartTime ? new Date(testStartTime).toISOString() : null,
-        currentChar: currentChar,
-        currentCharRef: currentCharRef.current,
-        recentlyMasteredChar: recentlyMasteredCharRef.current,
-        responseTimes: responseTimes,
-        mistakesCount: Object.keys(mistakesMap).length
-      },
-      appState: {
-        chars: state.chars,
-        charPoints: state.charPoints
-      },
-      localState: {
-        charPoints: localCharPointsRef.current
-      },
-      masteryStatus: {
-        levelChars: currentLevel?.chars || [],
-        masteryPoints: currentLevel?.chars.map(c => ({
-          char: c,
-          statePoints: state.charPoints[c] || 0,
-          localPoints: localCharPointsRef.current[c] || 0,
-          effectivePoints: Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0),
-          isMastered: Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
-        })) || [],
-        allMastered: currentLevel?.chars.every(c => 
-          Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
-        ) || false
-      },
-      // Add the new character selection debug info
-      characterSelectionDebug: lastPickerInputs ? {
-        levelId: lastPickerInputs.levelId,
-        levelName: lastPickerInputs.levelName,
-        levelChars: lastPickerInputs.levelChars,
-        stateChars: lastPickerInputs.stateChars,
-        recentlyMasteredChar: lastPickerInputs.recentlyMasteredChar,
-        mismatchDetected: lastPickerInputs.levelChars.join(',') !== lastPickerInputs.stateChars.join(','),
-        invalidCharsInState: lastPickerInputs.stateChars.filter(c => !lastPickerInputs.levelChars.includes(c)),
-        currentCharInvalid: currentChar ? !lastPickerInputs.levelChars.includes(currentChar) : false,
-        pointsSnapshot: lastPickerInputs.pointsSnapshot
-      } : null
-    };
-    
-    // Format as JSON with pretty printing
-    const debugText = JSON.stringify(debugInfo, null, 2);
-    
-    // Create a text block with markdown formatting
-    const clipboardText = `\`\`\`json\n${debugText}\n\`\`\``;
-    
-    // Copy to clipboard
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(clipboardText)
-        .then(() => {
-          // Show visual confirmation
-          setCopyStatus('copied');
-          // Reset after a delay
-          setTimeout(() => setCopyStatus('idle'), 2000);
-        })
-        .catch(err => {
-          logger.error('Failed to copy debug state:', err);
-          setCopyStatus('error');
-          setTimeout(() => setCopyStatus('idle'), 2000);
-        });
-    } else {
-      // Fallback for browsers without clipboard API
-      const textArea = document.createElement('textarea');
-      textArea.value = clipboardText;
-      textArea.style.position = 'fixed';
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      
-      try {
-        const successful = document.execCommand('copy');
-        if (successful) {
-          setCopyStatus('copied');
-          setTimeout(() => setCopyStatus('idle'), 2000);
-        } else {
-          setCopyStatus('error');
-          setTimeout(() => setCopyStatus('idle'), 2000);
-        }
-      } catch (err: unknown) {
-        logger.error('Failed to copy debug state:', err);
-        setCopyStatus('error');
-        setTimeout(() => setCopyStatus('idle'), 2000);
-      }
-      
-      document.body.removeChild(textArea);
-    }
-  }, [
-    state.selectedLevelId,
-    state.testActive,
-    state.chars,
-    state.charPoints,
-    currentLevel,
-    testStartTime,
-    currentChar,
-    currentCharRef,
-    recentlyMasteredCharRef,
-    responseTimes,
-    mistakesMap,
-    localCharPointsRef,
-    lastPickerInputs // Add lastPickerInputs to the dependency array
-  ]);
-  
-  // State for copy button status
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
-  
   return (
     <div className={styles.sendingTrainer}>
-      {/* Debug state information - only visible in development */}
+      {/* Debug panel - only visible in development */}
       {isClientRef.current && isDevelopmentRef.current && (
-        <div style={{ 
-          position: 'fixed', 
-          bottom: '10px', 
-          right: '10px', 
-          background: 'rgba(0,0,0,0.8)', 
-          color: 'white',
-          padding: '10px',
-          fontSize: '12px',
-          zIndex: 9999,
-          maxWidth: '500px',
-          maxHeight: '90vh',
-          overflow: 'auto',
-          border: '1px solid #666'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '5px', 
-            borderBottom: '1px solid #555', 
-            paddingBottom: '5px'
-          }}>
-            <div style={{fontWeight: 'bold', fontSize: '14px'}}>
-              COMPLETE STATE DIAGNOSTICS
-            </div>
-            <div 
-              onClick={copyDebugStateToClipboard}
-              style={{
-                fontSize: '16px',
-                cursor: 'pointer',
-                width: '24px',
-                height: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '3px',
-                background: copyStatus === 'idle' ? 'transparent' : 
-                           copyStatus === 'copied' ? 'rgba(0,80,0,0.5)' : 
-                           'rgba(80,0,0,0.5)',
-                transition: 'background-color 0.2s'
-              }}
-              title="Copy debug data to clipboard"
-            >
-              {copyStatus === 'idle' && (
-                <span style={{opacity: 0.8}}>📋</span>
-              )}
-              {copyStatus === 'copied' && (
-                <span style={{color: '#5f5', fontWeight: 'bold'}}>✓</span>
-              )}
-              {copyStatus === 'error' && (
-                <span style={{color: '#f55'}}>✗</span>
-              )}
-            </div>
-          </div>
-          
-          {/* Current Level Information - Highlighted at top */}
-          <div style={{
-            marginBottom: '10px',
-            padding: '5px',
-            backgroundColor: 'rgba(100,100,0,0.3)',
-            border: '1px solid #aa8',
-            borderRadius: '4px'
-          }}>
-            <div style={{fontWeight: 'bold', fontSize: '13px', marginBottom: '4px'}}>
-              CURRENT LEVEL STATUS
-            </div>
-            <div style={{display: 'flex', justifyContent: 'space-between'}}>
-              <div>
-                <span style={{color: '#ffb'}}>{currentLevel?.name || 'Unknown Level'}</span> 
-                (<span style={{color: '#ffb'}}>{state.selectedLevelId}</span>)
-              </div>
-              <div>
-                Test Active: <span style={{color: state.testActive ? '#8f8' : '#f88'}}>{state.testActive ? 'YES' : 'NO'}</span>
-              </div>
-            </div>
-            <div style={{marginTop: '3px'}}>
-              <div>Level Characters: <span style={{color: '#ffb'}}>{currentLevel?.chars.join(', ')}</span></div>
-              <div>AppState Characters: <span style={{color: '#ffb'}}>{state.chars.join(', ')}</span></div>
-            </div>
-            <div style={{marginTop: '3px'}}>
-              <div>
-                Mastery: {(state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length)} of {state.chars.length} characters mastered
-              </div>
-            </div>
-          </div>
-          
-          <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
-            {/* Level Completion Tracker */}
-            <div style={{
-              border: '1px solid #444', 
-              padding: '5px', 
-              backgroundColor: 'rgba(0,100,100,0.2)'
-            }}>
-              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>
-                Level Completion Status
-              </div>
-              <div>
-                <div>Last Checked: <span style={{color: '#8ff'}}>
-                  {Object.keys(localCharPointsRef.current).length > 0 ? 'Yes' : 'Not yet'}
-                </span></div>
-                <div style={{marginTop: '5px', display: 'flex', flexDirection: 'column', gap: '2px'}}>
-                  {currentLevel && currentLevel.chars.map(char => {
-                    const statePoints = state.charPoints[char] || 0;
-                    const localPoints = localCharPointsRef.current[char] || 0;
-                    const effectivePoints = Math.max(statePoints, localPoints);
-                    const isMastered = effectivePoints >= TARGET_POINTS;
-                    return (
-                      <div key={char} style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        padding: '1px 3px',
-                        backgroundColor: isMastered ? 'rgba(0,50,0,0.3)' : 'rgba(50,0,0,0.3)',
-                        borderRadius: '2px'
-                      }}>
-                        <div>Character: <span style={{color: '#8ff'}}>{char}</span></div>
-                        <div>
-                          <span style={{color: isMastered ? '#8f8' : '#f88'}}>
-                            {effectivePoints.toFixed(2)}/{TARGET_POINTS}
-                          </span>
-                          <span style={{marginLeft: '5px'}}>
-                            {isMastered ? '✅' : '❌'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div style={{marginTop: '5px', borderTop: '1px solid #444', paddingTop: '3px'}}>
-                  <div>
-                    All Mastered: <span style={{
-                      color: currentLevel && currentLevel.chars.every(c => 
-                        Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
-                      ) ? '#8f8' : '#f88'
-                    }}>
-                      {currentLevel && currentLevel.chars.every(c => 
-                        Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
-                      ) ? 'YES' : 'NO'}
-                    </span>
-                  </div>
-                  
-                  {/* Level completion indicator */}
-                  {currentLevel && currentLevel.chars.every(c => 
-                    Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
-                  ) && (
-                    <div style={{
-                      marginTop: '5px',
-                      padding: '4px',
-                      background: 'rgba(0,100,0,0.5)',
-                      borderRadius: '3px',
-                      fontWeight: 'bold',
-                      color: '#5f5',
-                      textAlign: 'center'
-                    }}>
-                      🏆 LEVEL COMPLETED 🏆
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* New section for character selection */}
-            <div style={{
-              border: '1px solid #444', 
-              padding: '5px', 
-              backgroundColor: 'rgba(100,50,0,0.2)',
-              marginTop: '10px'
-            }}>
-              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>
-                Character Selection Pool
-              </div>
-              <div>
-                <div>Recently Mastered: <span style={{color: '#ffaa66'}}>{recentlyMasteredCharRef.current || 'None'}</span></div>
-                <div style={{marginTop: '5px'}}>
-                  <div style={{fontWeight: 'bold'}}>Character Selection Status:</div>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '3px'}}>
-                    {currentLevel && currentLevel.chars.map(char => {
-                      const statePoints = state.charPoints[char] || 0;
-                      const localPoints = localCharPointsRef.current[char] || 0;
-                      const effectivePoints = Math.max(statePoints, localPoints);
-                      const isMastered = effectivePoints >= TARGET_POINTS;
-                      const isRecentlyMastered = char === recentlyMasteredCharRef.current;
-                      
-                      let selectionStatus = '';
-                      let statusColor = '#fff';
-                      
-                      if (isRecentlyMastered) {
-                        selectionStatus = 'SKIPPED (recently mastered)';
-                        statusColor = '#ff8';
-                      } else if (isMastered) {
-                        selectionStatus = `REDUCED CHANCE (${(COMPLETED_WEIGHT * 100).toFixed(0)}%)`;
-                        statusColor = '#8f8';
-                      } else {
-                        selectionStatus = 'PRIORITIZED';
-                        statusColor = '#f88';
-                      }
-                      
-                      return (
-                        <div key={char} style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          padding: '1px 3px',
-                          backgroundColor: isRecentlyMastered ? 'rgba(80,80,0,0.3)' : 
-                                         isMastered ? 'rgba(0,50,0,0.3)' : 'rgba(50,0,0,0.3)',
-                          borderRadius: '2px'
-                        }}>
-                          <div>
-                            <span style={{color: char === currentChar ? '#ff5' : '#fff'}}>{char}</span>
-                            {char === currentChar && <span style={{marginLeft: '5px', color: '#ff5'}}>← CURRENT</span>}
-                          </div>
-                          <div style={{color: statusColor}}>
-                            {selectionStatus}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div style={{marginTop: '5px', fontSize: '11px', fontStyle: 'italic', color: '#ccc'}}>
-                  Characters with higher point values are less likely to be selected. 
-                  Recently mastered characters are temporarily excluded.
-                </div>
-              </div>
-            </div>
-            
-            <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(0,50,0,0.2)'}}>
-              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>AppState Context</div>
-              <div>Level ID: <span style={{color: '#8fff8f'}}>{state.selectedLevelId}</span></div>
-              <div>Level Name: <span style={{color: '#8fff8f'}}>{currentLevel?.name || 'Unknown'}</span></div>
-              <div>Test Active: <span style={{color: '#8fff8f'}}>{state.testActive ? 'Yes' : 'No'}</span></div>
-              <div style={{marginTop: '5px'}}>
-                <div style={{fontWeight: 'bold'}}>Chars from AppState:</div>
-                <div style={{color: '#8fff8f'}}>{state.chars.join(', ')}</div>
-              </div>
-              <div style={{marginTop: '5px'}}>
-                <div style={{fontWeight: 'bold'}}>Points from AppState:</div>
-                <div>
-                  {Object.entries(state.charPoints).length > 0 ? (
-                    <table style={{borderCollapse: 'collapse', width: '100%'}}>
-                      <thead>
-                        <tr>
-                          <th style={{textAlign: 'left', padding: '2px', borderBottom: '1px solid #444'}}>Char</th>
-                          <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>Points</th>
-                          <th style={{textAlign: 'center', padding: '2px', borderBottom: '1px solid #444'}}>Mastered</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(state.charPoints).map(([char, points]) => (
-                          <tr key={char}>
-                            <td style={{padding: '1px'}}>{char}</td>
-                            <td style={{textAlign: 'right', padding: '1px'}}>{points.toFixed(2)}</td>
-                            <td style={{textAlign: 'center', padding: '1px'}}>{points >= TARGET_POINTS ? '✅' : '❌'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <span style={{color: '#aaa', fontStyle: 'italic'}}>No points recorded</span>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(0,50,0,0.2)'}}>
-              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>Local Component State</div>
-              <div>Current Char: <span style={{color: '#ff8f8f'}}>{currentChar || '(none)'}</span></div>
-              <div>Current Char Ref: <span style={{color: '#ff8f8f'}}>{currentCharRef.current || '(none)'}</span></div>
-              <div>Feedback State: <span style={{color: '#ff8f8f'}}>{feedbackState}</span></div>
-              <div>Test Start Time: <span style={{color: '#ff8f8f'}}>{testStartTime ? new Date(testStartTime).toISOString() : 'Not started'}</span></div>
-              <div>Char Start Time: <span style={{color: '#ff8f8f'}}>{charStartTime ? new Date(charStartTime).toISOString() : 'Not started'}</span></div>
-              <div>Char Start Time Ref: <span style={{color: '#ff8f8f'}}>{charStartTimeRef.current ? new Date(charStartTimeRef.current).toISOString() : 'Not set'}</span></div>
-              <div>Recently Mastered: <span style={{color: '#ff8f8f'}}>{recentlyMasteredCharRef.current || 'None'}</span></div>
-              <div>Response Times: <span style={{color: '#ff8f8f'}}>{responseTimes.length} records</span></div>
-              
-              <div style={{marginTop: '5px'}}>
-                <div style={{fontWeight: 'bold'}}>Local Points Tracking:</div>
-                <div>
-                  {Object.keys(localCharPointsRef.current).length > 0 ? (
-                    <table style={{borderCollapse: 'collapse', width: '100%'}}>
-                      <thead>
-                        <tr>
-                          <th style={{textAlign: 'left', padding: '2px', borderBottom: '1px solid #444'}}>Char</th>
-                          <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>Local</th>
-                          <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>AppState</th>
-                          <th style={{textAlign: 'center', padding: '2px', borderBottom: '1px solid #444'}}>Match?</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(localCharPointsRef.current).map(([char, points]) => {
-                          const appPoints = state.charPoints[char] || 0;
-                          const match = Math.abs(points - appPoints) < 0.001; // Float comparison
-                          return (
-                            <tr key={char}>
-                              <td style={{padding: '1px'}}>{char}</td>
-                              <td style={{textAlign: 'right', padding: '1px'}}>{points.toFixed(2)}</td>
-                              <td style={{textAlign: 'right', padding: '1px'}}>{appPoints.toFixed(2)}</td>
-                              <td style={{textAlign: 'center', padding: '1px', color: match ? 'green' : 'red'}}>{match ? '✓' : '✗'}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <span style={{color: '#aaa', fontStyle: 'italic'}}>No local points recorded</span>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(0,0,50,0.2)'}}>
-              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>Response History</div>
-              <div>
-                {responseTimes.length > 0 ? (
-                  <table style={{borderCollapse: 'collapse', width: '100%'}}>
-                    <thead>
-                      <tr>
-                        <th style={{textAlign: 'left', padding: '2px', borderBottom: '1px solid #444'}}>#</th>
-                        <th style={{textAlign: 'left', padding: '2px', borderBottom: '1px solid #444'}}>Char</th>
-                        <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>Time (s)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {responseTimes.map((rt, idx) => (
-                        <tr key={idx}>
-                          <td style={{padding: '1px'}}>{idx + 1}</td>
-                          <td style={{padding: '1px'}}>{rt.char}</td>
-                          <td style={{textAlign: 'right', padding: '1px'}}>{rt.time.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <span style={{color: '#aaa', fontStyle: 'italic'}}>No responses recorded</span>
-                )}
-              </div>
-            </div>
-            
-            <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(50,50,0,0.2)'}}>
-              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>Level Definition</div>
-              {currentLevel ? (
-                <>
-                  <div>ID: <span style={{color: '#ffff8f'}}>{currentLevel.id}</span></div>
-                  <div>Name: <span style={{color: '#ffff8f'}}>{currentLevel.name}</span></div>
-                  <div>Type: <span style={{color: '#ffff8f'}}>{currentLevel.type}</span></div>
-                  <div>Chars from level definition: <span style={{color: '#ffff8f'}}>{currentLevel.chars.join(', ')}</span></div>
-                  {isCheckpoint && (
-                    <div>Strike Limit: <span style={{color: '#ffff8f'}}>{strikeLimit}</span></div>
-                  )}
-                </>
-              ) : (
-                <span style={{color: '#aaa', fontStyle: 'italic'}}>No level definition found</span>
-              )}
-            </div>
-            
-            {/* Mismatch detection */}
-            {currentLevel && (
-              (() => {
-                const levelChars = currentLevel.chars;
-                const stateChars = state.chars;
-                const sameLength = levelChars.length === stateChars.length;
-                const allPresent = levelChars.every(c => stateChars.includes(c));
-                const noExtras = stateChars.every(c => levelChars.includes(c));
-                const match = sameLength && allPresent && noExtras;
-                
-                if (!match) {
-                  return (
-                    <div style={{
-                      border: '2px solid #f00', 
-                      padding: '5px', 
-                      backgroundColor: 'rgba(100,0,0,0.5)',
-                      marginTop: '10px',
-                      color: '#faa'
-                    }}>
-                      <div style={{fontWeight: 'bold', color: '#f55'}}>⚠️ CHARACTER MISMATCH DETECTED!</div>
-                      <div>Level chars: {levelChars.join(', ')}</div>
-                      <div>State chars: {stateChars.join(', ')}</div>
-                      <div>Same length: {sameLength ? 'Yes' : 'No'}</div>
-                      <div>All present: {allPresent ? 'Yes' : 'No'}</div>
-                      <div>No extras: {noExtras ? 'Yes' : 'No'}</div>
-                      <div style={{marginTop: '5px', fontStyle: 'italic', color: '#fcc'}}>
-                        This indicates a state synchronization problem
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()
-            )}
-            
-            <div style={{marginTop: '10px', border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(50,0,50,0.2)'}}>
-              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>
-                Complete Character Tracking
-              </div>
-              <div>
-                <table style={{borderCollapse: 'collapse', width: '100%'}}>
-                  <thead>
-                    <tr>
-                      <th style={{textAlign: 'left', padding: '2px', borderBottom: '1px solid #444'}}>Char</th>
-                      <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>Local Points</th>
-                      <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>AppState Points</th>
-                      <th style={{textAlign: 'center', padding: '2px', borderBottom: '1px solid #444'}}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentLevel && currentLevel.chars.map(char => {
-                      const localPoints = localCharPointsRef.current[char] || 0;
-                      const appPoints = state.charPoints[char] || 0;
-                      const effectivePoints = Math.max(localPoints, appPoints);
-                      const isMastered = effectivePoints >= TARGET_POINTS;
-                      const isAttempted = effectivePoints > 0;
-                      
-                      return (
-                        <tr key={char} style={{
-                          backgroundColor: char === currentChar ? 'rgba(255,255,0,0.15)' : 'transparent'
-                        }}>
-                          <td style={{padding: '1px', fontWeight: char === currentChar ? 'bold' : 'normal'}}>
-                            {char}{char === currentChar ? ' ←' : ''}
-                          </td>
-                          <td style={{textAlign: 'right', padding: '1px'}}>{localPoints.toFixed(2)}</td>
-                          <td style={{textAlign: 'right', padding: '1px'}}>{appPoints.toFixed(2)}</td>
-                          <td style={{textAlign: 'center', padding: '1px'}}>
-                            {!isAttempted && (
-                              <span style={{color: '#aaa'}}>Not attempted</span>
-                            )}
-                            {isAttempted && !isMastered && (
-                              <span style={{color: '#f88'}}>In progress</span>
-                            )}
-                            {isMastered && (
-                              <span style={{color: '#8f8'}}>Mastered ✓</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{marginTop: '5px', fontSize: '11px', color: '#ccc'}}>
-                Shows all characters in the current level regardless of whether they've been attempted.
-              </div>
-            </div>
-            
-            {/* Character Picker Debug Widget */}
-            <div style={{
-              marginTop: '15px', 
-              border: '2px solid #f00', 
-              padding: '5px', 
-              backgroundColor: 'rgba(80,0,0,0.3)'
-            }}>
-              <div style={{
-                fontWeight: 'bold', 
-                marginBottom: '2px', 
-                borderBottom: '1px solid #f88', 
-                paddingBottom: '2px', 
-                color: '#f88'
-              }}>
-                🔍 CHARACTER SELECTION DEBUG
-              </div>
-              
-              {lastPickerInputs ? (
-                <div>
-                  <div style={{marginBottom: '5px'}}>
-                    <div><strong>Last Character Selection:</strong></div>
-                    <div>Level: <span style={{color: '#f88'}}>{lastPickerInputs.levelName} ({lastPickerInputs.levelId})</span></div>
-                    <div>Current Char: <span style={{color: '#f88'}}>{currentChar || '(none)'}</span></div>
-                  </div>
-                  
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginBottom: '5px',
-                    padding: '4px',
-                    backgroundColor: 'rgba(50,0,0,0.4)',
-                    borderRadius: '3px'
-                  }}>
-                    <div>
-                      <div><strong>⚠️ Level Chars Used:</strong></div>
-                      <div style={{color: '#f88'}}>{lastPickerInputs.levelChars.join(', ')}</div>
-                    </div>
-                    <div>
-                      <div><strong>⚠️ State Chars:</strong></div>
-                      <div style={{color: '#f88'}}>{lastPickerInputs.stateChars.join(', ')}</div>
-                    </div>
-                  </div>
-                  
-                  <div style={{marginBottom: '5px'}}>
-                    <div><strong>Recently Mastered:</strong> <span style={{color: '#f88'}}>{lastPickerInputs.recentlyMasteredChar || 'None'}</span></div>
-                  </div>
-                  
-                  <div>
-                    <div><strong>Character Point Snapshot:</strong></div>
-                    <table style={{width: '100%', borderCollapse: 'collapse'}}>
-                      <thead>
-                        <tr>
-                          <th style={{textAlign: 'left', borderBottom: '1px solid #666'}}>Char</th>
-                          <th style={{textAlign: 'right', borderBottom: '1px solid #666'}}>Points</th>
-                          <th style={{textAlign: 'center', borderBottom: '1px solid #666'}}>In Level?</th>
-                          <th style={{textAlign: 'center', borderBottom: '1px solid #666'}}>In State?</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(lastPickerInputs.pointsSnapshot).map(([char, points]) => {
-                          const inLevel = lastPickerInputs.levelChars.includes(char);
-                          const inState = lastPickerInputs.stateChars.includes(char);
-                          const isCurrent = char === currentChar;
-                          
-                          return (
-                            <tr key={char} style={{
-                              backgroundColor: isCurrent ? 'rgba(80,80,0,0.3)' : 'transparent',
-                              color: isCurrent ? '#ff0' : (inLevel ? '#fff' : '#a55')
-                            }}>
-                              <td style={{padding: '1px'}}>{char} {isCurrent && '←'}</td>
-                              <td style={{textAlign: 'right', padding: '1px'}}>{points.toFixed(2)}</td>
-                              <td style={{textAlign: 'center', padding: '1px', color: inLevel ? '#8f8' : '#f55'}}>
-                                {inLevel ? '✓' : '✗'}
-                              </td>
-                              <td style={{textAlign: 'center', padding: '1px', color: inState ? '#8f8' : '#f55'}}>
-                                {inState ? '✓' : '✗'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  
-                  <div style={{marginTop: '8px', padding: '3px', backgroundColor: 'rgba(80,0,0,0.5)', borderRadius: '3px'}}>
-                    <div style={{color: '#f55', fontWeight: 'bold'}}>CHARACTER MISMATCH DETECTION:</div>
-                    <div>
-                      {lastPickerInputs.levelChars.join(',') !== lastPickerInputs.stateChars.join(',') ? (
-                        <div style={{color: '#f55'}}>
-                          ⚠️ <strong>MISMATCH DETECTED:</strong> Level chars and State chars are different!
-                        </div>
-                      ) : (
-                        <div style={{color: '#8f8'}}>
-                          Level chars and State chars match correctly.
-                        </div>
-                      )}
-                    </div>
-                    {lastPickerInputs.stateChars.some(c => !lastPickerInputs.levelChars.includes(c)) && (
-                      <div style={{color: '#f55', marginTop: '3px'}}>
-                        Found characters in State that don't belong in current level: 
-                        <strong>{lastPickerInputs.stateChars.filter(c => !lastPickerInputs.levelChars.includes(c)).join(', ')}</strong>
-                      </div>
-                    )}
-                    {currentChar && !lastPickerInputs.levelChars.includes(currentChar) && (
-                      <div style={{color: '#f00', marginTop: '3px', fontWeight: 'bold'}}>
-                        🚨 CRITICAL: Current char "{currentChar}" is not in level chars!
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div style={{color: '#aaa', fontStyle: 'italic'}}>No character selection recorded yet</div>
-              )}
-            </div>
-          </div>
-        </div>
+        <SendingModeDebugPanel
+          state={state}
+          currentLevel={currentLevel}
+          testStartTime={testStartTime}
+          currentChar={currentChar}
+          currentCharRef={currentCharRef}
+          recentlyMasteredCharRef={{ current: charPoints.recentlyMasteredChar }}
+          responseTimes={responseTimes}
+          mistakesMap={mistakesMap}
+          localCharPointsRef={{ current: charPoints.localCharPoints }}
+          lastPickerInputs={lastPickerInputs}
+          TARGET_POINTS={TARGET_POINTS}
+          feedbackState={feedbackState}
+          charStartTime={charStartTime}
+          charStartTimeRef={charStartTimeRef}
+        />
       )}
       
       {testResults ? (
@@ -1700,28 +1000,14 @@ const SendingMode: React.FC<SendingModeProps> = () => {
             </div>
           )}
           
-          <div className={styles.currentCharDisplay}>
-            {currentChar && (
-              <div className={styles.bigCharacter}>{currentChar.toUpperCase()}</div>
-            )}
-          </div>
-          
-          <div className={styles.feedbackContainer}>
-            {feedbackState === 'correct' && (
-              <div className={styles.correctFeedback}>Correct!</div>
-            )}
-            {feedbackState === 'incorrect' && (
-              <div className={styles.incorrectFeedback}>{incorrectChar}</div>
-            )}
-          </div>
+          <CharacterDisplay currentChar={currentChar} />
+          <FeedbackDisplay feedbackState={feedbackState} incorrectChar={incorrectChar} />
           
           <div className={styles.sendingInstructions}>
             Use ← key for <span className={styles.dot}>·</span> and → key for <span className={styles.dash}>–</span>
           </div>
           
-          <div className={styles.keyerDisplay}>
-            <div className={styles.keyerOutput}>{morseOutput}</div>
-          </div>
+          <KeyerDisplay morseOutput={morseOutput} />
           
           <div className={styles.actionHints}>
             Esc: End Test
@@ -1744,4 +1030,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   );
 };
 
-export default SendingMode; 
+/**
+ * Export the component wrapped in error boundary and context provider
+ */
+export default function SendingModeWithErrorBoundary() {
+  return (
+    <SendingModeErrorBoundary>
+      <SendingModeWithContext />
+    </SendingModeErrorBoundary>
+  );
+}
