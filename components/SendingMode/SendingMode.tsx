@@ -905,6 +905,112 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     }
   }, []);
   
+  // Function to copy debug state to clipboard
+  const copyDebugStateToClipboard = useCallback(() => {
+    // Gather all the debug information
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      currentLevel: {
+        id: state.selectedLevelId,
+        name: currentLevel?.name || 'Unknown',
+        levelChars: currentLevel?.chars || [],
+        type: currentLevel?.type || 'unknown'
+      },
+      testStatus: {
+        active: state.testActive,
+        testStartTime: testStartTime ? new Date(testStartTime).toISOString() : null,
+        currentChar: currentChar,
+        currentCharRef: currentCharRef.current,
+        recentlyMasteredChar: recentlyMasteredCharRef.current,
+        responseTimes: responseTimes,
+        mistakesCount: Object.keys(mistakesMap).length
+      },
+      appState: {
+        chars: state.chars,
+        charPoints: state.charPoints
+      },
+      localState: {
+        charPoints: localCharPointsRef.current
+      },
+      masteryStatus: {
+        levelChars: currentLevel?.chars || [],
+        masteryPoints: currentLevel?.chars.map(c => ({
+          char: c,
+          statePoints: state.charPoints[c] || 0,
+          localPoints: localCharPointsRef.current[c] || 0,
+          effectivePoints: Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0),
+          isMastered: Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
+        })) || [],
+        allMastered: currentLevel?.chars.every(c => 
+          Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
+        ) || false
+      }
+    };
+    
+    // Format as JSON with pretty printing
+    const debugText = JSON.stringify(debugInfo, null, 2);
+    
+    // Create a text block with markdown formatting
+    const clipboardText = `\`\`\`json\n${debugText}\n\`\`\``;
+    
+    // Copy to clipboard
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(clipboardText)
+        .then(() => {
+          // Show visual confirmation
+          setCopyStatus('copied');
+          // Reset after a delay
+          setTimeout(() => setCopyStatus('idle'), 2000);
+        })
+        .catch(err => {
+          console.error('Failed to copy debug state:', err);
+          setCopyStatus('error');
+          setTimeout(() => setCopyStatus('idle'), 2000);
+        });
+    } else {
+      // Fallback for browsers without clipboard API
+      const textArea = document.createElement('textarea');
+      textArea.value = clipboardText;
+      textArea.style.position = 'fixed';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          setCopyStatus('copied');
+          setTimeout(() => setCopyStatus('idle'), 2000);
+        } else {
+          setCopyStatus('error');
+          setTimeout(() => setCopyStatus('idle'), 2000);
+        }
+      } catch (err: unknown) {
+        console.error('Failed to copy debug state:', err);
+        setCopyStatus('error');
+        setTimeout(() => setCopyStatus('idle'), 2000);
+      }
+      
+      document.body.removeChild(textArea);
+    }
+  }, [
+    state.selectedLevelId,
+    state.testActive,
+    state.chars,
+    state.charPoints,
+    currentLevel,
+    testStartTime,
+    currentChar,
+    currentCharRef,
+    recentlyMasteredCharRef,
+    responseTimes,
+    mistakesMap,
+    localCharPointsRef
+  ]);
+  
+  // State for copy button status
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+  
   return (
     <div className={styles.sendingTrainer}>
       {/* Debug state information - only visible in development */}
@@ -923,11 +1029,135 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           overflow: 'auto',
           border: '1px solid #666'
         }}>
-          <div style={{fontWeight: 'bold', marginBottom: '5px', fontSize: '14px', borderBottom: '1px solid #555', paddingBottom: '5px'}}>
-            COMPLETE STATE DIAGNOSTICS
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '5px', 
+            borderBottom: '1px solid #555', 
+            paddingBottom: '5px'
+          }}>
+            <div style={{fontWeight: 'bold', fontSize: '14px'}}>
+              COMPLETE STATE DIAGNOSTICS
+            </div>
+            <div 
+              onClick={copyDebugStateToClipboard}
+              style={{
+                fontSize: '16px',
+                cursor: 'pointer',
+                width: '24px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '3px',
+                background: copyStatus === 'idle' ? 'transparent' : 
+                           copyStatus === 'copied' ? 'rgba(0,80,0,0.5)' : 
+                           'rgba(80,0,0,0.5)',
+                transition: 'background-color 0.2s'
+              }}
+              title="Copy debug data to clipboard"
+            >
+              {copyStatus === 'idle' && (
+                <span style={{opacity: 0.8}}>📋</span>
+              )}
+              {copyStatus === 'copied' && (
+                <span style={{color: '#5f5', fontWeight: 'bold'}}>✓</span>
+              )}
+              {copyStatus === 'error' && (
+                <span style={{color: '#f55'}}>✗</span>
+              )}
+            </div>
+          </div>
+          
+          {/* Current Level Information - Highlighted at top */}
+          <div style={{
+            marginBottom: '10px',
+            padding: '5px',
+            backgroundColor: 'rgba(100,100,0,0.3)',
+            border: '1px solid #aa8',
+            borderRadius: '4px'
+          }}>
+            <div style={{fontWeight: 'bold', fontSize: '13px', marginBottom: '4px'}}>
+              CURRENT LEVEL STATUS
+            </div>
+            <div style={{display: 'flex', justifyContent: 'space-between'}}>
+              <div>
+                <span style={{color: '#ffb'}}>{currentLevel?.name || 'Unknown Level'}</span> 
+                (<span style={{color: '#ffb'}}>{state.selectedLevelId}</span>)
+              </div>
+              <div>
+                Test Active: <span style={{color: state.testActive ? '#8f8' : '#f88'}}>{state.testActive ? 'YES' : 'NO'}</span>
+              </div>
+            </div>
+            <div style={{marginTop: '3px'}}>
+              <div>Level Characters: <span style={{color: '#ffb'}}>{currentLevel?.chars.join(', ')}</span></div>
+              <div>AppState Characters: <span style={{color: '#ffb'}}>{state.chars.join(', ')}</span></div>
+            </div>
+            <div style={{marginTop: '3px'}}>
+              <div>
+                Mastery: {(state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length)} of {state.chars.length} characters mastered
+              </div>
+            </div>
           </div>
           
           <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+            {/* Level Completion Tracker */}
+            <div style={{
+              border: '1px solid #444', 
+              padding: '5px', 
+              backgroundColor: 'rgba(0,100,100,0.2)'
+            }}>
+              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>
+                Level Completion Status
+              </div>
+              <div>
+                <div>Last Checked: <span style={{color: '#8ff'}}>
+                  {Object.keys(localCharPointsRef.current).length > 0 ? 'Yes' : 'Not yet'}
+                </span></div>
+                <div style={{marginTop: '5px', display: 'flex', flexDirection: 'column', gap: '2px'}}>
+                  {currentLevel && currentLevel.chars.map(char => {
+                    const statePoints = state.charPoints[char] || 0;
+                    const localPoints = localCharPointsRef.current[char] || 0;
+                    const effectivePoints = Math.max(statePoints, localPoints);
+                    const isMastered = effectivePoints >= TARGET_POINTS;
+                    return (
+                      <div key={char} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '1px 3px',
+                        backgroundColor: isMastered ? 'rgba(0,50,0,0.3)' : 'rgba(50,0,0,0.3)',
+                        borderRadius: '2px'
+                      }}>
+                        <div>Character: <span style={{color: '#8ff'}}>{char}</span></div>
+                        <div>
+                          <span style={{color: isMastered ? '#8f8' : '#f88'}}>
+                            {effectivePoints.toFixed(2)}/{TARGET_POINTS}
+                          </span>
+                          <span style={{marginLeft: '5px'}}>
+                            {isMastered ? '✅' : '❌'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{marginTop: '5px', borderTop: '1px solid #444', paddingTop: '3px'}}>
+                  <div>
+                    All Mastered: <span style={{
+                      color: currentLevel && currentLevel.chars.every(c => 
+                        Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
+                      ) ? '#8f8' : '#f88'
+                    }}>
+                      {currentLevel && currentLevel.chars.every(c => 
+                        Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
+                      ) ? 'YES' : 'NO'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(0,50,0,0.2)'}}>
               <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>AppState Context</div>
               <div>Level ID: <span style={{color: '#8fff8f'}}>{state.selectedLevelId}</span></div>
@@ -966,7 +1196,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
               </div>
             </div>
             
-            <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(50,0,0,0.2)'}}>
+            <div style={{border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(0,50,0,0.2)'}}>
               <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>Local Component State</div>
               <div>Current Char: <span style={{color: '#ff8f8f'}}>{currentChar || '(none)'}</span></div>
               <div>Current Char Ref: <span style={{color: '#ff8f8f'}}>{currentCharRef.current || '(none)'}</span></div>
