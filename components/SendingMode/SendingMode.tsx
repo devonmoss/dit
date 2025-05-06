@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import styles from './SendingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
 import { isBrowser } from '../../utils/morse';
@@ -169,27 +169,46 @@ const SendingMode: React.FC = () => {
     };
   }, []);
   
-  // Pick next character based on mastery weights - using chars from ref for consistency
+  // Pick next character based on mastery weights - using consistent values
   const pickNextChar = useCallback(() => {
     if (levelCharsRef.current.length === 0) {
       console.error('[SendingMode] No characters in level chars ref');
       return '';
     }
     
+    // Debug log both state and refs for comparison
     console.log('[SendingMode] Picking next character');
     console.log('[SendingMode] Available chars (ref):', levelCharsRef.current);
-    console.log('[SendingMode] Current charPoints (state):', localCharPoints);
-    console.log('[SendingMode] Current charPoints (ref):', charPointsRef.current);
     console.log('[SendingMode] Recently mastered:', recentlyMasteredCharRef.current);
     
-    // Always use the refs to ensure consistent values across render cycles
+    // Log each character's points from both sources for comparison
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[SendingMode] Character points comparison:');
+      levelCharsRef.current.forEach(char => {
+        const statePoints = localCharPoints[char] || 0;
+        const refPoints = charPointsRef.current[char] || 0;
+        console.log(`[SendingMode] ${char}: state=${statePoints.toFixed(2)}, ref=${refPoints.toFixed(2)}`);
+      });
+    }
+    
+    // For character selection, use a merged version with the highest values from both sources
+    const mergedPoints: Record<string, number> = {};
+    levelCharsRef.current.forEach(char => {
+      const stateValue = localCharPoints[char] || 0;
+      const refValue = charPointsRef.current[char] || 0;
+      mergedPoints[char] = Math.max(stateValue, refValue);
+    });
+    
+    console.log('[SendingMode] Using merged points for selection:', mergedPoints);
+    
+    // Use the merged points for character selection
     return selectNextCharacter(
-      levelCharsRef.current,  // Use level chars ref
-      charPointsRef.current,  // Use charPoints ref instead of state
+      levelCharsRef.current,
+      mergedPoints,
       TARGET_POINTS,
       recentlyMasteredCharRef.current
     );
-  }, []);
+  }, [localCharPoints]);
   
   // Stop any current sound
   const stopSound = useCallback(() => {
@@ -237,6 +256,7 @@ const SendingMode: React.FC = () => {
   // Play element (dot/dash)
   const playElement = useCallback((symbol: '.' | '-') => {
     if (!audioContextRef.current || !gainNodeRef.current) return;
+    if (symbol !== '.' && symbol !== '-') return;
     
     stopSound();
     
@@ -288,19 +308,34 @@ const SendingMode: React.FC = () => {
   const updateLocalPoints = useCallback((char: string, points: number) => {
     console.log(`[SendingMode] Updating local points for ${char} to ${points}`);
     
+    // Create a copy of current points to prevent mutation issues
+    const updatedCharPoints = { ...charPointsRef.current };
+    updatedCharPoints[char] = points;
+    
     // First update the ref immediately for consistent access in callbacks
-    charPointsRef.current = { ...charPointsRef.current, [char]: points };
+    charPointsRef.current = updatedCharPoints;
     console.log(`[SendingMode] Updated charPointsRef:`, charPointsRef.current);
     
-    // Then update the local state for rendering
+    // Update state too (which will trigger a render)
     setLocalCharPoints(prev => {
-      const newPoints = { ...prev, [char]: points };
+      // Important: make a new object to ensure React detects the change
+      const newPoints = { ...prev };
+      newPoints[char] = points;
       console.log(`[SendingMode] Updated local points state:`, newPoints);
       return newPoints;
     });
     
     // Also update the app state to keep them in sync
     updateCharPoints(char, points);
+    
+    // If we just reached mastery, update the recently mastered ref
+    const wasJustMastered = points >= TARGET_POINTS && 
+      (charPointsRef.current[char] || 0) < TARGET_POINTS;
+    
+    if (wasJustMastered) {
+      console.log(`[SendingMode] Character ${char} just reached mastery!`);
+      recentlyMasteredCharRef.current = char;
+    }
   }, [updateCharPoints]);
   
   // Finish the test
@@ -366,6 +401,11 @@ const SendingMode: React.FC = () => {
   
   // Handle character input from the keyer
   const handleCharacter = useCallback((char: string) => {
+    if (!char) {
+      console.log('[SendingMode] Received empty character, ignoring');
+      return;
+    }
+    
     console.log(`[SendingMode] Handling character input: ${char}`);
     
     // Use the ref value instead of state to avoid stale closure issues
@@ -380,7 +420,8 @@ const SendingMode: React.FC = () => {
     
     // Calculate response time using the ref for consistency
     const now = Date.now();
-    const startTime = charStartTimeRef.current || now;
+    // Default to current time if no start time is recorded
+    const startTime = charStartTimeRef.current ? charStartTimeRef.current : now;
     const responseTime = now - startTime;
     console.log(`[SendingMode] Response time: ${responseTime}ms (start: ${startTime}, now: ${now})`);
     
@@ -411,9 +452,9 @@ const SendingMode: React.FC = () => {
       const willCompleteMastery = newPoints >= TARGET_POINTS && currentPoints < TARGET_POINTS;
       
       // If this character will now be mastered, track it to avoid immediate reselection
+      // Note: We now handle this in updateLocalPoints instead
       if (willCompleteMastery) {
-        console.log(`[SendingMode] Character ${successChar} has reached mastery!`);
-        recentlyMasteredCharRef.current = successChar;
+        console.log(`[SendingMode] Character ${successChar} will reach mastery with these points!`);
       }
       
       // Update local character points
@@ -426,16 +467,21 @@ const SendingMode: React.FC = () => {
       
       // Delay before next question or finishing
       feedbackTimerRef.current = window.setTimeout(() => {
-        // Use the ref for most up-to-date points
-        const currentPoints = charPointsRef.current;
+        // Use merged points from both sources for most accuracy
+        const mergedPoints: Record<string, number> = {};
+        levelCharsRef.current.forEach(char => {
+          const stateValue = localCharPoints[char] || 0;
+          const refValue = charPointsRef.current[char] || 0;
+          mergedPoints[char] = Math.max(stateValue, refValue);
+        });
         
-        console.log(`[SendingMode] Checking mastery with points from ref:`, currentPoints);
+        console.log(`[SendingMode] Checking mastery with merged points:`, mergedPoints);
         console.log(`[SendingMode] Using level chars:`, levelCharsRef.current);
         
-        // Check level completion using the refs to ensure consistency
+        // Check level completion using the merged points
         const allMastered = levelCharsRef.current.length > 0 && 
           levelCharsRef.current.every(c => {
-            const pointsForChar = currentPoints[c] || 0;
+            const pointsForChar = mergedPoints[c] || 0;
             const isMastered = pointsForChar >= TARGET_POINTS;
             console.log(`[SendingMode] Character ${c}: ${pointsForChar}/${TARGET_POINTS} - ${isMastered ? 'MASTERED' : 'not mastered'}`);
             return isMastered;
@@ -540,7 +586,9 @@ const SendingMode: React.FC = () => {
   // Handle an element (dot/dash) from the keyer
   const handleElement = useCallback((symbol: '.' | '-') => {
     // Always append to morse output regardless of state
-    setMorseOutput(prev => prev + symbol);
+    if (symbol === '.' || symbol === '-') {
+      setMorseOutput(prev => prev + symbol);
+    }
   }, []);
   
   // Create the keyer with stabilized callbacks
@@ -747,10 +795,52 @@ const SendingMode: React.FC = () => {
   
   // Calculate progress - mastered characters using local points
   // Use levelCharsRef for consistent mastery calculations
-  // Get mastery counts from charPointsRef to ensure latest values
-  const masteredCount = levelCharsRef.current.filter(c => (charPointsRef.current[c] || 0) >= TARGET_POINTS).length;
-  const totalChars = levelCharsRef.current.length;
+  // Calculate mastered count safely
+  const masteredCount = useMemo(() => {
+    // Guard against empty arrays
+    if (!levelCharsRef.current || levelCharsRef.current.length === 0) {
+      return 0;
+    }
+    
+    // Create merged points using both state and ref 
+    const merged: Record<string, number> = {};
+    
+    // Safely iterate through characters
+    levelCharsRef.current.forEach(c => {
+      if (c) { // Make sure character is defined
+        const stateValue = (localCharPoints && c in localCharPoints) ? localCharPoints[c] : 0;
+        const refValue = (charPointsRef.current && c in charPointsRef.current) ? charPointsRef.current[c] : 0;
+        merged[c] = Math.max(stateValue, refValue);
+      }
+    });
+    
+    // Count mastered characters
+    return levelCharsRef.current.filter(c => 
+      c && merged[c] >= TARGET_POINTS
+    ).length;
+  }, [localCharPoints]);
+  
+  // Safely calculate total chars
+  const totalChars = levelCharsRef.current ? levelCharsRef.current.length : 0;
   const progress = `Mastered: ${masteredCount}/${totalChars}`;
+  
+  // Calculate merged character points for display
+  const mergedCharPoints = useMemo(() => {
+    // Safely merge state and ref values
+    const merged: Record<string, number> = {};
+    
+    if (levelCharsRef.current && levelCharsRef.current.length > 0) {
+      levelCharsRef.current.forEach(c => {
+        if (c) {
+          const stateValue = (localCharPoints && c in localCharPoints) ? localCharPoints[c] : 0;
+          const refValue = (charPointsRef.current && c in charPointsRef.current) ? charPointsRef.current[c] : 0;
+          merged[c] = Math.max(stateValue, refValue);
+        }
+      });
+    }
+    
+    return merged;
+  }, [localCharPoints]);
   
   // Using useRef for client detection to avoid hydration mismatches
   useEffect(() => {
@@ -812,10 +902,10 @@ const SendingMode: React.FC = () => {
           </div>
           
           <MasteryDisplay 
-            // Use charPointsRef as source of truth for most up-to-date values
+            // Use merged points for most accurate display
             targetPoints={TARGET_POINTS}
-            charPoints={charPointsRef.current}
-            chars={levelCharsRef.current}
+            charPoints={mergedCharPoints}
+            chars={levelCharsRef.current || []}
           />
           
           {isCheckpoint && strikeLimit && (
