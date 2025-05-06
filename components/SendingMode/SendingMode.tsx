@@ -47,6 +47,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const [charStartTime, setCharStartTime] = useState<number | null>(null);
   const [testStartTime, setTestStartTime] = useState<number | null>(null);
   
+  // Additional ref for stable timing tracking
+  const charStartTimeRef = useRef<number>(0);
+  
   // Audio refs - these need to be refs due to how Web Audio works
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -141,6 +144,14 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     currentCharRef.current = currentChar;
     console.log(`Syncing currentCharRef to: "${currentChar}"`);
   }, [currentChar]);
+  
+  // Sync charStartTime with ref
+  useEffect(() => {
+    if (charStartTime) {
+      charStartTimeRef.current = charStartTime;
+      console.log(`Syncing charStartTimeRef to: ${charStartTime}`);
+    }
+  }, [charStartTime]);
   
   // Stop any current sound
   const stopSound = useCallback(() => {
@@ -253,7 +264,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setFeedbackState('none');
     
     // Set the start time for response time tracking
-    setCharStartTime(Date.now());
+    const now = Date.now();
+    setCharStartTime(now);
+    charStartTimeRef.current = now;
+    console.log(`Setting character start time: ${now}`);
   }, [pickNextChar, state.testActive]);
   
   // Handle an element (dot/dash) from the keyer
@@ -304,7 +318,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     console.log(`SendingMode: Comparing ${char.toLowerCase()} === ${currentChar.toLowerCase()}: ${char.toLowerCase() === currentChar.toLowerCase()}`);
     
     // Calculate response time
-    const responseTime = charStartTime ? (Date.now() - charStartTime) : 0;
+    const responseTime = charStartTimeRef.current ? (Date.now() - charStartTimeRef.current) : 0;
+    console.log(`Response time calculation: ${Date.now()} - ${charStartTimeRef.current} = ${responseTime}ms`);
     
     // Check if character matches
     if (char.toLowerCase() === currentChar.toLowerCase()) {
@@ -327,6 +342,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Update character points - consistent with TrainingMode
       const currentPoints = state.charPoints[successChar] || 0;
       const newPoints = currentPoints + points;
+      
+      console.log(`[POINTS DEBUG] Updating points for ${successChar}:`);
+      console.log(`  - Current points from state: ${state.charPoints[successChar] || 0}`);
+      console.log(`  - Points being added: ${points}`);
+      console.log(`  - New total points: ${newPoints}`);
       
       // Check if character will reach mastery with this addition
       const willCompleteMastery = newPoints >= TARGET_POINTS && currentPoints < TARGET_POINTS;
@@ -482,7 +502,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       setCurrentChar(nextChar);
       setMorseOutput('');
       setFeedbackState('none');
-      setCharStartTime(Date.now());
+      const now = Date.now();
+      setCharStartTime(now);
+      charStartTimeRef.current = now;
+      console.log(`Setting character start time during test start: ${now}`);
     }, 100);
   }, [startTest, pickNextChar]);
   
@@ -528,7 +551,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       setCurrentChar(nextChar);
       setMorseOutput('');
       setFeedbackState('none');
-      setCharStartTime(Date.now());
+      const now = Date.now();
+      setCharStartTime(now);
+      charStartTimeRef.current = now;
+      console.log(`Setting character start time during test start: ${now}`);
     }, 100);
   }, [startTestWithLevelId, pickNextChar]);
   
