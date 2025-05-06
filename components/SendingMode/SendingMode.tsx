@@ -49,7 +49,8 @@ const SendingMode: React.FC = () => {
   // Reference to track character points that's immediately available to callbacks
   const charPointsRef = useRef<Record<string, number>>({});
   
-  // Test timing state
+  // Test timing state - use both ref and state
+  const testStartTimeRef = useRef<number | null>(null);
   const [testStartTime, setTestStartTime] = useState<number | null>(null);
   
   // Question timing state - use both ref and state
@@ -346,7 +347,29 @@ const SendingMode: React.FC = () => {
   const finishTest = useCallback((completed = true) => {
     // Calculate elapsed time
     const endTime = Date.now();
-    const elapsedSec = testStartTime ? (endTime - testStartTime) / 1000 : 0;
+    
+    // Prefer the ref for timing as it's more reliable, with various fallbacks
+    let elapsedSec = 0;
+    if (testStartTimeRef.current) {
+      // Primary source: Use ref (most reliable)
+      elapsedSec = (endTime - testStartTimeRef.current) / 1000;
+      console.log(`[SendingMode] Test finished. Duration from ref: ${elapsedSec.toFixed(2)}s (${testStartTimeRef.current} to ${endTime})`);
+    } else if (testStartTime) {
+      // Secondary source: Use state
+      elapsedSec = (endTime - testStartTime) / 1000;
+      console.log(`[SendingMode] Test finished. Duration from state: ${elapsedSec.toFixed(2)}s (${testStartTime} to ${endTime})`);
+    } else {
+      // Fallback: use the average time spent on all characters as estimate
+      if (responseTimes.length > 0) {
+        const totalResponseTime = responseTimes.reduce((sum, item) => sum + item.time, 0);
+        elapsedSec = totalResponseTime;
+        console.log(`[SendingMode] No test start time recorded. Using response times: ${elapsedSec.toFixed(2)}s`);
+      } else {
+        // Absolute minimum fallback - shouldn't happen with our fixes
+        elapsedSec = 60; // Default to 1 minute if we have nothing else
+        console.log(`[SendingMode] No timing data available. Using default: ${elapsedSec}s`);
+      }
+    }
     
     // Save response times
     if (responseTimes.length > 0) {
@@ -651,6 +674,12 @@ const SendingMode: React.FC = () => {
     console.log('[SendingMode] Installing keyer for new test');
     keyerRef.current.install();
     
+    // Always set the test start time when starting a test - both ref and state
+    const now = Date.now();
+    testStartTimeRef.current = now;
+    setTestStartTime(now);
+    console.log('[SendingMode] Setting test start time:', now);
+    
     // Start the test in the AppState
     startTest();
     
@@ -665,10 +694,9 @@ const SendingMode: React.FC = () => {
     }, 100);
   }, [startTest, nextQuestion, isCheckpoint, strikeLimit]);
   
-  // Clean restart with time recording
+  // Clean restart with time recording (now handleStartTest already sets the time)
   const startTestAndRecordTime = useCallback(() => {
-    console.log('[SendingMode] Starting test and recording time');
-    setTestStartTime(Date.now());
+    console.log('[SendingMode] Starting test with time recording');
     handleStartTest();
   }, [handleStartTest]);
   
@@ -697,8 +725,11 @@ const SendingMode: React.FC = () => {
     console.log('[SendingMode] Installing keyer for new test with level:', levelId);
     keyerRef.current.install();
     
-    // Set test start time
-    setTestStartTime(Date.now());
+    // Set test start time - both ref and state
+    const now = Date.now();
+    testStartTimeRef.current = now;
+    setTestStartTime(now);
+    console.log('[SendingMode] Setting test start time for level:', levelId, now);
     
     // Start test with level ID
     startTestWithLevelId(levelId);
