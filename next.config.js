@@ -7,6 +7,14 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
   
+  // Enable detailed source maps for better debugging
+  webpack: (config, { dev, isServer }) => {
+    if (dev) {
+      config.devtool = 'eval-source-map';
+    }
+    return config;
+  },
+  
   // Redirects
   async redirects() {
     return [
