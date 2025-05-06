@@ -389,11 +389,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Play error sound
       playErrorSound();
       
-      // Show next character after longer delay
-      console.log(`SendingMode: Incorrect match - showing next character in 2000ms`);
+      // Clear feedback after delay but KEEP the same character
+      console.log(`SendingMode: Incorrect match - keeping same character, clearing feedback in 2000ms`);
       setTimeout(() => {
         setFeedbackState('none');
-        showNextChar();
+        // Reset morse output so they can try again
+        setMorseOutput('');
       }, 2000);
     }
     
