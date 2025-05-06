@@ -60,6 +60,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const currentCharRef = useRef('');
   const strikeCountRef = useRef(0);  // Add a ref to track strikes
   
+  // Add a ref to store points between updates since the context isn't working correctly
+  const charPointsRef = useRef<Record<string, number>>({});
+  
   // Track current environment
   const isClientRef = useRef(false);
   const isDevelopmentRef = useRef(false);
@@ -321,18 +324,27 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Add to response times log
       setResponseTimes(prev => [...prev, { char: successChar, time: responseTime / 1000 }]);
       
-      // Update character points - simpler approach like TrainingMode
-      const currentPoints = state.charPoints[successChar] || 0;
-      console.log(`SendingMode: Current points for "${successChar}": ${currentPoints}`);
+      // Update character points with better tracking
+      // First get points from our ref (which tracks correctly between calls)
+      const currentPoints = charPointsRef.current[successChar] || 0;
+      console.log(`SendingMode: Current points for "${successChar}" (from ref): ${currentPoints}`);
+      console.log(`SendingMode: Current points for "${successChar}" (from state): ${state.charPoints[successChar] || 0}`);
       
       const newPoints = currentPoints + points; // Add to existing points
-      console.log(`SendingMode: Updating points for "${successChar}" to ${newPoints} (adding ${points})`);
+      console.log(`SendingMode: Updating points for "${successChar}" from ${currentPoints} to ${newPoints} (adding ${points})`);
+      
+      // Update both our ref and the app state
+      charPointsRef.current[successChar] = newPoints;
       updateCharPoints(successChar, newPoints);
       
-      // Create a simulated updated charPoints object for mastery checks
-      const updatedCharPoints = { ...state.charPoints, [successChar]: newPoints };
+      // Log the update
+      console.log(`SendingMode: Updated points ref for "${successChar}" to ${charPointsRef.current[successChar]}`);
       
-      // Check if this completes mastery using simulated state
+      // Create a simulated updated charPoints object for mastery checks
+      // Use our ref as the source of truth
+      const updatedCharPoints = { ...charPointsRef.current };
+      
+      // Check if this completes mastery using our ref
       const willComplete = newPoints >= TARGET_POINTS;
       const othersMastered = state.chars
         .filter(c => c !== successChar)
@@ -371,13 +383,20 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         return { ...prev, [targetChar]: count + 1 };
       });
       
-      // Reduce points - similar approach for incorrect answers
-      const currentPoints = state.charPoints[targetChar] || 0;
-      console.log(`SendingMode: Current points for "${targetChar}": ${currentPoints}`);
+      // Reduce points using our ref as the source of truth
+      const currentPoints = charPointsRef.current[targetChar] || 0;
+      console.log(`SendingMode: Current points for "${targetChar}" (from ref): ${currentPoints}`);
+      console.log(`SendingMode: Current points for "${targetChar}" (from state): ${state.charPoints[targetChar] || 0}`);
       
       const newPoints = Math.max(0, currentPoints * INCORRECT_PENALTY);
-      console.log(`SendingMode: Reducing points for "${targetChar}" to ${newPoints} (30% reduction)`);
+      console.log(`SendingMode: Reducing points for "${targetChar}" from ${currentPoints} to ${newPoints} (30% reduction)`);
+      
+      // Update both our ref and the app state
+      charPointsRef.current[targetChar] = newPoints;
       updateCharPoints(targetChar, newPoints);
+      
+      // Log the update
+      console.log(`SendingMode: Updated points ref for "${targetChar}" to ${charPointsRef.current[targetChar]}`);
       
       // Properly enforce the checkpoint strike rule
       if (isCheckpoint && strikeLimit) {
@@ -463,6 +482,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setCompleted(true);
     setShowResults(false);
     
+    // Initialize our points tracking ref
+    charPointsRef.current = {};
+    
     // Start app test with the current level ID
     // This is critical - we need to use startTestWithLevelId instead of startTest
     // to ensure charPoints are properly initialized
@@ -499,10 +521,17 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
-  // Update progress display - use state.charPoints again
+  // Update progress display using our ref
   useEffect(() => {
     if (sendingActive) {
-      const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
+      // Use our ref as the source of truth, but fall back to state
+      const masteredCount = state.chars.filter(c => {
+        const points = charPointsRef.current[c] !== undefined ? 
+                       charPointsRef.current[c] : 
+                       (state.charPoints[c] || 0);
+        return points >= TARGET_POINTS;
+      }).length;
+      
       setLevelProgress(`Mastered: ${masteredCount}/${state.chars.length}`);
     }
   }, [sendingActive, state.chars, state.charPoints]);
@@ -577,7 +606,16 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         }}>
           <div>Level ID: {state.selectedLevelId}</div>
           <div>Characters: {state.chars.join(', ')}</div>
-          <div>Mastery:
+          <div>Mastery: <small>(ref values)</small>
+            <ul style={{margin: '5px 0', paddingLeft: '20px'}}>
+              {state.chars.map(c => (
+                <li key={c}>
+                  {c}: {charPointsRef.current[c] || 0}/{TARGET_POINTS}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>State Mastery: <small>(context values)</small>
             <ul style={{margin: '5px 0', paddingLeft: '20px'}}>
               {state.chars.map(c => (
                 <li key={c}>
