@@ -30,7 +30,7 @@ interface CharTiming {
 const SendingMode: React.FC<SendingModeProps> = () => {
   const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel, startTestWithLevelId } = useAppState();
   
-  // Local UI state - align with TrainingMode approach
+  // Local UI state
   const [currentChar, setCurrentChar] = useState('');
   const [morseOutput, setMorseOutput] = useState('');
   const [feedbackState, setFeedbackState] = useState<'none' | 'correct' | 'incorrect'>('none');
@@ -43,14 +43,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     elapsedTime: number;
   } | null>(null);
   
-  // Timing state
-  const [charStartTime, setCharStartTime] = useState<number | null>(null);
+  // Test timing state
   const [testStartTime, setTestStartTime] = useState<number | null>(null);
   
-  // Additional ref for stable timing tracking
-  const charStartTimeRef = useRef<number>(0);
+  // Question timing state (analogous to TrainingMode's questionStartTime)
+  const [charStartTime, setCharStartTime] = useState<number | null>(null);
   
-  // Audio refs - these need to be refs due to how Web Audio works
+  // Audio refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const oscillatorRef = useRef<OscillatorNode | null>(null);
@@ -58,16 +57,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   // Reference to track recently mastered character
   const recentlyMasteredCharRef = useRef<string | null>(null);
   
-  // Client/development detection
+  // Environment detection
   const isClientRef = useRef(false);
   const isDevelopmentRef = useRef(false);
-  
-  // Reference to store the keyer instance
-  const keyerRef = useRef<ReturnType<typeof useIambicKeyer> | null>(null);
-  
-  // Refs to track current state for keyer callbacks
-  const currentCharRef = useRef<string>('');
-  const testActiveRef = useRef<boolean>(false);
   
   // Get current level info
   const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
@@ -100,7 +92,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     };
   }, []);
   
-  // Ensure level characters are correctly loaded on mount - from TrainingMode
+  // Ensure level characters are correctly loaded on mount
   useEffect(() => {
     if (currentLevel && state.chars.length > 0) {
       // Check if current state.chars matches the expected level's chars
@@ -124,7 +116,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     }
   }, [currentLevel, state.chars, state.selectedLevelId, selectLevel]);
   
-  // Debug logging - from TrainingMode
+  // Debug logging
   useEffect(() => {
     console.log('---------------------------------------');
     console.log(`[${new Date().toISOString()}] State Update`);
@@ -133,25 +125,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     console.log('testActive:', state.testActive);
     console.log('---------------------------------------');
   }, [state.selectedLevelId, state.chars, state.testActive]);
-  
-  // Keep refs in sync with state
-  useEffect(() => {
-    testActiveRef.current = state.testActive;
-    console.log(`📊 [STATE] Test Active changed: ${state.testActive}`);
-  }, [state.testActive]);
-  
-  useEffect(() => {
-    currentCharRef.current = currentChar;
-    console.log(`Syncing currentCharRef to: "${currentChar}"`);
-  }, [currentChar]);
-  
-  // Sync charStartTime with ref
-  useEffect(() => {
-    if (charStartTime) {
-      charStartTimeRef.current = charStartTime;
-      console.log(`Syncing charStartTimeRef to: ${charStartTime}`);
-    }
-  }, [charStartTime]);
   
   // Stop any current sound
   const stopSound = useCallback(() => {
@@ -235,7 +208,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     return 1 - ((seconds - MIN_RESPONSE_TIME) / (MAX_RESPONSE_TIME - MIN_RESPONSE_TIME));
   }, []);
   
-  // Pick next character based on mastery weights - using TrainingMode approach
+  // Pick next character based on mastery weights
   const pickNextChar = useCallback(() => {
     console.log(`SendingMode: Selecting next character from ${state.chars.length} characters:`, state.chars);
     console.log(`SendingMode: Current points:`, state.charPoints);
@@ -249,38 +222,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     );
   }, [state.chars, state.charPoints]);
   
-  // Show next character
-  const showNextChar = useCallback(() => {
-    if (!state.testActive) {
-      console.log('Cannot show next character - test not active');
-      return;
-    }
-    
-    const nextChar = pickNextChar();
-    console.log(`SendingMode: Showing next character: "${nextChar}"`);
-    
-    setCurrentChar(nextChar);
-    setMorseOutput('');
-    setFeedbackState('none');
-    
-    // Set the start time for response time tracking
-    const now = Date.now();
-    setCharStartTime(now);
-    charStartTimeRef.current = now;
-    console.log(`Setting character start time: ${now}`);
-  }, [pickNextChar, state.testActive]);
-  
-  // Handle an element (dot/dash) from the keyer
-  const handleElement = useCallback((symbol: '.' | '-') => {
-    if (!testActiveRef.current) {
-      console.log(`Element ${symbol} detected but testActiveRef is false - ignoring`);
-      return;
-    }
-    
-    setMorseOutput(prev => prev + symbol);
-  }, []);
-  
-  // Finish test - aligned with TrainingMode
+  // Finish the test - similar to TrainingMode's finishTest
   const finishTest = useCallback((completed = true) => {
     // Calculate elapsed time
     const endTime = Date.now();
@@ -303,33 +245,49 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     });
   }, [testStartTime, responseTimes, saveResponseTimes, endTest]);
   
-  // Handle a character from the keyer
+  // Present next question - similar to TrainingMode's nextQuestion
+  const nextQuestion = useCallback(() => {
+    const nextChar = pickNextChar();
+    console.log(`SendingMode: Next question with character: "${nextChar}"`);
+    
+    // Set the current character
+    setCurrentChar(nextChar);
+    setMorseOutput('');
+    setFeedbackState('none');
+    
+    // Set the start time for response time tracking
+    const now = Date.now();
+    setCharStartTime(now);
+    console.log(`Setting character start time: ${now}`);
+    
+    // Return a promise that resolves immediately to match TrainingMode's flow
+    return Promise.resolve();
+  }, [pickNextChar]);
+  
+  // Handle character input from the keyer
   const handleCharacter = useCallback((char: string) => {
-    // Use refs instead of state to avoid stale closures
-    if (!testActiveRef.current || !currentCharRef.current) {
-      console.log(`SendingMode: Character detected but test not active or no current character - ignoring`);
-      console.log(`  testActiveRef: ${testActiveRef.current}, currentCharRef: "${currentCharRef.current}"`);
+    // Skip if no current char to match against
+    if (!currentChar) {
+      console.log(`SendingMode: Character "${char}" detected but no current character - ignoring`);
       return;
     }
-    
-    const currentChar = currentCharRef.current;
     
     console.log(`SendingMode: Keyer decoded: "${char}", target: "${currentChar}"`);
     console.log(`SendingMode: Comparing ${char.toLowerCase()} === ${currentChar.toLowerCase()}: ${char.toLowerCase() === currentChar.toLowerCase()}`);
     
     // Calculate response time
-    const responseTime = charStartTimeRef.current ? (Date.now() - charStartTimeRef.current) : 0;
-    console.log(`Response time calculation: ${Date.now()} - ${charStartTimeRef.current} = ${responseTime}ms`);
+    const responseTime = charStartTime ? (Date.now() - charStartTime) : 0;
+    console.log(`Response time calculation: ${Date.now()} - ${charStartTime} = ${responseTime}ms`);
     
     // Check if character matches
     if (char.toLowerCase() === currentChar.toLowerCase()) {
       console.log(`SendingMode: CORRECT match - "${char}" matches "${currentChar}"`);
       
-      // Clear the current character from the display
+      // Store the successful character
       const successChar = currentChar;
-      setCurrentChar('');
       
-      // Correct character!
+      // Clear the current character and set feedback
+      setCurrentChar('');
       setFeedbackState('correct');
       
       // Calculate points based on response time
@@ -339,7 +297,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Add to response times log
       setResponseTimes(prev => [...prev, { char: successChar, time: responseTime / 1000 }]);
       
-      // Update character points - consistent with TrainingMode
+      // Update character points
       const currentPoints = state.charPoints[successChar] || 0;
       const newPoints = currentPoints + points;
       
@@ -360,7 +318,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       
       console.log(`Character ${successChar} updated: ${currentPoints} → ${newPoints} points (${points} added, response time: ${(responseTime / 1000).toFixed(2)}s)`);
       
-      // Delay before next question or finishing
+      // Delay before next question or finishing - like TrainingMode
       setTimeout(() => {
         // Create a simulated updated charPoints object that includes the most recent update
         const updatedCharPoints = { ...state.charPoints, [successChar]: newPoints };
@@ -376,19 +334,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         if (allMastered) {
           finishTest(true);
         } else {
-          setFeedbackState('none');
-          
-          // Force the next character to show regardless of test state
-          // This helps with race conditions where state.testActive might temporarily be false
-          const nextChar = pickNextChar();
-          console.log(`SendingMode: Forcing next character after correct answer: "${nextChar}"`);
-          setCurrentChar(nextChar);
-          setMorseOutput('');
-          setFeedbackState('none');
-          const now = Date.now();
-          setCharStartTime(now);
-          charStartTimeRef.current = now;
-          console.log(`Setting character start time for next character: ${now}`);
+          nextQuestion();
         }
       }, FEEDBACK_DELAY);
     } else {
@@ -430,7 +376,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       playErrorSound();
       
       // Clear feedback after delay but KEEP the same character
-      console.log(`SendingMode: Incorrect match - keeping same character, clearing feedback in 2000ms`);
+      console.log(`SendingMode: Incorrect match - keeping same character, clearing feedback in ${FEEDBACK_DELAY}ms`);
       setTimeout(() => {
         setFeedbackState('none');
         // Reset morse output so they can try again
@@ -438,30 +384,36 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       }, FEEDBACK_DELAY);
     }
     
-    // Clear morse output
+    // Clear morse output after processing input
     setMorseOutput('');
   }, [
     currentChar,
-    state.testActive,
-    state.charPoints,
-    state.chars,
     charStartTime,
     calculatePointsForTime,
     updateCharPoints,
+    state.charPoints, 
+    state.chars,
     isCheckpoint,
     strikeLimit,
     strikeCount,
     playErrorSound,
-    showNextChar,
+    nextQuestion,
     finishTest
   ]);
   
-  // Create a stable onWpmChange callback
+  // Handle an element (dot/dash) from the keyer
+  const handleElement = useCallback((symbol: '.' | '-') => {
+    // Always append to morse output regardless of state
+    // This ensures dots/dashes are displayed even if there's UI latency
+    setMorseOutput(prev => prev + symbol);
+  }, []);
+  
+  // Create the keyer with stabilized callbacks
   const onWpmChange = useCallback((newWpm: number) => {
     console.log('WPM changed to', newWpm);
   }, []);
-
-  // Create the keyer with stabilized callbacks
+  
+  // Create the keyer
   const keyer = useIambicKeyer({
     wpm: state.sendWpm,
     minWpm: 5,
@@ -472,12 +424,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     onWpmChange
   });
   
-  // Store keyer in ref immediately after creation
+  // Store keyer in ref for stable access
+  const keyerRef = useRef(keyer);
   useEffect(() => {
     keyerRef.current = keyer;
   }, [keyer]);
   
-  // Start test - aligned with TrainingMode's handleStartTest
+  // Start test - similar to TrainingMode's handleStartTest
   const handleStartTest = useCallback(() => {
     console.log('SendingMode: Starting test - initializing state');
     
@@ -495,34 +448,24 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     recentlyMasteredCharRef.current = null;
     
     // Clear any pending keyer state
-    if (keyerRef.current) {
-      keyerRef.current.clear();
-    }
+    keyerRef.current.clear();
     
     // Start the test in the AppState
     startTest();
     
     // Set test start time
-    setTestStartTime(Date.now());
+    const now = Date.now();
+    setTestStartTime(now);
+    console.log(`Setting test start time: ${now}`);
     
-    // Show first character after a short delay
+    // Start the first question after a short delay to ensure state is updated
     setTimeout(() => {
-      // Force a character to show even if state.testActive is not yet updated
-      const nextChar = pickNextChar();
-      console.log(`SendingMode: Forcing first character "${nextChar}" regardless of test state`);
-      setCurrentChar(nextChar);
-      setMorseOutput('');
-      setFeedbackState('none');
-      const now = Date.now();
-      setCharStartTime(now);
-      charStartTimeRef.current = now;
-      console.log(`Setting character start time during test start: ${now}`);
+      nextQuestion();
     }, 100);
-  }, [startTest, pickNextChar]);
+  }, [startTest, nextQuestion]);
   
   // Clean restart with time recording
   const startTestAndRecordTime = useCallback(() => {
-    setTestStartTime(Date.now());
     handleStartTest();
   }, [handleStartTest]);
   
@@ -544,34 +487,24 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     recentlyMasteredCharRef.current = null;
     
     // Clear any pending keyer state
-    if (keyerRef.current) {
-      keyerRef.current.clear();
-    }
+    keyerRef.current.clear();
     
     // Set test start time
-    setTestStartTime(Date.now());
+    const now = Date.now();
+    setTestStartTime(now);
+    console.log(`Setting test start time: ${now}`);
     
     // Start test with the level ID
     startTestWithLevelId(levelId);
     
-    // Show first character after a short delay
+    // Start the first question after a short delay to ensure state is updated
     setTimeout(() => {
-      // Force a character to show even if state.testActive is not yet updated
-      const nextChar = pickNextChar();
-      console.log(`SendingMode: Forcing first character "${nextChar}" regardless of test state`);
-      setCurrentChar(nextChar);
-      setMorseOutput('');
-      setFeedbackState('none');
-      const now = Date.now();
-      setCharStartTime(now);
-      charStartTimeRef.current = now;
-      console.log(`Setting character start time during test start: ${now}`);
+      nextQuestion();
     }, 100);
-  }, [startTestWithLevelId, pickNextChar]);
+  }, [startTestWithLevelId, nextQuestion]);
   
-  // Install keyer once on mount with stable references
+  // Install keyer once on mount
   useEffect(() => {
-    // Only install/uninstall on mount/unmount
     if (isBrowser) {
       console.log('Installing keyer (on mount only)');
       keyer.install();
@@ -579,19 +512,17 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     return () => {
       console.log('Uninstalling keyer (on unmount only)');
-      if (keyerRef.current) {
-        keyerRef.current.uninstall();
-      }
+      keyerRef.current.uninstall();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array ensures this only runs on mount/unmount
   
   // Add escape key handler
   useEffect(() => {
-    if (!isBrowser || !state.testActive) return;
+    if (!isBrowser) return;
     
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && state.testActive) {
         e.preventDefault();
         finishTest(false);
       }
