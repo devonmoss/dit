@@ -62,6 +62,10 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   // Reference to store the keyer instance
   const keyerRef = useRef<ReturnType<typeof useIambicKeyer> | null>(null);
   
+  // Refs to track current state for keyer callbacks
+  const currentCharRef = useRef<string>('');
+  const testActiveRef = useRef<boolean>(false);
+  
   // Get current level info
   const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
   const isCheckpoint = currentLevel?.type === 'checkpoint';
@@ -126,6 +130,17 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     console.log('testActive:', state.testActive);
     console.log('---------------------------------------');
   }, [state.selectedLevelId, state.chars, state.testActive]);
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    testActiveRef.current = state.testActive;
+    console.log(`Syncing testActiveRef to: ${state.testActive}`);
+  }, [state.testActive]);
+  
+  useEffect(() => {
+    currentCharRef.current = currentChar;
+    console.log(`Syncing currentCharRef to: "${currentChar}"`);
+  }, [currentChar]);
   
   // Stop any current sound
   const stopSound = useCallback(() => {
@@ -276,10 +291,14 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Handle a character from the keyer
   const handleCharacter = useCallback((char: string) => {
-    if (!state.testActive || !currentChar) {
+    // Use refs instead of state to avoid stale closures
+    if (!testActiveRef.current || !currentCharRef.current) {
       console.log(`SendingMode: Character detected but test not active or no current character - ignoring`);
+      console.log(`  testActiveRef: ${testActiveRef.current}, currentCharRef: "${currentCharRef.current}"`);
       return;
     }
+    
+    const currentChar = currentCharRef.current;
     
     console.log(`SendingMode: Keyer decoded: "${char}", target: "${currentChar}"`);
     console.log(`SendingMode: Comparing ${char.toLowerCase()} === ${currentChar.toLowerCase()}: ${char.toLowerCase() === currentChar.toLowerCase()}`);
@@ -406,7 +425,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     finishTest
   ]);
   
-  // Create the keyer
+  // Create a stable onWpmChange callback
+  const onWpmChange = useCallback((newWpm: number) => {
+    console.log('WPM changed to', newWpm);
+  }, []);
+
+  // Create the keyer with stabilized callbacks
   const keyer = useIambicKeyer({
     wpm: state.sendWpm,
     minWpm: 5,
@@ -414,10 +438,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     onElement: handleElement,
     playElement: playElement,
     onCharacter: handleCharacter,
-    onWpmChange: (newWpm) => {
-      console.log('WPM changed to', newWpm);
-    }
+    onWpmChange
   });
+  
+  // Store keyer in ref immediately after creation
+  useEffect(() => {
+    keyerRef.current = keyer;
+  }, [keyer]);
   
   // Start test - aligned with TrainingMode's handleStartTest
   const handleStartTest = useCallback(() => {
@@ -511,9 +538,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     if (isBrowser) {
       console.log('Installing keyer (on mount only)');
       keyer.install();
-      
-      // Store keyer in ref for stable reference
-      keyerRef.current = keyer;
     }
     
     return () => {
