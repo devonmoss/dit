@@ -57,6 +57,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   // Reference to track recently mastered character
   const recentlyMasteredCharRef = useRef<string | null>(null);
   
+  // Reference to track current character for callbacks
+  const currentCharRef = useRef<string>('');
+  
   // Environment detection
   const isClientRef = useRef(false);
   const isDevelopmentRef = useRef(false);
@@ -125,6 +128,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     console.log('testActive:', state.testActive);
     console.log('---------------------------------------');
   }, [state.selectedLevelId, state.chars, state.testActive]);
+  
+  // Keep currentCharRef in sync with currentChar state
+  useEffect(() => {
+    currentCharRef.current = currentChar;
+    console.log(`Updated currentCharRef to: "${currentChar}"`);
+  }, [currentChar]);
   
   // Stop any current sound
   const stopSound = useCallback(() => {
@@ -252,6 +261,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Set the current character
     setCurrentChar(nextChar);
+    currentCharRef.current = nextChar;
+    console.log(`Directly set currentCharRef to: "${nextChar}"`);
+    
     setMorseOutput('');
     setFeedbackState('none');
     
@@ -267,11 +279,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   // Handle character input from the keyer
   const handleCharacter = useCallback((char: string) => {
     // Skip if no current char to match against
-    if (!currentChar) {
-      console.log(`SendingMode: Character "${char}" detected but no current character - ignoring`);
+    if (!currentCharRef.current) {
+      console.log(`SendingMode: Character "${char}" detected but currentCharRef is empty - ignoring`);
       return;
     }
     
+    const currentChar = currentCharRef.current;
     console.log(`SendingMode: Keyer decoded: "${char}", target: "${currentChar}"`);
     console.log(`SendingMode: Comparing ${char.toLowerCase()} === ${currentChar.toLowerCase()}: ${char.toLowerCase() === currentChar.toLowerCase()}`);
     
@@ -288,6 +301,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       
       // Clear the current character and set feedback
       setCurrentChar('');
+      currentCharRef.current = '';
       setFeedbackState('correct');
       
       // Calculate points based on response time
@@ -387,7 +401,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     // Clear morse output after processing input
     setMorseOutput('');
   }, [
-    currentChar,
+    currentCharRef,
     charStartTime,
     calculatePointsForTime,
     updateCharPoints,
