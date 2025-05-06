@@ -48,6 +48,9 @@ const SendingMode: React.FC = () => {
   const gainNodeRef = useRef<GainNode | null>(null);
   const oscillatorRef = useRef<OscillatorNode | null>(null);
   
+  // Feedback timer ref to prevent multiple feedback states from occurring
+  const feedbackTimerRef = useRef<number | null>(null);
+  
   // Reference to track recently mastered character (same approach as TrainingMode)
   const recentlyMasteredCharRef = useRef<string | null>(null);
   
@@ -235,7 +238,22 @@ const SendingMode: React.FC = () => {
   // Present next question
   const nextQuestion = useCallback(() => {
     const nextChar = pickNextChar();
-    setCurrentChar(nextChar);
+    console.log(`[SendingMode] Next character selected: '${nextChar}'`);
+    
+    if (!nextChar) {
+      console.error('[SendingMode] No character selected - this is a critical error');
+      // Try to recover by forcing a character from the level
+      if (currentLevel && currentLevel.chars.length > 0) {
+        const fallbackChar = currentLevel.chars[0];
+        console.log(`[SendingMode] Using fallback character: ${fallbackChar}`);
+        setCurrentChar(fallbackChar);
+      } else {
+        console.error('[SendingMode] Cannot recover - no characters available');
+      }
+    } else {
+      setCurrentChar(nextChar);
+    }
+    
     setMorseOutput('');
     setFeedbackState('none');
     
@@ -245,12 +263,16 @@ const SendingMode: React.FC = () => {
     
     // Return a promise that resolves immediately
     return Promise.resolve();
-  }, [pickNextChar]);
+  }, [pickNextChar, currentLevel]);
   
   // Handle character input from the keyer
   const handleCharacter = useCallback((char: string) => {
+    // Use the ref value instead of state to avoid stale closure issues
+    const targetChar = currentCharRef.current;
+    
     // Skip if no current char to match against
-    if (!currentChar) {
+    if (!targetChar) {
+      console.log('[SendingMode] No character to match against');
       return;
     }
     
@@ -258,10 +280,10 @@ const SendingMode: React.FC = () => {
     const responseTime = charStartTime ? (Date.now() - charStartTime) : 0;
     
     // Check if character matches
-    if (char.toLowerCase() === currentChar.toLowerCase()) {
+    if (char.toLowerCase() === targetChar.toLowerCase()) {
       // Correct character entered
       // Store the successful character
-      const successChar = currentChar;
+      const successChar = targetChar;
       
       // Clear the current character and set feedback
       setCurrentChar('');
@@ -288,8 +310,13 @@ const SendingMode: React.FC = () => {
       // Update character points
       updateCharPoints(successChar, newPoints);
       
+      // Clear any existing feedback timer
+      if (feedbackTimerRef.current !== null) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+      
       // Delay before next question or finishing
-      setTimeout(() => {
+      feedbackTimerRef.current = window.setTimeout(() => {
         // Create a simulated updated charPoints object that includes the most recent update
         const updatedCharPoints = { ...state.charPoints, [successChar]: newPoints };
         
@@ -330,7 +357,6 @@ const SendingMode: React.FC = () => {
       }, FEEDBACK_DELAY);
     } else {
       // Incorrect character
-      
       // Store the character that was incorrectly entered for display
       setIncorrectChar(char);
       
@@ -339,16 +365,16 @@ const SendingMode: React.FC = () => {
       
       // Update mistakes map
       setMistakesMap(prev => {
-        const count = prev[currentChar] || 0;
-        return { ...prev, [currentChar]: count + 1 };
+        const count = prev[targetChar] || 0;
+        return { ...prev, [targetChar]: count + 1 };
       });
       
       // Reduce points with the penalty
-      const currentPoints = state.charPoints[currentChar] || 0;
+      const currentPoints = state.charPoints[targetChar] || 0;
       const newPoints = Math.max(0, currentPoints * INCORRECT_PENALTY);
       
       // Update the app state
-      updateCharPoints(currentChar, newPoints);
+      updateCharPoints(targetChar, newPoints);
       
       // Properly enforce the checkpoint strike rule
       if (isCheckpoint && strikeLimit) {
@@ -364,8 +390,13 @@ const SendingMode: React.FC = () => {
       // Play error sound
       playErrorSound();
       
+      // Clear any existing feedback timer
+      if (feedbackTimerRef.current !== null) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+      
       // Clear feedback after delay but KEEP the same character
-      setTimeout(() => {
+      feedbackTimerRef.current = window.setTimeout(() => {
         setFeedbackState('none');
         // Reset morse output so they can try again
         setMorseOutput('');
@@ -385,7 +416,6 @@ const SendingMode: React.FC = () => {
     playErrorSound,
     nextQuestion,
     finishTest,
-    currentChar,
     charStartTime
   ]);
   
@@ -408,14 +438,23 @@ const SendingMode: React.FC = () => {
     onElement: handleElement,
     playElement: playElement,
     onCharacter: handleCharacter,
-    onWpmChange
+    onWpmChange,
+    onInvalidCharacter: (code) => {
+      console.log(`Invalid morse code detected: ${code}`);
+    }
   });
   
   // Store keyer in ref for stable access
   const keyerRef = useRef(keyer);
+  
+  // Store current character in a ref to avoid stale closures
+  const currentCharRef = useRef<string>(currentChar);
+  
+  // Update refs when dependencies change
   useEffect(() => {
     keyerRef.current = keyer;
-  }, [keyer]);
+    currentCharRef.current = currentChar;
+  }, [keyer, currentChar]);
   
   // Start test
   const handleStartTest = useCallback(() => {
@@ -487,7 +526,13 @@ const SendingMode: React.FC = () => {
     }
     
     return () => {
+      // Clean up keyer
       keyerRef.current.uninstall();
+      
+      // Clean up any pending feedback timers
+      if (feedbackTimerRef.current !== null) {
+        clearTimeout(feedbackTimerRef.current);
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array ensures this only runs on mount/unmount
@@ -558,13 +603,12 @@ const SendingMode: React.FC = () => {
     }
   }, []);
   
-  // Simple debug state for development mode only
-  const debugState = {
+  // Debug info for development only
+  const debugInfo = {
     level: state.selectedLevelId,
-    levelChars: currentLevel?.chars || [],
-    stateChars: state.chars,
     currentChar,
-    charPoints: state.charPoints,
+    currentCharRef: currentCharRef.current,
+    morseOutput
   };
   
   return (
@@ -584,20 +628,10 @@ const SendingMode: React.FC = () => {
           maxHeight: '200px',
           overflow: 'auto'
         }}>
-          <div>Level ID: {debugState.level}</div>
-          <div>Level chars: {debugState.levelChars.join(', ')}</div>
-          <div>State chars: {debugState.stateChars.join(', ')}</div>
-          <div>Current char: {debugState.currentChar}</div>
-          <div>Character points:
-            <ul style={{margin: '5px 0', paddingLeft: '20px'}}>
-              {state.chars.map(c => (
-                <li key={c}>
-                  {c}: {state.charPoints[c] || 0}/{TARGET_POINTS}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>Recently mastered: {recentlyMasteredCharRef.current || 'none'}</div>
+          <div>Level: {debugInfo.level}</div>
+          <div>Current char (state): <strong>{debugInfo.currentChar || 'none'}</strong></div>
+          <div>Current char (ref): <strong>{debugInfo.currentCharRef || 'none'}</strong></div>
+          <div>Morse output: <strong>{debugInfo.morseOutput}</strong></div>
         </div>
       )}
       
