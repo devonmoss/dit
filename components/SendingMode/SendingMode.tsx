@@ -137,7 +137,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   // Keep refs in sync with state
   useEffect(() => {
     testActiveRef.current = state.testActive;
-    console.log(`Syncing testActiveRef to: ${state.testActive}`);
+    console.log(`📊 [STATE] Test Active changed: ${state.testActive}`);
   }, [state.testActive]);
   
   useEffect(() => {
@@ -272,13 +272,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Handle an element (dot/dash) from the keyer
   const handleElement = useCallback((symbol: '.' | '-') => {
-    if (!state.testActive) {
-      console.log(`Element ${symbol} detected but test not active - ignoring`);
+    if (!testActiveRef.current) {
+      console.log(`Element ${symbol} detected but testActiveRef is false - ignoring`);
       return;
     }
     
     setMorseOutput(prev => prev + symbol);
-  }, [state.testActive]);
+  }, []);
   
   // Finish test - aligned with TrainingMode
   const finishTest = useCallback((completed = true) => {
@@ -377,7 +377,18 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           finishTest(true);
         } else {
           setFeedbackState('none');
-          showNextChar();
+          
+          // Force the next character to show regardless of test state
+          // This helps with race conditions where state.testActive might temporarily be false
+          const nextChar = pickNextChar();
+          console.log(`SendingMode: Forcing next character after correct answer: "${nextChar}"`);
+          setCurrentChar(nextChar);
+          setMorseOutput('');
+          setFeedbackState('none');
+          const now = Date.now();
+          setCharStartTime(now);
+          charStartTimeRef.current = now;
+          console.log(`Setting character start time for next character: ${now}`);
         }
       }, FEEDBACK_DELAY);
     } else {
