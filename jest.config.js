@@ -9,11 +9,11 @@ const createJestConfig = nextJest({ dir: './' });
 
 /** @type {import('jest').Config} */
 const customJestConfig = {
-  // Only run our new iambic keyer tests; skip unrelated broken suites
-  // Only run our new iambic keyer tests; skip unrelated broken suites
+  // Run our test suite focusing on SendingMode issues
   testMatch: [
     '<rootDir>/__tests__/useIambicKeyer.test.ts',
-    '<rootDir>/__tests__/useIambicKeyer.test.tsx'
+    '<rootDir>/__tests__/useIambicKeyer.test.tsx',
+    '<rootDir>/__tests__/components/SendingMode.test.tsx'
   ],
   testEnvironment: 'jsdom',
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/'],
