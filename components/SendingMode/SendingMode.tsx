@@ -59,6 +59,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const isClientRef = useRef(false);
   const isDevelopmentRef = useRef(false);
   
+  // Reference to store the keyer instance
+  const keyerRef = useRef<ReturnType<typeof useIambicKeyer> | null>(null);
+  
   // Get current level info
   const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
   const isCheckpoint = currentLevel?.type === 'checkpoint';
@@ -434,7 +437,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     recentlyMasteredCharRef.current = null;
     
     // Clear any pending keyer state
-    keyer.clear();
+    if (keyerRef.current) {
+      keyerRef.current.clear();
+    }
     
     // Start the test in the AppState
     startTest();
@@ -444,9 +449,15 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Show first character after a short delay
     setTimeout(() => {
-      showNextChar();
+      // Force a character to show even if state.testActive is not yet updated
+      const nextChar = pickNextChar();
+      console.log(`SendingMode: Forcing first character "${nextChar}" regardless of test state`);
+      setCurrentChar(nextChar);
+      setMorseOutput('');
+      setFeedbackState('none');
+      setCharStartTime(Date.now());
     }, 100);
-  }, [startTest, showNextChar, keyer]);
+  }, [startTest, pickNextChar]);
   
   // Clean restart with time recording
   const startTestAndRecordTime = useCallback(() => {
@@ -472,7 +483,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     recentlyMasteredCharRef.current = null;
     
     // Clear any pending keyer state
-    keyer.clear();
+    if (keyerRef.current) {
+      keyerRef.current.clear();
+    }
     
     // Set test start time
     setTestStartTime(Date.now());
@@ -482,22 +495,35 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Show first character after a short delay
     setTimeout(() => {
-      showNextChar();
+      // Force a character to show even if state.testActive is not yet updated
+      const nextChar = pickNextChar();
+      console.log(`SendingMode: Forcing first character "${nextChar}" regardless of test state`);
+      setCurrentChar(nextChar);
+      setMorseOutput('');
+      setFeedbackState('none');
+      setCharStartTime(Date.now());
     }, 100);
-  }, [startTestWithLevelId, showNextChar, keyer]);
+  }, [startTestWithLevelId, pickNextChar]);
   
-  // Install keyer once on mount
+  // Install keyer once on mount with stable references
   useEffect(() => {
+    // Only install/uninstall on mount/unmount
     if (isBrowser) {
-      console.log('Installing keyer');
+      console.log('Installing keyer (on mount only)');
       keyer.install();
+      
+      // Store keyer in ref for stable reference
+      keyerRef.current = keyer;
     }
     
     return () => {
-      console.log('Uninstalling keyer');
-      keyer.uninstall();
+      console.log('Uninstalling keyer (on unmount only)');
+      if (keyerRef.current) {
+        keyerRef.current.uninstall();
+      }
     };
-  }, [keyer]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array ensures this only runs on mount/unmount
   
   // Add escape key handler
   useEffect(() => {
