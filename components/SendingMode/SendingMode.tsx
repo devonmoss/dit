@@ -40,10 +40,14 @@ const SendingMode: React.FC = () => {
   // Local character points state - directly tied to the current level's characters
   const [localCharPoints, setLocalCharPoints] = useState<Record<string, number>>({});
   
+  // Reference to current level's characters for consistent access
+  const levelCharsRef = useRef<string[]>([]);
+  
   // Test timing state
   const [testStartTime, setTestStartTime] = useState<number | null>(null);
   
-  // Question timing state
+  // Question timing state - use both ref and state
+  const charStartTimeRef = useRef<number | null>(null);
   const [charStartTime, setCharStartTime] = useState<number | null>(null);
   
   // Audio refs
@@ -82,7 +86,12 @@ const SendingMode: React.FC = () => {
   useEffect(() => {
     if (currentLevel) {
       console.log('[SendingMode] Initializing local character points for level:', currentLevel.id);
-      // Create a new object with only the character points for the current level
+      
+      // Store the current level's chars in a ref for immediate access across render cycles
+      levelCharsRef.current = [...currentLevel.chars];
+      console.log('[SendingMode] Setting level chars ref to:', levelCharsRef.current);
+      
+      // Create a new object with ONLY the character points for the current level
       const levelCharPoints: Record<string, number> = {};
       currentLevel.chars.forEach(char => {
         // Initialize with app state values or 0
@@ -117,23 +126,26 @@ const SendingMode: React.FC = () => {
     };
   }, []);
   
-  // Pick next character based on mastery weights - using current level's chars directly
+  // Pick next character based on mastery weights - using chars from ref for consistency
   const pickNextChar = useCallback(() => {
-    if (!currentLevel) return '';
+    if (levelCharsRef.current.length === 0) {
+      console.error('[SendingMode] No characters in level chars ref');
+      return '';
+    }
     
     console.log('[SendingMode] Picking next character');
-    console.log('[SendingMode] Available chars:', currentLevel.chars);
+    console.log('[SendingMode] Available chars (ref):', levelCharsRef.current);
     console.log('[SendingMode] Current charPoints:', localCharPoints);
     console.log('[SendingMode] Recently mastered:', recentlyMasteredCharRef.current);
     
-    // Use the shared utility function with current level's chars directly
+    // Always use the ref to ensure consistent chars across render cycles
     return selectNextCharacter(
-      currentLevel.chars,
+      levelCharsRef.current,
       localCharPoints,
       TARGET_POINTS,
       recentlyMasteredCharRef.current
     );
-  }, [currentLevel, localCharPoints]);
+  }, [localCharPoints]);
   
   // Stop any current sound
   const stopSound = useCallback(() => {
@@ -285,10 +297,11 @@ const SendingMode: React.FC = () => {
     setMorseOutput('');
     setFeedbackState('none');
     
-    // Set the start time for response time tracking
+    // Set the start time for response time tracking - both ref and state
     const now = Date.now();
     console.log(`[SendingMode] Setting char start time to: ${now}`);
-    setCharStartTime(now);
+    charStartTimeRef.current = now; // Set ref for immediate access in callbacks
+    setCharStartTime(now); // Set state for rendering
     
     // Return a promise that resolves immediately
     return Promise.resolve();
@@ -316,8 +329,8 @@ const SendingMode: React.FC = () => {
       return;
     }
     
-    // Calculate response time
-    const responseTime = charStartTime ? (Date.now() - charStartTime) : 0;
+    // Calculate response time using the ref for consistency
+    const responseTime = charStartTimeRef.current ? (Date.now() - charStartTimeRef.current) : 0;
     console.log(`[SendingMode] Response time: ${responseTime}ms`);
     
     // Check if character matches
@@ -365,10 +378,9 @@ const SendingMode: React.FC = () => {
         // Check if all characters are mastered using the updated points
         const updatedPoints = { ...localCharPoints, [successChar]: newPoints };
         
-        // Check using current level's chars directly
-        const allMastered = currentLevel ? currentLevel.chars.every(c => 
-          (updatedPoints[c] || 0) >= TARGET_POINTS
-        ) : false;
+        // Check level completion using the ref to ensure consistency
+        const allMastered = levelCharsRef.current.length > 0 && 
+          levelCharsRef.current.every(c => (updatedPoints[c] || 0) >= TARGET_POINTS);
         
         console.log(`[SendingMode] All characters mastered? ${allMastered}`);
         
@@ -649,9 +661,9 @@ const SendingMode: React.FC = () => {
   }, [state.selectedLevelId, startTestWithExplicitLevel, startTestAndRecordTime]);
   
   // Calculate progress - mastered characters using local points
-  const masteredCount = currentLevel ? 
-    currentLevel.chars.filter(c => (localCharPoints[c] || 0) >= TARGET_POINTS).length : 0;
-  const totalChars = currentLevel ? currentLevel.chars.length : 0;
+  // Use levelCharsRef for consistent mastery calculations
+  const masteredCount = levelCharsRef.current.filter(c => (localCharPoints[c] || 0) >= TARGET_POINTS).length;
+  const totalChars = levelCharsRef.current.length;
   const progress = `Mastered: ${masteredCount}/${totalChars}`;
   
   // Using useRef for client detection to avoid hydration mismatches
