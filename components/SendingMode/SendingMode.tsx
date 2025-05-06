@@ -1154,6 +1154,87 @@ const SendingMode: React.FC<SendingModeProps> = () => {
                       ) ? 'YES' : 'NO'}
                     </span>
                   </div>
+                  
+                  {/* Level completion indicator */}
+                  {currentLevel && currentLevel.chars.every(c => 
+                    Math.max(state.charPoints[c] || 0, localCharPointsRef.current[c] || 0) >= TARGET_POINTS
+                  ) && (
+                    <div style={{
+                      marginTop: '5px',
+                      padding: '4px',
+                      background: 'rgba(0,100,0,0.5)',
+                      borderRadius: '3px',
+                      fontWeight: 'bold',
+                      color: '#5f5',
+                      textAlign: 'center'
+                    }}>
+                      🏆 LEVEL COMPLETED 🏆
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* New section for character selection */}
+            <div style={{
+              border: '1px solid #444', 
+              padding: '5px', 
+              backgroundColor: 'rgba(100,50,0,0.2)',
+              marginTop: '10px'
+            }}>
+              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>
+                Character Selection Pool
+              </div>
+              <div>
+                <div>Recently Mastered: <span style={{color: '#ffaa66'}}>{recentlyMasteredCharRef.current || 'None'}</span></div>
+                <div style={{marginTop: '5px'}}>
+                  <div style={{fontWeight: 'bold'}}>Character Selection Status:</div>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '3px'}}>
+                    {currentLevel && currentLevel.chars.map(char => {
+                      const statePoints = state.charPoints[char] || 0;
+                      const localPoints = localCharPointsRef.current[char] || 0;
+                      const effectivePoints = Math.max(statePoints, localPoints);
+                      const isMastered = effectivePoints >= TARGET_POINTS;
+                      const isRecentlyMastered = char === recentlyMasteredCharRef.current;
+                      
+                      let selectionStatus = '';
+                      let statusColor = '#fff';
+                      
+                      if (isRecentlyMastered) {
+                        selectionStatus = 'SKIPPED (recently mastered)';
+                        statusColor = '#ff8';
+                      } else if (isMastered) {
+                        selectionStatus = `REDUCED CHANCE (${(COMPLETED_WEIGHT * 100).toFixed(0)}%)`;
+                        statusColor = '#8f8';
+                      } else {
+                        selectionStatus = 'PRIORITIZED';
+                        statusColor = '#f88';
+                      }
+                      
+                      return (
+                        <div key={char} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          padding: '1px 3px',
+                          backgroundColor: isRecentlyMastered ? 'rgba(80,80,0,0.3)' : 
+                                         isMastered ? 'rgba(0,50,0,0.3)' : 'rgba(50,0,0,0.3)',
+                          borderRadius: '2px'
+                        }}>
+                          <div>
+                            <span style={{color: char === currentChar ? '#ff5' : '#fff'}}>{char}</span>
+                            {char === currentChar && <span style={{marginLeft: '5px', color: '#ff5'}}>← CURRENT</span>}
+                          </div>
+                          <div style={{color: statusColor}}>
+                            {selectionStatus}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={{marginTop: '5px', fontSize: '11px', fontStyle: 'italic', color: '#ccc'}}>
+                  Characters with higher point values are less likely to be selected. 
+                  Recently mastered characters are temporarily excluded.
                 </div>
               </div>
             </div>
