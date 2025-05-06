@@ -267,8 +267,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     // End app test
     endTest(isCompleted);
     
-    // Create results summary - use state.charPoints directly
-    const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
+    // Create results summary using our ref as source of truth
+    const masteredCount = state.chars.filter(c => (charPointsRef.current[c] || 0) >= TARGET_POINTS).length;
     const totalCount = state.chars.length;
     const avgTime = responseTimes.length > 0 
       ? (responseTimes.reduce((sum, item) => sum + item.time, 0) / responseTimes.length).toFixed(2)
@@ -279,9 +279,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setTestResults(results);
     
     // Show results
-    console.log(`SendingMode: Showing results summary page`);
+    console.log(`SendingMode: Showing results summary page - explicitly setting showResults=true`);
     setShowResults(true);
-  }, [state.chars, responseTimes, saveResponseTimes, endTest, sendingActive, isCheckpoint, strikeLimit, state.charPoints]);
+  }, [state.chars, responseTimes, saveResponseTimes, endTest, sendingActive, isCheckpoint, strikeLimit]);
   
   // Handle a character from the keyer
   const handleCharacter = useCallback((char: string) => {
@@ -353,7 +353,51 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       if (willComplete && othersMastered) {
         // Level complete!
         console.log(`SendingMode: Level complete! All characters mastered.`);
-        setTimeout(() => finishTest(true), 750);
+        console.log(`SendingMode: Mastery status (from ref):`, charPointsRef.current);
+        
+        // Handle completion directly here instead of using the delayed finishTest
+        // Set active ref to false immediately - this affects callbacks
+        activeRef.current = false;
+        currentCharRef.current = '';  // Clear current character ref
+        
+        // Make sure we show the "Correct!" feedback before finishing
+        setTimeout(() => {
+          console.log(`SendingMode: Handling level completion directly`);
+          
+          // Update UI state
+          setSendingActive(false);
+          setCompleted(true);
+          
+          // Calculate elapsed time
+          const endTime = Date.now();
+          const totalTime = (endTime - testStartTimeRef.current) / 1000;
+          setElapsedTime(totalTime);
+          
+          // Save response times
+          if (responseTimes.length > 0) {
+            console.log(`SendingMode: Saving ${responseTimes.length} response times`);
+            saveResponseTimes(responseTimes);
+          }
+          
+          // End app test
+          endTest(true);
+          
+          // Create results summary using our ref as source of truth
+          const masteredCount = state.chars.filter(c => (charPointsRef.current[c] || 0) >= TARGET_POINTS).length;
+          const totalCount = state.chars.length;
+          const avgTime = responseTimes.length > 0 
+            ? (responseTimes.reduce((sum, item) => sum + item.time, 0) / responseTimes.length).toFixed(2)
+            : '0';
+          
+          const results = `You've mastered ${masteredCount}/${totalCount} characters. Average response time: ${avgTime}s`;
+          console.log(`SendingMode: Test results: ${results}`);
+          setTestResults(results);
+          
+          // Show results explicitly
+          console.log(`SendingMode: DIRECTLY setting showResults=true`);
+          setShowResults(true);
+        }, 750);
+        
         return;
       }
       
