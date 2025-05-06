@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, ErrorBoundary } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './SendingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
 import { isBrowser } from '../../utils/morse';
@@ -7,16 +7,6 @@ import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
 import { trainingLevels } from '../../utils/levels';
 import { useIambicKeyer } from '../../hooks/useIambicKeyer';
 import { selectNextCharacter } from '../../utils/characterSelection';
-import { CharPointsProvider, useCharPoints } from '../../contexts/CharPointsContext';
-import { createLogger } from '../../utils/logger';
-import { getLevelChars, validateLevelCharacters, areAllCharsMastered } from '../../utils/levelUtils';
-import SendingModeDebugPanel from './SendingModeDebugPanel';
-import FeedbackDisplay from './FeedbackDisplay';
-import KeyerDisplay from './KeyerDisplay';
-import CharacterDisplay from './CharacterDisplay';
-
-// Create logger instance for this component
-const logger = createLogger('SendingMode');
 
 // Constants
 const TARGET_POINTS = 3;
@@ -26,72 +16,13 @@ const MIN_RESPONSE_TIME = 0.8; // seconds
 const MAX_RESPONSE_TIME = 7; // seconds
 const INCORRECT_PENALTY = 0.7; // 30% reduction
 
-/* eslint-disable @typescript-eslint/no-empty-object-type */
-interface SendingModeProps {
-  // Empty interface for future props
-}
-/* eslint-enable @typescript-eslint/no-empty-object-type */
-
 interface CharTiming {
   char: string;
   time: number;
 }
 
-/**
- * SendingMode component wrapper that provides CharPointsContext
- */
-const SendingModeWithContext: React.FC<SendingModeProps> = (props) => {
-  return (
-    <CharPointsProvider>
-      <SendingMode {...props} />
-    </CharPointsProvider>
-  );
-};
-
-/**
- * Error boundary component for SendingMode
- */
-class SendingModeErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error: Error | null }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    logger.error('SendingMode error boundary caught error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className={styles.errorContainer}>
-          <h3>Something went wrong with the Sending Mode component</h3>
-          <p>Please try refreshing the page or selecting a different level.</p>
-          <details>
-            <summary>Technical details</summary>
-            <pre>{this.state.error?.message}</pre>
-          </details>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-/**
- * SendingMode component responsible for iambic keyer practice
- */
-const SendingMode: React.FC<SendingModeProps> = () => {
+const SendingMode: React.FC = () => {
   const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel, startTestWithLevelId } = useAppState();
-  const charPoints = useCharPoints();
   
   // Local UI state
   const [currentChar, setCurrentChar] = useState('');
@@ -109,7 +40,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   // Test timing state
   const [testStartTime, setTestStartTime] = useState<number | null>(null);
   
-  // Question timing state (analogous to TrainingMode's questionStartTime)
+  // Question timing state
   const [charStartTime, setCharStartTime] = useState<number | null>(null);
   
   // Audio refs
@@ -117,75 +48,51 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const gainNodeRef = useRef<GainNode | null>(null);
   const oscillatorRef = useRef<OscillatorNode | null>(null);
   
-  // Reference to track current character for callbacks
-  const currentCharRef = useRef<string>('');
+  // Reference to track recently mastered character (same approach as TrainingMode)
+  const recentlyMasteredCharRef = useRef<string | null>(null);
   
-  // Reference to track character start time
-  const charStartTimeRef = useRef<number>(0);
-  
-  // Environment detection
+  // Environment detection for debug panel
   const isClientRef = useRef(false);
   const isDevelopmentRef = useRef(false);
   
-  // New state for character selection debugging
-  const [lastPickerInputs, setLastPickerInputs] = useState<{
-    levelId: string;
-    levelName: string;
-    levelChars: string[];
-    stateChars: string[];
-    pointsSnapshot: Record<string, number>;
-    recentlyMasteredChar: string | null;
-  } | null>(null);
-
-  // Get current level info - memoized to prevent recalculation
-  const currentLevel = useMemo(() => {
-    return trainingLevels.find(level => level.id === state.selectedLevelId);
-  }, [state.selectedLevelId]);
-  
+  // Get current level (directly using the find result, like TrainingMode)
+  const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
   const isCheckpoint = currentLevel?.type === 'checkpoint';
   const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
   
-  // Pre-declare handleLevelSelection
-  const handleLevelSelection = useCallback((levelId: string) => {
-    logger.info(`Explicitly selecting level ${levelId}`);
-    
-    // Reset local character points tracking
-    charPoints.resetLocalCharPoints();
-    charPoints.setRecentlyMasteredChar(null);
-    
-    // Then select the level
-    selectLevel(levelId);
-  }, [selectLevel, charPoints]);
-  
-  // Utility function to verify and fix character sets
-  const verifyAndFixCharacterSet = useCallback(() => {
-    // Use character utility to validate character set
-    const { valid, missing, extra } = validateLevelCharacters(
-      state.selectedLevelId, 
-      state.chars
-    );
-    
-    if (valid) {
-      logger.debug('Character sets match, no fix needed');
-      return true;
+  // Ensure level characters are correctly loaded on mount (following TrainingMode approach)
+  useEffect(() => {
+    if (currentLevel && state.chars.length > 0) {
+      // Check if current state.chars matches the expected level's chars
+      const levelChars = currentLevel.chars;
+      const stateChars = state.chars;
+      
+      // Compare arrays to see if they have the same characters
+      const sameLength = levelChars.length === stateChars.length;
+      const allCharsPresent = levelChars.every(c => stateChars.includes(c));
+      const noExtraChars = stateChars.every(c => levelChars.includes(c));
+      
+      if (!(sameLength && allCharsPresent && noExtraChars)) {
+        console.log('Characters mismatch detected on mount:');
+        console.log('Current level:', state.selectedLevelId);
+        console.log('Expected chars:', levelChars);
+        console.log('Actual chars:', stateChars);
+        
+        // Re-select the level to fix characters
+        selectLevel(state.selectedLevelId);
+      }
     }
-    
-    // Log the mismatch
-    logger.warn('Character set mismatch detected:');
-    logger.warn(`- Level: ${state.selectedLevelId}`);
-    logger.warn(`- Missing chars: ${missing.join(', ')}`);
-    logger.warn(`- Extra chars: ${extra.join(', ')}`);
-    
-    // Attempt to fix by re-selecting the level
-    logger.info(`Fixing by re-selecting level: ${state.selectedLevelId}`);
-    
-    // Reset local character points
-    charPoints.resetLocalCharPoints();
-    
-    // Use our custom handler for proper reset
-    handleLevelSelection(state.selectedLevelId);
-    return false;
-  }, [state.selectedLevelId, state.chars, handleLevelSelection, charPoints]);
+  }, [currentLevel, state.chars, state.selectedLevelId, selectLevel]);
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('---------------------------------------');
+    console.log(`[${new Date().toISOString()}] State Update`);
+    console.log('Level ID:', state.selectedLevelId);
+    console.log('Characters in state:', JSON.stringify(state.chars));
+    console.log('testActive:', state.testActive);
+    console.log('---------------------------------------');
+  }, [state.selectedLevelId, state.chars, state.testActive]);
   
   // Initialize audio on first render
   useEffect(() => {
@@ -198,138 +105,29 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         gain.gain.value = 0.5;
         gain.connect(ctx.destination);
         gainNodeRef.current = gain;
-        
-        logger.debug('Audio context initialized successfully');
       } catch (e) {
-        logger.error('Failed to initialize audio context:', e);
+        console.error('Failed to initialize audio context:', e);
       }
     }
     
     return () => {
       stopSound();
       if (audioContextRef.current) {
-        audioContextRef.current.close().catch(e => logger.error('Error closing audio context:', e));
+        audioContextRef.current.close().catch(e => console.error('Error closing audio context:', e));
       }
     };
   }, []);
   
-  // Ensure level characters are correctly loaded on mount - with recursion protection
-  const levelCheckRef = useRef(false);
-  useEffect(() => {
-    // Skip validation if we've already corrected character set
-    if (levelCheckRef.current) return;
-    
-    if (currentLevel && state.chars.length > 0) {
-      // Check if current state.chars matches the expected level's chars
-      const { valid, missing, extra } = validateLevelCharacters(
-        state.selectedLevelId, 
-        state.chars
-      );
-      
-      logger.debug(`Level chars check: Level ID: ${state.selectedLevelId}`);
-      
-      if (!valid) {
-        logger.warn('Characters mismatch detected - reselecting level');
-        
-        if (missing.length > 0) {
-          logger.error(`Missing characters: ${missing.join(', ')}`);
-        }
-        
-        if (extra.length > 0) {
-          logger.warn(`Extra characters present: ${extra.join(', ')}`);
-        }
-        
-        // Set flag to prevent recursion
-        levelCheckRef.current = true;
-        
-        // Re-select the level to fix characters
-        logger.info(`Calling selectLevel with ID: ${state.selectedLevelId}`);
-        selectLevel(state.selectedLevelId);
-        
-        // Reset flag after a delay
-        setTimeout(() => {
-          levelCheckRef.current = false;
-        }, 1000);
-      } else {
-        logger.debug('Characters match correctly');
-      }
-    }
-  }, [currentLevel, state.chars, state.selectedLevelId, selectLevel]);
-  
-  // Debug logging for state changes
-  useEffect(() => {
-    logger.debug(
-      `State Update - Level: ${state.selectedLevelId}, ` +
-      `Chars: [${state.chars.join(',')}], ` +
-      `TestActive: ${state.testActive}`
+  // Pick next character based on mastery weights - same as TrainingMode
+  const pickNextChar = useCallback(() => {
+    // Use the shared utility function from TrainingMode
+    return selectNextCharacter(
+      state.chars,
+      state.charPoints,
+      TARGET_POINTS,
+      recentlyMasteredCharRef.current
     );
-  }, [state.selectedLevelId, state.chars, state.testActive]);
-  
-  // Monitor level changes - with recursion protection
-  const levelChangeRef = useRef<string | null>(null);
-  useEffect(() => {
-    // Skip if we're already handling this level change
-    if (levelChangeRef.current === state.selectedLevelId) {
-      return;
-    }
-    
-    // Track current level to prevent recursive handling
-    levelChangeRef.current = state.selectedLevelId;
-    
-    // This effect runs whenever the level ID changes
-    logger.info(`Level changed to: ${state.selectedLevelId}`);
-    
-    // Find the level object
-    const level = trainingLevels.find(l => l.id === state.selectedLevelId);
-    if (!level) {
-      logger.error(`Could not find level with ID: ${state.selectedLevelId}`);
-      return;
-    }
-    
-    logger.debug(`Level change: ${level.name} (${level.id})`);
-    
-    // Just log if characters don't match (we handle fixing in other useEffect)
-    const { valid } = validateLevelCharacters(state.selectedLevelId, state.chars);
-    if (!valid) {
-      logger.warn(`Level change detected but characters don't match`);
-    }
-    
-    // Always reset localCharPoints when level changes to prevent state carryover
-    charPoints.resetLocalCharPoints();
-    logger.debug('Reset localCharPoints due to level change');
-  }, [state.selectedLevelId, state.chars, charPoints]);
-    
-  // Synchronization effect to force consistent level ID on mount (once only)
-  const initialSyncRef = useRef(false);
-  useEffect(() => {
-    // Only run this synchronization once on component mount
-    if (initialSyncRef.current || !state.selectedLevelId) return;
-    
-    // Mark as initialized to prevent future calls
-    initialSyncRef.current = true;
-    
-    logger.info(`One-time level sync on mount: ${state.selectedLevelId}`);
-    
-    // Reset any local state that could cause problems
-    charPoints.resetLocalCharPoints();
-    charPoints.setRecentlyMasteredChar(null);
-    
-    logger.debug('Performed one-time level sync to ensure consistency');
-  }, [charPoints, state.selectedLevelId]); 
-  
-  // Keep currentCharRef in sync with currentChar state
-  useEffect(() => {
-    currentCharRef.current = currentChar;
-    logger.debug(`Updated currentCharRef to: "${currentChar}"`);
-  }, [currentChar]);
-  
-  // Keep charStartTimeRef in sync with charStartTime state
-  useEffect(() => {
-    if (charStartTime) {
-      charStartTimeRef.current = charStartTime;
-      logger.debug(`Synced charStartTimeRef: ${charStartTime}`);
-    }
-  }, [charStartTime]);
+  }, [state.chars, state.charPoints]);
   
   // Stop any current sound
   const stopSound = useCallback(() => {
@@ -370,7 +168,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         }
       }, 150);
     } catch (e) {
-      logger.error('Error playing error sound:', e);
+      console.error('Error playing error sound:', e);
     }
   }, [stopSound]);
   
@@ -399,7 +197,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
         }
       }, duration);
     } catch (e) {
-      logger.error('Error playing element:', e);
+      console.error('Error playing element:', e);
     }
   }, [state.sendWpm, stopSound]);
   
@@ -413,48 +211,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     return 1 - ((seconds - MIN_RESPONSE_TIME) / (MAX_RESPONSE_TIME - MIN_RESPONSE_TIME));
   }, []);
   
-  // Pick next character based on mastery weights
-  const pickNextChar = useCallback(() => {
-    // CRITICALLY IMPORTANT: Use currentLevel?.chars directly to ensure we're using the right character set
-    // This ensures we're using the current displayed level's characters, not just what's in state
-    if (!currentLevel) {
-      logger.error('Cannot pick next character: currentLevel is null');
-      return 'e'; // Fallback to a safe default
-    }
-    
-    const levelChars = currentLevel.chars;
-    const levelId = currentLevel.id;
-    
-    logger.debug(`Using ${levelChars.length} characters for level ${levelId}`);
-    
-    // Special validation: ensure we don't present characters not in the current level
-    // This is critical to prevent level-4 characters appearing in level-1
-    const validatedStateChars = state.chars.filter(c => levelChars.includes(c));
-    
-    if (validatedStateChars.length !== state.chars.length) {
-      logger.warn(`State chars mismatch! Filtered ${state.chars.length} to ${validatedStateChars.length}`);
-    }
-    
-    // Store the inputs for debugging
-    setLastPickerInputs({
-      levelId: levelId,
-      levelName: currentLevel.name || "Direct Lookup",
-      levelChars: [...levelChars],
-      stateChars: [...validatedStateChars],
-      pointsSnapshot: {...state.charPoints},
-      recentlyMasteredChar: charPoints.recentlyMasteredChar
-    });
-    
-    // Use the current level's character list - NOT the state.selectedLevelId
-    return selectNextCharacter(
-      levelChars,
-      state.charPoints,
-      TARGET_POINTS,
-      charPoints.recentlyMasteredChar
-    );
-  }, [state.chars, state.charPoints, charPoints.recentlyMasteredChar, currentLevel]);
-  
-  // Finish the test - similar to TrainingMode's finishTest
+  // Finish the test
   const finishTest = useCallback((completed = true) => {
     // Calculate elapsed time
     const endTime = Date.now();
@@ -462,244 +219,117 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Save response times
     if (responseTimes.length > 0) {
-      logger.debug(`Saving ${responseTimes.length} response times`);
       saveResponseTimes(responseTimes);
     }
     
-    // End app test
+    // End test
     endTest(completed);
     
     // Set test results
-    logger.info(`Test ${completed ? 'completed' : 'ended'}, elapsed time: ${elapsedSec.toFixed(1)}s`);
     setTestResults({
       completed,
       elapsedTime: elapsedSec
     });
   }, [testStartTime, responseTimes, saveResponseTimes, endTest]);
   
-  // Present next question - similar to TrainingMode's nextQuestion
-  const verifyRecursionRef = useRef(false);
+  // Present next question
   const nextQuestion = useCallback(() => {
-    // Add recursion protection
-    if (verifyRecursionRef.current) {
-      logger.warn('Avoiding recursive character verification');
-      return Promise.resolve();
-    }
-    
-    // First verify character set is correct
-    if (!verifyAndFixCharacterSet()) {
-      logger.warn('Character set mismatch detected - fixing before proceeding');
-      
-      // Set recursion guard
-      verifyRecursionRef.current = true;
-      
-      // Wait a moment for the fix to apply, then try again
-      setTimeout(() => {
-        verifyRecursionRef.current = false;
-        nextQuestion();
-      }, 500);
-      return Promise.resolve();
-    }
-    
-    // Ensure we have a valid currentLevel
-    if (!currentLevel) {
-      logger.error(`Cannot continue: currentLevel is null`);
-      return Promise.resolve();
-    }
-    
-    // Get the next character using the character selection logic
     const nextChar = pickNextChar();
-    logger.debug(`Next question with character: "${nextChar}"`);
-    
-    // CRITICAL SAFETY CHECK: Validate against the current level object's chars
-    // This is the most direct source of truth for what characters should be in this level
-    const currentLevelChars = currentLevel.chars;
-    
-    // Check if the selected character is valid for the current level
-    if (!currentLevelChars.includes(nextChar)) {
-      logger.error(`Character "${nextChar}" not in current level (${currentLevel.id}) character set`);
-      
-      // Force select a valid character from the current level
-      const validChar = currentLevelChars[0]; // fallback to first char
-      logger.warn(`Replacing invalid character "${nextChar}" with valid character "${validChar}"`);
-      
-      // Set the corrected character
-      setCurrentChar(validChar);
-      currentCharRef.current = validChar;
-      logger.debug(`Set currentCharRef to corrected character: "${validChar}"`);
-    } else {
-      // Normal flow for valid character
-      setCurrentChar(nextChar);
-      currentCharRef.current = nextChar;
-      logger.debug(`Set currentCharRef to: "${nextChar}"`);
-    }
-    
+    setCurrentChar(nextChar);
     setMorseOutput('');
     setFeedbackState('none');
     
     // Set the start time for response time tracking
     const now = Date.now();
     setCharStartTime(now);
-    charStartTimeRef.current = now; // Set the ref value too
-    logger.debug(`Setting character start time: ${now}`);
     
-    // Log point information for this character for debugging
-    const currentStatePoints = state.charPoints[currentChar] || 0;
-    const currentLocalPoints = charPoints.localCharPoints[currentChar] || 0;
-    logger.debug(`Character "${currentChar}" points - state: ${currentStatePoints}, local: ${currentLocalPoints}`);
-    
-    // Return a promise that resolves immediately to match TrainingMode's flow
+    // Return a promise that resolves immediately
     return Promise.resolve();
-  }, [
-    pickNextChar, 
-    verifyAndFixCharacterSet, 
-    state.charPoints, 
-    state.selectedLevelId, 
-    currentChar, 
-    charPoints.localCharPoints
-  ]);
+  }, [pickNextChar]);
   
   // Handle character input from the keyer
   const handleCharacter = useCallback((char: string) => {
     // Skip if no current char to match against
-    if (!currentCharRef.current) {
-      logger.debug(`Character "${char}" detected but currentCharRef is empty - ignoring`);
+    if (!currentChar) {
       return;
     }
     
-    const currentChar = currentCharRef.current;
-    
-    // SAFETY CHECK: Make sure the current character is valid for this level
-    if (currentLevel && !currentLevel.chars.includes(currentChar)) {
-      logger.error(`Current character "${currentChar}" is invalid for level ${currentLevel.id} - resetting`);
-      // Force a valid character selection
-      setCurrentChar('');
-      currentCharRef.current = '';
-      nextQuestion();
-      return;
-    }
-    
-    logger.debug(`Keyer decoded: "${char}", target: "${currentChar}"`);
-    
-    // Calculate response time - use the ref value for reliability
-    const responseTime = charStartTimeRef.current ? (Date.now() - charStartTimeRef.current) : 0;
-    logger.debug(`Response time: ${responseTime}ms`);
+    // Calculate response time
+    const responseTime = charStartTime ? (Date.now() - charStartTime) : 0;
     
     // Check if character matches
     if (char.toLowerCase() === currentChar.toLowerCase()) {
-      logger.debug(`CORRECT match - "${char}" matches "${currentChar}"`);
-      
+      // Correct character entered
       // Store the successful character
       const successChar = currentChar;
       
       // Clear the current character and set feedback
       setCurrentChar('');
-      currentCharRef.current = '';
       setFeedbackState('correct');
       
       // Calculate points based on response time
       const points = calculatePointsForTime(responseTime);
-      logger.debug(`Awarding ${points.toFixed(2)} points for response time: ${responseTime}ms`);
       
       // Add to response times log
       setResponseTimes(prev => [...prev, { char: successChar, time: responseTime / 1000 }]);
       
-      // Get current points from app state
+      // Get current points
       const currentPoints = state.charPoints[successChar] || 0;
-      
-      // Get current points from our local tracker
-      const localPoints = charPoints.localCharPoints[successChar] || 0;
-      const effectiveCurrentPoints = Math.max(currentPoints, localPoints);
-      
-      // If there's a mismatch, log a warning
-      if (currentPoints !== localPoints) {
-        logger.warn(`Point mismatch for "${successChar}": state=${currentPoints}, local=${localPoints}. Using ${effectiveCurrentPoints}.`);
-      }
-      
-      const newPoints = effectiveCurrentPoints + points;
-      
-      logger.debug(`Updating points for ${successChar}: ${effectiveCurrentPoints} → ${newPoints}`);
+      const newPoints = currentPoints + points;
       
       // Check if character will reach mastery with this addition
-      const willCompleteMastery = newPoints >= TARGET_POINTS && effectiveCurrentPoints < TARGET_POINTS;
+      const willCompleteMastery = newPoints >= TARGET_POINTS && currentPoints < TARGET_POINTS;
       
       // If this character will now be mastered, track it to avoid immediate reselection
       if (willCompleteMastery) {
-        charPoints.setRecentlyMasteredChar(successChar);
-        logger.info(`Character "${successChar}" mastered!`);
+        recentlyMasteredCharRef.current = successChar;
       }
       
-      // Update our local context state
-      charPoints.updateLocalCharPoints(successChar, newPoints);
-      
-      // Call the context function
+      // Update character points
       updateCharPoints(successChar, newPoints);
       
-      // Delay before next question or finishing - like TrainingMode
+      // Delay before next question or finishing
       setTimeout(() => {
-        // Check if all characters are mastered using the levelUtils helper
-        const allMastered = areAllCharsMastered(
-          state.selectedLevelId,
-          charPoints.localCharPoints,
-          TARGET_POINTS
-        );
+        // Create a simulated updated charPoints object that includes the most recent update
+        const updatedCharPoints = { ...state.charPoints, [successChar]: newPoints };
         
-        // Get new characters to make sure we have some to try
-        const levelChars = getLevelChars(state.selectedLevelId);
+        // Check if all characters are mastered using the updated points
+        const allMastered = state.chars.every(c => (updatedCharPoints[c] || 0) >= TARGET_POINTS);
+        
+        // Check for old characters mastered
         const oldChars = ['e', 't']; // Level 1 characters
-        const newChars = levelChars.filter(c => !oldChars.includes(c));
+        const newChars = state.chars.filter(c => !oldChars.includes(c));
         
-        // Create a merged points object that takes the maximum of state and local values
-        const mergedPoints: Record<string, number> = { ...state.charPoints };
-        Object.entries(charPoints.localCharPoints).forEach(([char, points]) => {
-          mergedPoints[char] = Math.max(mergedPoints[char] || 0, points);
-        });
-        
-        // Check specific character sets
         const oldCharsMastered = oldChars.every(c => {
-          if (!levelChars.includes(c)) return true; // Skip if not in this level
-          const points = mergedPoints[c] || 0;
+          if (!state.chars.includes(c)) return true; // Skip if not in this level
+          const points = updatedCharPoints[c] || 0;
           return points >= TARGET_POINTS;
         });
         
         const newCharsAttempted = newChars.some(c => {
-          return (mergedPoints[c] || 0) > 0;
+          return (updatedCharPoints[c] || 0) > 0;
         });
         
-        logger.debug(`Completion status: allMastered=${allMastered}, oldCharsMastered=${oldCharsMastered}, newCharsAttempted=${newCharsAttempted}`);
-        
-        // NEVER end the test unless all characters have been mastered
-        // Also ensure at least one new character has been attempted before finishing
         if (allMastered) {
-          logger.info(`Level complete - all ${levelChars.length} characters are mastered`);
           finishTest(true);
-        } else if (oldCharsMastered && !newCharsAttempted) {
-          logger.info(`Only old characters mastered but new characters not attempted - forcing new character selection`);
-          
-          // Force selection of a new character from the level
+        } else if (oldCharsMastered && !newCharsAttempted && newChars.length > 0) {
+          // Force selection of a new character
           const forceChar = newChars[0];
-          logger.debug(`Forcing selection of new character: "${forceChar}" for next question`);
           
           // Set current character directly
           setCurrentChar(forceChar);
-          currentCharRef.current = forceChar;
-          
-          // Reset the morse output and feedback state
           setMorseOutput('');
           setFeedbackState('none');
           
           // Set the start time for response time tracking
           const now = Date.now();
           setCharStartTime(now);
-          charStartTimeRef.current = now;
         } else {
-          logger.debug(`Continuing test - not all characters mastered yet`);
           nextQuestion();
         }
       }, FEEDBACK_DELAY);
     } else {
       // Incorrect character
-      logger.debug(`INCORRECT match - "${char}" does not match "${currentChar}"`);
       
       // Store the character that was incorrectly entered for display
       setIncorrectChar(char);
@@ -710,22 +340,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Update mistakes map
       setMistakesMap(prev => {
         const count = prev[currentChar] || 0;
-        logger.debug(`Increasing mistake count for "${currentChar}" from ${count} to ${count + 1}`);
         return { ...prev, [currentChar]: count + 1 };
       });
       
       // Reduce points with the penalty
       const currentPoints = state.charPoints[currentChar] || 0;
-      const localPoints = charPoints.localCharPoints[currentChar] || 0;
-      const effectiveCurrentPoints = Math.max(currentPoints, localPoints);
-      
-      // Calculate the new, reduced point value
-      const newPoints = Math.max(0, effectiveCurrentPoints * INCORRECT_PENALTY);
-      
-      logger.debug(`Reducing points for "${currentChar}": ${effectiveCurrentPoints} → ${newPoints}`);
-      
-      // Update our local tracking
-      charPoints.updateLocalCharPoints(currentChar, newPoints);
+      const newPoints = Math.max(0, currentPoints * INCORRECT_PENALTY);
       
       // Update the app state
       updateCharPoints(currentChar, newPoints);
@@ -733,11 +353,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       // Properly enforce the checkpoint strike rule
       if (isCheckpoint && strikeLimit) {
         const newStrikeCount = strikeCount + 1;
-        logger.debug(`Increasing strike count to ${newStrikeCount} (limit: ${strikeLimit})`);
         setStrikeCount(newStrikeCount);
         
         if (newStrikeCount >= strikeLimit) {
-          logger.info(`Strike limit reached (${newStrikeCount}/${strikeLimit}) - ending test`);
           finishTest(false);
           return;
         }
@@ -747,7 +365,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       playErrorSound();
       
       // Clear feedback after delay but KEEP the same character
-      logger.debug(`Incorrect match - keeping same character, clearing feedback after delay`);
       setTimeout(() => {
         setFeedbackState('none');
         // Reset morse output so they can try again
@@ -761,26 +378,26 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     calculatePointsForTime,
     updateCharPoints,
     state.charPoints, 
+    state.chars,
     isCheckpoint,
     strikeLimit,
     strikeCount,
     playErrorSound,
     nextQuestion,
     finishTest,
-    charPoints,
-    currentLevel
+    currentChar,
+    charStartTime
   ]);
   
   // Handle an element (dot/dash) from the keyer
   const handleElement = useCallback((symbol: '.' | '-') => {
     // Always append to morse output regardless of state
-    // This ensures dots/dashes are displayed even if there's UI latency
     setMorseOutput(prev => prev + symbol);
   }, []);
   
   // Create the keyer with stabilized callbacks
   const onWpmChange = useCallback((newWpm: number) => {
-    logger.debug(`WPM changed to ${newWpm}`);
+    console.log(`WPM changed to ${newWpm}`);
   }, []);
   
   // Create the keyer
@@ -800,15 +417,8 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     keyerRef.current = keyer;
   }, [keyer]);
   
-  // Start test - similar to TrainingMode's handleStartTest
+  // Start test
   const handleStartTest = useCallback(() => {
-    logger.info('Starting test - initializing state');
-    
-    // Force level consistency before starting
-    const currentLevelId = state.selectedLevelId;
-    logger.debug(`Forcing level sync before test start: ${currentLevelId}`);
-    selectLevel(currentLevelId);
-    
     // Reset all state
     setCurrentChar('');
     setMorseOutput('');
@@ -820,10 +430,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setTestResults(null);
     
     // Reset recently mastered character
-    charPoints.setRecentlyMasteredChar(null);
-    
-    // Reset local character points to prevent carryover between tests
-    charPoints.resetLocalCharPoints();
+    recentlyMasteredCharRef.current = null;
     
     // Clear any pending keyer state
     keyerRef.current.clear();
@@ -831,26 +438,20 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     // Start the test in the AppState
     startTest();
     
-    // Set test start time
-    const now = Date.now();
-    setTestStartTime(now);
-    logger.debug(`Setting test start time: ${now}`);
-    
-    // Start the first question after a short delay to ensure state is updated
+    // Need a slight delay to ensure state is updated
     setTimeout(() => {
       nextQuestion();
     }, 100);
-  }, [startTest, nextQuestion, state.selectedLevelId, selectLevel, charPoints]);
+  }, [startTest, nextQuestion]);
   
   // Clean restart with time recording
   const startTestAndRecordTime = useCallback(() => {
+    setTestStartTime(Date.now());
     handleStartTest();
   }, [handleStartTest]);
   
-  // Handle test starting with level ID
+  // Handle moving to specific level
   const startTestWithExplicitLevel = useCallback((levelId: string) => {
-    logger.info(`Starting test with explicit level ID: ${levelId}`);
-    
     // Reset all state
     setCurrentChar('');
     setMorseOutput('');
@@ -862,50 +463,30 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setTestResults(null);
     
     // Reset recently mastered character
-    charPoints.setRecentlyMasteredChar(null);
-    
-    // Reset local character points to prevent carryover between levels
-    charPoints.resetLocalCharPoints();
+    recentlyMasteredCharRef.current = null;
     
     // Clear any pending keyer state
     keyerRef.current.clear();
     
-    // First explicitly select the level to ensure characters are loaded correctly
-    logger.debug(`Explicitly selecting level ${levelId} before starting test`);
-    handleLevelSelection(levelId);
-    
     // Set test start time
-    const now = Date.now();
-    setTestStartTime(now);
-    logger.debug(`Setting test start time: ${now}`);
+    setTestStartTime(Date.now());
     
-    // Then start the test with the level ID
+    // Start test with level ID
+    startTestWithLevelId(levelId);
+    
+    // Start the first question after a short delay
     setTimeout(() => {
-      logger.debug(`Starting test with level ID: ${levelId}`);
-      startTestWithLevelId(levelId);
-      
-      // Start the first question after a short delay to ensure state is updated
-      setTimeout(() => {
-        nextQuestion();
-      }, 50);
-    }, 50); // Small delay to ensure level selection completes
-  }, [
-    selectLevel, 
-    startTestWithLevelId, 
-    nextQuestion, 
-    handleLevelSelection, 
-    charPoints
-  ]);
+      nextQuestion();
+    }, 150);
+  }, [startTestWithLevelId, nextQuestion]);
   
   // Install keyer once on mount
   useEffect(() => {
     if (isBrowser) {
-      logger.debug('Installing keyer (on mount only)');
       keyer.install();
     }
     
     return () => {
-      logger.debug('Uninstalling keyer (on unmount only)');
       keyerRef.current.uninstall();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -934,7 +515,6 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Handle next level - aligned with TrainingMode
   const handleNextLevel = useCallback(() => {
-    logger.info("Moving to next level");
     setTestResults(null);
     
     // Reset state
@@ -946,63 +526,27 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setResponseTimes([]);
     setMistakesMap({});
     
-    // Reset local character points to prevent carryover between levels
-    charPoints.resetLocalCharPoints();
-    
     // Get current level index
     const currentLevelIndex = trainingLevels.findIndex(l => l.id === state.selectedLevelId);
-    logger.debug(`Moving from level index: ${currentLevelIndex}`);
     
     if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
       // Move to next level
       const nextLevel = trainingLevels[currentLevelIndex + 1];
-      logger.debug(`Moving to level: ${nextLevel.id} (${nextLevel.name})`);
       
       // Set the test start time
-      const now = Date.now();
-      setTestStartTime(now);
+      setTestStartTime(Date.now());
       
-      // Following TrainingMode's approach: First select the level, then start test
-      logger.debug(`Selecting level: ${nextLevel.id}`);
-      handleLevelSelection(nextLevel.id);
-      
-      // Then start the test with a delay
-      setTimeout(() => {
-        logger.debug(`Starting test with level: ${nextLevel.id}`);
-        startTestWithLevelId(nextLevel.id);
-        
-        // Then set up the first question
-        setTimeout(() => {
-          nextQuestion();
-        }, 200);
-      }, 100);
+      // Start test with the next level ID
+      startTestWithExplicitLevel(nextLevel.id);
     } else {
       // Restart current level if at end
-      logger.debug("Restarting current level (at end of levels)");
       startTestAndRecordTime();
     }
-  }, [
-    state.selectedLevelId, 
-    handleLevelSelection, 
-    startTestWithLevelId, 
-    nextQuestion, 
-    startTestAndRecordTime,
-    charPoints
-  ]);
+  }, [state.selectedLevelId, startTestWithExplicitLevel, startTestAndRecordTime]);
   
   // Calculate progress - mastered characters
-  const masteredCount = useMemo(() => {
-    return state.chars.filter(c => {
-      // Use effective points (max of local and app state)
-      const statePoints = state.charPoints[c] || 0;
-      const localPoints = charPoints.localCharPoints[c] || 0;
-      return Math.max(statePoints, localPoints) >= TARGET_POINTS;
-    }).length;
-  }, [state.chars, state.charPoints, charPoints.localCharPoints]);
-  
-  const progress = useMemo(() => {
-    return state.chars.length > 0 ? `Mastered: ${masteredCount}/${state.chars.length}` : '';
-  }, [masteredCount, state.chars.length]);
+  const masteredCount = state.chars.filter(c => (state.charPoints[c] || 0) >= TARGET_POINTS).length;
+  const progress = state.chars.length > 0 ? `Mastered: ${masteredCount}/${state.chars.length}` : '';
   
   // Using useRef for client detection to avoid hydration mismatches
   useEffect(() => {
@@ -1014,26 +558,47 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     }
   }, []);
   
+  // Simple debug state for development mode only
+  const debugState = {
+    level: state.selectedLevelId,
+    levelChars: currentLevel?.chars || [],
+    stateChars: state.chars,
+    currentChar,
+    charPoints: state.charPoints,
+  };
+  
   return (
     <div className={styles.sendingTrainer}>
       {/* Debug panel - only visible in development */}
       {isClientRef.current && isDevelopmentRef.current && (
-        <SendingModeDebugPanel
-          state={state}
-          currentLevel={currentLevel}
-          testStartTime={testStartTime}
-          currentChar={currentChar}
-          currentCharRef={currentCharRef}
-          recentlyMasteredCharRef={{ current: charPoints.recentlyMasteredChar }}
-          responseTimes={responseTimes}
-          mistakesMap={mistakesMap}
-          localCharPointsRef={{ current: charPoints.localCharPoints }}
-          lastPickerInputs={lastPickerInputs}
-          TARGET_POINTS={TARGET_POINTS}
-          feedbackState={feedbackState}
-          charStartTime={charStartTime}
-          charStartTimeRef={charStartTimeRef}
-        />
+        <div style={{ 
+          position: 'fixed', 
+          bottom: '10px', 
+          right: '10px', 
+          background: 'rgba(0,0,0,0.8)', 
+          color: 'white',
+          padding: '10px',
+          fontSize: '12px',
+          zIndex: 9999,
+          maxWidth: '300px',
+          maxHeight: '200px',
+          overflow: 'auto'
+        }}>
+          <div>Level ID: {debugState.level}</div>
+          <div>Level chars: {debugState.levelChars.join(', ')}</div>
+          <div>State chars: {debugState.stateChars.join(', ')}</div>
+          <div>Current char: {debugState.currentChar}</div>
+          <div>Character points:
+            <ul style={{margin: '5px 0', paddingLeft: '20px'}}>
+              {state.chars.map(c => (
+                <li key={c}>
+                  {c}: {state.charPoints[c] || 0}/{TARGET_POINTS}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>Recently mastered: {recentlyMasteredCharRef.current || 'none'}</div>
+        </div>
       )}
       
       {testResults ? (
@@ -1068,14 +633,28 @@ const SendingMode: React.FC<SendingModeProps> = () => {
             </div>
           )}
           
-          <CharacterDisplay currentChar={currentChar} />
-          <FeedbackDisplay feedbackState={feedbackState} incorrectChar={incorrectChar} />
+          <div className={styles.currentCharDisplay}>
+            {currentChar && (
+              <div className={styles.bigCharacter}>{currentChar.toUpperCase()}</div>
+            )}
+          </div>
+          
+          <div className={styles.feedbackContainer}>
+            {feedbackState === 'correct' && (
+              <div className={styles.correctFeedback}>Correct!</div>
+            )}
+            {feedbackState === 'incorrect' && (
+              <div className={styles.incorrectFeedback}>{incorrectChar}</div>
+            )}
+          </div>
           
           <div className={styles.sendingInstructions}>
             Use ← key for <span className={styles.dot}>·</span> and → key for <span className={styles.dash}>–</span>
           </div>
           
-          <KeyerDisplay morseOutput={morseOutput} />
+          <div className={styles.keyerDisplay}>
+            <div className={styles.keyerOutput}>{morseOutput}</div>
+          </div>
           
           <div className={styles.actionHints}>
             Esc: End Test
@@ -1098,13 +677,4 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   );
 };
 
-/**
- * Export the component wrapped in error boundary and context provider
- */
-export default function SendingModeWithErrorBoundary() {
-  return (
-    <SendingModeErrorBoundary>
-      <SendingModeWithContext />
-    </SendingModeErrorBoundary>
-  );
-}
+export default SendingMode;
