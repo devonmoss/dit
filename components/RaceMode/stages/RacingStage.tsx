@@ -66,7 +66,7 @@ const RacingStage: React.FC<RacingStageProps> = ({
           <div className={styles.typingInstructions}>
             {raceMode === 'copy'
               ? 'Listen for the Morse code and type the character you hear'
-              : 'Use ← key for · and → key for – to send the character displayed'
+              : 'Use ← key for · and → key for – or Left/Right Ctrl keys to send the character displayed'
             }
           </div>
         </div>
@@ -91,7 +91,7 @@ const RacingStage: React.FC<RacingStageProps> = ({
                 <div className={styles.keyerOutput}>{keyerOutput}</div>
               </div>
               <div className={styles.hint}>
-                Use ← key for · and → key for –
+                Use ← key or Left Ctrl for · and → key or Right Ctrl for –
               </div>
             </div>
           )}

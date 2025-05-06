@@ -583,7 +583,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           </div>
           
           <div className={styles.sendingInstructions}>
-            Use ← key for <span className={styles.dot}>·</span> and → key for <span className={styles.dash}>–</span>
+            Use ← key or Left Ctrl for <span className={styles.dot}>·</span> and → key or Right Ctrl for <span className={styles.dash}>–</span>
           </div>
           
           <div className={styles.keyerDisplay}>
@@ -597,7 +597,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       ) : (
         <div className={styles.startContainer}>
           <div className={styles.modeDescription}>
-            Use left and right arrow keys to mimic an iambic paddle and send morse code characters.
+            Use left and right arrow keys or left and right Ctrl keys to mimic an iambic paddle and send morse code characters.
           </div>
           <button 
             className="shared-start-button"

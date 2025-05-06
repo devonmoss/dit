@@ -250,25 +250,6 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
           </div>
         </div>
         
-        {/* Debug info - always visible */}
-        <div style={{ 
-          margin: '10px 0', 
-          padding: '10px', 
-          backgroundColor: '#f0f0f0', 
-          border: '1px solid #ddd',
-          borderRadius: '4px',
-          fontSize: '14px'
-        }}>
-          <div><strong>Debug Info:</strong></div>
-          <div>Current Index (prop): {currentCharIndex}</div>
-          <div>Current Index (ref): {currentCharIndexRef.current}</div>
-          <div>Expected Character: '{raceText[currentCharIndexRef.current]}' (index: {currentCharIndexRef.current})</div>
-          <div>Last Detected: {lastDetectedChar ? `'${lastDetectedChar}'` : 'none'}</div>
-          <div>Progress: {userProgress}%</div>
-          <div>Race Text: {generateSequenceDisplay()}</div>
-          <div>Current Morse: {keyerOutput}</div>
-        </div>
-        
         {/* Current character display */}
         <div className={styles.currentCharContainer}>
           <div className={styles.currentCharPrompt}>Current character:</div>
@@ -276,7 +257,7 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
             {!showCorrectIndicator ? currentChar : ''}
           </div>
           <div className={styles.typingInstructions}>
-            Use ← key for · (dot) and → key for – (dash) to send the character displayed
+            Use ← key or Left Ctrl for · (dot) and → key or Right Ctrl for – (dash) to send the character displayed
           </div>
         </div>
         
@@ -287,7 +268,7 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
               <div className={styles.keyerOutput}>{keyerOutput}</div>
             </div>
             <div className={styles.hint}>
-              Left arrow (←) = DOT, Right arrow (→) = DASH
+              Left arrow (←) or Left Ctrl = DOT, Right arrow (→) or Right Ctrl = DASH
             </div>
           </div>
         </div>

@@ -24,7 +24,7 @@ interface UseRaceInputHandlerResult {
   keyerOutput: string;
   showCorrectIndicator: boolean;
   replayCurrent: () => void;
-  keyStateRef: React.MutableRefObject<{ ArrowLeft: boolean; ArrowRight: boolean }>;
+  keyStateRef: React.MutableRefObject<{ ArrowLeft: boolean; ArrowRight: boolean; ControlLeft: boolean; ControlRight: boolean }>;
   sendQueueRef: React.MutableRefObject<string[]>;
 }
 
@@ -54,7 +54,12 @@ export function useRaceInputHandler({
   // References for input handling
   const sendIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sendQueueRef = useRef<string[]>([]);
-  const keyStateRef = useRef({ ArrowLeft: false, ArrowRight: false });
+  const keyStateRef = useRef({ 
+    ArrowLeft: false, 
+    ArrowRight: false,
+    ControlLeft: false, 
+    ControlRight: false 
+  });
   
   // Get the expected Morse code pattern for the current character
   const getExpectedMorse = useCallback(() => {
@@ -234,8 +239,14 @@ export function useRaceInputHandler({
           symbol = sendQueueRef.current.shift();
         } else {
           // Key state for iambic keying
-          const left = keyStateRef.current.ArrowLeft;
-          const right = keyStateRef.current.ArrowRight;
+          const leftArrow = keyStateRef.current.ArrowLeft;
+          const rightArrow = keyStateRef.current.ArrowRight;
+          const leftCtrl = keyStateRef.current.ControlLeft;
+          const rightCtrl = keyStateRef.current.ControlRight;
+          
+          // Either arrow key or control key can be used
+          const left = leftArrow || leftCtrl;
+          const right = rightArrow || rightCtrl;
           
           if (!left && !right) {
             await wait(10);
@@ -338,28 +349,30 @@ export function useRaceInputHandler({
       // Special handling for send mode with arrow keys
       if (raceMode === 'send') {
         // Handle paddle key presses for send mode
-        if (e.key === 'ArrowLeft') {
+        if (e.key === 'ArrowLeft' || e.code === 'ControlLeft') {
           e.preventDefault();
           
           // Only queue a dot if key wasn't already pressed
-          if (!keyStateRef.current.ArrowLeft) {
+          const keyRef = e.key === 'ArrowLeft' ? 'ArrowLeft' : 'ControlLeft';
+          if (!keyStateRef.current[keyRef]) {
             sendQueueRef.current.push('.');
           }
           
           // Update ref state immediately
-          keyStateRef.current.ArrowLeft = true;
+          keyStateRef.current[keyRef] = true;
           return;
         } 
-        else if (e.key === 'ArrowRight') {
+        else if (e.key === 'ArrowRight' || e.code === 'ControlRight') {
           e.preventDefault();
           
           // Only queue a dash if key wasn't already pressed
-          if (!keyStateRef.current.ArrowRight) {
+          const keyRef = e.key === 'ArrowRight' ? 'ArrowRight' : 'ControlRight';
+          if (!keyStateRef.current[keyRef]) {
             sendQueueRef.current.push('-');
           }
           
           // Update ref state immediately
-          keyStateRef.current.ArrowRight = true;
+          keyStateRef.current[keyRef] = true;
           return;
         }
         
@@ -369,7 +382,12 @@ export function useRaceInputHandler({
           e.preventDefault();
           // Clear send queue and state
           sendQueueRef.current = [];
-          keyStateRef.current = { ArrowLeft: false, ArrowRight: false };
+          keyStateRef.current = { 
+            ArrowLeft: false, 
+            ArrowRight: false,
+            ControlLeft: false, 
+            ControlRight: false 
+          };
           setKeyerOutput('');
           setCodeBuffer('');
           setWordBuffer('');
@@ -442,11 +460,16 @@ export function useRaceInputHandler({
       // Only handle events during active racing in send mode
       if (raceStage !== RaceStage.RACING || raceMode !== 'send') return;
       
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
+          e.code === 'ControlLeft' || e.code === 'ControlRight') {
         e.preventDefault();
         
         // Update ref state immediately
-        keyStateRef.current[e.key as 'ArrowLeft' | 'ArrowRight'] = false;
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          keyStateRef.current[e.key] = false;
+        } else {
+          keyStateRef.current[e.code as 'ControlLeft' | 'ControlRight'] = false;
+        }
       }
     };
     

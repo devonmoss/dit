@@ -279,7 +279,7 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     const isNewUserAction = (now - lastKeyActionTime.current) > 1000;
     lastKeyActionTime.current = now;
     
-    if (e.key === 'ArrowLeft') {
+    if (e.key === 'ArrowLeft' || e.code === 'ControlLeft') {
       e.preventDefault();
       
       // Left arrow down = dot paddle press
@@ -332,7 +332,7 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
           startSequence('.');
         }
       }
-    } else if (e.key === 'ArrowRight') {
+    } else if (e.key === 'ArrowRight' || e.code === 'ControlRight') {
       e.preventDefault();
       
       // Right arrow down = dash paddle press
@@ -400,7 +400,7 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   };
   
   const handleKeyUp = (e: KeyboardEvent) => {
-    if (e.key === 'ArrowLeft') {
+    if (e.key === 'ArrowLeft' || e.code === 'ControlLeft') {
       e.preventDefault();
       
       // Left arrow up = dot paddle release
@@ -415,7 +415,7 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       if (!dashHeld.current && elementTimer.current === null && buffer.current) {
         scheduleChar();
       }
-    } else if (e.key === 'ArrowRight') {
+    } else if (e.key === 'ArrowRight' || e.code === 'ControlRight') {
       e.preventDefault();
       
       // Right arrow up = dash paddle release
