@@ -175,6 +175,17 @@ const EnhancedRaceMode: React.FC = () => {
     sendWpm: state.sendWpm // Pass the sendWpm from app state
   });
   
+  // Add debug logging for replayCurrent function
+  const debugReplayCurrent = useCallback(() => {
+    console.log('AUDIO DEBUG: replayCurrent called', {
+      currentCharIndex,
+      currentChar: raceText[currentCharIndex] || 'none',
+      raceStage,
+      raceMode
+    });
+    return replayCurrent();
+  }, [replayCurrent, currentCharIndex, raceText, raceStage, raceMode]);
+  
   // Keep participants in sync with race channel
   useEffect(() => {
     // Update local participants when race channel participants change
@@ -390,13 +401,20 @@ const EnhancedRaceMode: React.FC = () => {
       setRaceStatus('racing');
       setStartTime(startTime);
       
+      // Debug: Log when race starts and first character should play soon
+      console.log('AUDIO DEBUG: Race started - first character should play soon', {
+        raceMode,
+        firstChar: raceText.length > 0 ? raceText[0] : 'none',
+        hasAudioContext: audioContext !== null
+      });
+      
       // Reset the activity timer when race starts
       lastActivityTimeRef.current = Date.now();
       console.log('Race started - initializing activity timer');
     } catch (err) {
       console.error('Error starting race:', err);
     }
-  }, [raceId, raceText, playMorseChar]);
+  }, [raceId, raceText, playMorseChar, raceMode, audioContext]);
   
   // Finish the race for a user
   const finishRace = useCallback(async () => {
@@ -936,7 +954,7 @@ const EnhancedRaceMode: React.FC = () => {
           onlineUserIds={onlineUsers.map(user => user.user_id)}
           keyerOutput={keyerOutput}
           showCorrectIndicator={showCorrectIndicator}
-          onReplayCurrent={replayCurrent}
+          onReplayCurrent={debugReplayCurrent}
         />
       )}
       

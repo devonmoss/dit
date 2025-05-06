@@ -278,13 +278,47 @@ export function useRaceInputHandler({
     };
   }, [raceStage, raceMode, sendWpm, handleWordComplete, playSendSymbol]);
 
-  // Replay current character function
+  // Replay current character
   const replayCurrent = useCallback(() => {
-    if (raceStage !== RaceStage.RACING || currentCharIndex >= raceText.length) return;
-    
-    // Play the current character again
-    playMorseChar(raceText[currentCharIndex]);
-  }, [raceStage, raceText, currentCharIndex, playMorseChar]);
+    if (raceStage === RaceStage.RACING && raceMode === 'copy' && currentCharIndex < raceText.length) {
+      const currentChar = raceText[currentCharIndex];
+      console.log('AUDIO DEBUG: Replaying current character', { 
+        currentChar, 
+        currentCharIndex,
+        raceStage,
+        raceMode,
+        hasAudioContext: !!audioContext
+      });
+      
+      if (currentChar && audioContext) {
+        playMorseChar(currentChar).catch(err => {
+          console.error('AUDIO DEBUG: Error playing morse char:', err);
+        });
+      }
+    }
+  }, [raceStage, raceMode, raceText, currentCharIndex, playMorseChar, audioContext]);
+
+  // Auto-play first character when race starts
+  useEffect(() => {
+    if (raceStage === RaceStage.RACING && raceMode === 'copy' && currentCharIndex === 0 && raceText.length > 0) {
+      console.log('AUDIO DEBUG: Auto-playing first character on race start', {
+        firstChar: raceText[0],
+        raceStage,
+        raceMode,
+        currentCharIndex,
+        hasAudioContext: !!audioContext
+      });
+      
+      // Small delay to ensure everything is ready
+      setTimeout(() => {
+        if (raceText[0] && audioContext) {
+          playMorseChar(raceText[0]).catch(err => {
+            console.error('AUDIO DEBUG: Error auto-playing first character:', err);
+          });
+        }
+      }, 100);
+    }
+  }, [raceStage, raceMode, raceText, currentCharIndex, playMorseChar, audioContext]);
 
   // Handle keydown events - copied directly from SendingMode's approach
   useEffect(() => {
