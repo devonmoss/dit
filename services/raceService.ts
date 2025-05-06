@@ -154,3 +154,19 @@ export async function finishRace(raceId: string, userId: string, data: {
   
   return response.json();
 }
+
+// Update race creator
+export async function updateRaceCreator(raceId: string, creatorId: string) {
+  const response = await fetch(`/api/races/${raceId}/creator`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ creator_id: creatorId })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to update race creator');
+  }
+  
+  return response.json();
+}

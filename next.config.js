@@ -2,9 +2,17 @@
 const nextConfig = {
   reactStrictMode: true,
   
-  // Disable ESLint during build
+  // Re-enable ESLint during build
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
+  },
+  
+  // Enable detailed source maps for better debugging
+  webpack: (config, { dev, isServer }) => {
+    if (dev) {
+      config.devtool = 'eval-source-map';
+    }
+    return config;
   },
   
   // Redirects

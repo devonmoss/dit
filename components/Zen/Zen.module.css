@@ -1,0 +1,35 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  background-color: var(--background-color);
+}
+
+.textarea {
+  width: 100%;
+  max-width: 600px;
+  height: 250px;
+  font-size: 1.4rem;
+  font-family: var(--font-family);
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  resize: none;
+  background-color: var(--primary-bg);
+  color: var(--accent-color);
+  outline: none; /* Remove the focus outline */
+}
+
+.textarea:focus {
+  border-color: var(--border-color); /* Keep the same border on focus */
+  box-shadow: none; /* Remove any focus shadow */
+}
+
+.hint {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+  margin-top: 0.5rem;
+  text-align: center;
+}

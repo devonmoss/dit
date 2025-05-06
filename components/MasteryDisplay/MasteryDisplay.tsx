@@ -4,20 +4,31 @@ import { useAppState } from '../../contexts/AppStateContext';
 
 interface MasteryDisplayProps {
   targetPoints?: number;
+  // Optional props to override AppState context for more direct control
+  charPoints?: Record<string, number>;
+  chars?: string[];
 }
 
-const MasteryDisplay: React.FC<MasteryDisplayProps> = ({ targetPoints = 3 }) => {
+const MasteryDisplay: React.FC<MasteryDisplayProps> = ({ 
+  targetPoints = 3,
+  charPoints,
+  chars
+}) => {
   const { state, getCurrentLevel } = useAppState();
-  const currentLevel = getCurrentLevel();
   
-  if (!currentLevel) {
+  // Use props if provided, otherwise fall back to app state
+  const currentLevel = getCurrentLevel();
+  const displayChars = chars || (currentLevel ? currentLevel.chars : []);
+  const pointsSource = charPoints || state.charPoints;
+  
+  if (displayChars.length === 0) {
     return null;
   }
   
   return (
     <div className={styles.masteryContainer}>
-      {currentLevel.chars.map(char => {
-        const points = state.charPoints[char] || 0;
+      {displayChars.map(char => {
+        const points = pointsSource[char] || 0;
         const fraction = Math.min(points / targetPoints, 1);
         
         // SVG circle parameters
@@ -54,4 +65,4 @@ const MasteryDisplay: React.FC<MasteryDisplayProps> = ({ targetPoints = 3 }) => 
   );
 };
 
-export default MasteryDisplay; 
+export default MasteryDisplay;
