@@ -70,6 +70,16 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   // Reference to track character points locally
   const localCharPointsRef = useRef<Record<string, number>>({});
   
+  // New state for character selection debugging
+  const [lastPickerInputs, setLastPickerInputs] = useState<{
+    levelId: string;
+    levelName: string;
+    levelChars: string[];
+    stateChars: string[];
+    pointsSnapshot: Record<string, number>;
+    recentlyMasteredChar: string | null;
+  } | null>(null);
+  
   // Pre-declare handleLevelSelection
   const handleLevelSelection = useCallback((levelId: string) => {
     console.log(`SendingMode: Explicitly selecting level ${levelId}`);
@@ -351,6 +361,16 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     console.log(`SendingMode: Current points:`, state.charPoints);
     console.log(`SendingMode: Recently mastered char:`, recentlyMasteredCharRef.current);
     
+    // Store the inputs for debugging
+    setLastPickerInputs({
+      levelId: levelDefinition.id,
+      levelName: levelDefinition.name,
+      levelChars: [...levelChars],
+      stateChars: [...state.chars],
+      pointsSnapshot: {...state.charPoints},
+      recentlyMasteredChar: recentlyMasteredCharRef.current
+    });
+    
     // IMPORTANT: Use the level's character list directly instead of state.chars
     return selectNextCharacter(
       levelChars,
@@ -422,10 +442,31 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     const nextChar = pickNextChar();
     console.log(`SendingMode: Next question with character: "${nextChar}"`);
     
-    // Set the current character
-    setCurrentChar(nextChar);
-    currentCharRef.current = nextChar;
-    console.log(`Directly set currentCharRef to: "${nextChar}"`);
+    // SAFETY CHECK: Validate the nextChar is actually in the current level's character set
+    const currentLevelDef = trainingLevels.find(level => level.id === state.selectedLevelId);
+    if (!currentLevelDef) {
+      console.error(`SendingMode: Couldn't find level with ID: ${state.selectedLevelId} for character validation`);
+      return Promise.resolve();
+    }
+    
+    // Check if the selected character is valid for this level
+    if (!currentLevelDef.chars.includes(nextChar)) {
+      console.error(`🚨 ERROR: Character "${nextChar}" not in current level (${currentLevelDef.id}) character set: ${currentLevelDef.chars.join(', ')}`);
+      
+      // Force select a valid character from the current level
+      const validChar = currentLevelDef.chars[0]; // fallback to first char
+      console.log(`🛠️ CORRECTION: Replacing invalid character "${nextChar}" with valid character "${validChar}"`);
+      
+      // Set the corrected character
+      setCurrentChar(validChar);
+      currentCharRef.current = validChar;
+      console.log(`Directly set currentCharRef to corrected character: "${validChar}"`);
+    } else {
+      // Normal flow for valid character
+      setCurrentChar(nextChar);
+      currentCharRef.current = nextChar;
+      console.log(`Directly set currentCharRef to: "${nextChar}"`);
+    }
     
     setMorseOutput('');
     setFeedbackState('none');
@@ -437,13 +478,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     console.log(`Setting character start time: ${now} (also set in ref)`);
     
     // Log point information for this character for debugging
-    const currentStatePoints = state.charPoints[nextChar] || 0;
-    const currentLocalPoints = localCharPointsRef.current[nextChar] || 0;
-    console.log(`Current character "${nextChar}" points - state: ${currentStatePoints}, local: ${currentLocalPoints}`);
+    const currentStatePoints = state.charPoints[currentChar] || 0;
+    const currentLocalPoints = localCharPointsRef.current[currentChar] || 0;
+    console.log(`Current character "${currentChar}" points - state: ${currentStatePoints}, local: ${currentLocalPoints}`);
     
     // Return a promise that resolves immediately to match TrainingMode's flow
     return Promise.resolve();
-  }, [pickNextChar, verifyAndFixCharacterSet, state.charPoints]);
+  }, [pickNextChar, verifyAndFixCharacterSet, state.charPoints, state.selectedLevelId, currentChar]);
   
   // Handle character input from the keyer
   const handleCharacter = useCallback((char: string) => {
@@ -578,20 +619,80 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           return isMastered;
         });
         
+        // Check if only partial mastery (old Level 1 chars are mastered, but new Level 2 chars are not)
+        const oldChars = ['e', 't']; // Level 1 characters
+        const newChars = levelChars.filter(c => !oldChars.includes(c)); // New characters in this level
+        
+        const oldCharsMastered = oldChars.every(c => {
+          if (!levelChars.includes(c)) return true; // Skip if not in this level
+          const points = mergedPoints[c] || 0;
+          return points >= TARGET_POINTS;
+        });
+        
+        const newCharsMastered = newChars.every(c => {
+          const points = mergedPoints[c] || 0;
+          return points >= TARGET_POINTS;
+        });
+        
+        const newCharsAttempted = newChars.some(c => {
+          return (mergedPoints[c] || 0) > 0;
+        });
+        
         console.log('Completion check:', { 
           levelId: state.selectedLevelId,
           levelName: currentLevelDef.name,
           levelChars,
+          oldChars,
+          newChars,
+          oldCharsMastered,
+          newCharsMastered,
+          newCharsAttempted,
           statePointsSource: 'AppState',
           localPointsSource: 'LocalRef',
           mergedPoints,
           allMastered
         });
         
-        // Simple completion check - just verify all characters in THIS level are mastered
+        // NEVER end the test unless all characters have been mastered
+        // Also ensure at least one new character has been attempted before finishing
         if (allMastered) {
           console.log(`✅ Level complete - all ${levelChars.length} characters are mastered`);
           finishTest(true);
+        } else if (oldCharsMastered && !newCharsAttempted) {
+          console.log(`⚠️ Only old characters mastered but new characters not yet attempted - forcing new character selection`);
+          
+          // Force selection of a new character by skipping the next question
+          // Temporarily set recentlyMasteredCharRef to all old characters to force new char selection
+          const oldMastered = oldChars.filter(c => levelChars.includes(c));
+          if (oldMastered.length > 0 && newChars.length > 0) {
+            // Store the original recently mastered char
+            const originalRecentlyMastered = recentlyMasteredCharRef.current;
+            
+            // Force select a new character from the level
+            const forceChar = newChars[0];
+            console.log(`🔄 Forcing selection of new character: "${forceChar}" for next question`);
+            
+            // Set current character directly
+            setCurrentChar(forceChar);
+            currentCharRef.current = forceChar;
+            
+            // Reset the morse output and feedback state
+            setMorseOutput('');
+            setFeedbackState('none');
+            
+            // Set the start time for response time tracking
+            const now = Date.now();
+            setCharStartTime(now);
+            charStartTimeRef.current = now;
+            
+            // Restore the original recently mastered character after forcing selection
+            setTimeout(() => {
+              recentlyMasteredCharRef.current = originalRecentlyMastered;
+            }, 100);
+          } else {
+            // If we can't force selection, just continue with normal flow
+            nextQuestion();
+          }
         } else {
           console.log(`⏳ Continuing test - not all characters mastered yet`);
           nextQuestion();
@@ -1402,6 +1503,174 @@ const SendingMode: React.FC<SendingModeProps> = () => {
                 return null;
               })()
             )}
+            
+            <div style={{marginTop: '10px', border: '1px solid #444', padding: '5px', backgroundColor: 'rgba(50,0,50,0.2)'}}>
+              <div style={{fontWeight: 'bold', marginBottom: '2px', borderBottom: '1px solid #444', paddingBottom: '2px'}}>
+                Complete Character Tracking
+              </div>
+              <div>
+                <table style={{borderCollapse: 'collapse', width: '100%'}}>
+                  <thead>
+                    <tr>
+                      <th style={{textAlign: 'left', padding: '2px', borderBottom: '1px solid #444'}}>Char</th>
+                      <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>Local Points</th>
+                      <th style={{textAlign: 'right', padding: '2px', borderBottom: '1px solid #444'}}>AppState Points</th>
+                      <th style={{textAlign: 'center', padding: '2px', borderBottom: '1px solid #444'}}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentLevel && currentLevel.chars.map(char => {
+                      const localPoints = localCharPointsRef.current[char] || 0;
+                      const appPoints = state.charPoints[char] || 0;
+                      const effectivePoints = Math.max(localPoints, appPoints);
+                      const isMastered = effectivePoints >= TARGET_POINTS;
+                      const isAttempted = effectivePoints > 0;
+                      
+                      return (
+                        <tr key={char} style={{
+                          backgroundColor: char === currentChar ? 'rgba(255,255,0,0.15)' : 'transparent'
+                        }}>
+                          <td style={{padding: '1px', fontWeight: char === currentChar ? 'bold' : 'normal'}}>
+                            {char}{char === currentChar ? ' ←' : ''}
+                          </td>
+                          <td style={{textAlign: 'right', padding: '1px'}}>{localPoints.toFixed(2)}</td>
+                          <td style={{textAlign: 'right', padding: '1px'}}>{appPoints.toFixed(2)}</td>
+                          <td style={{textAlign: 'center', padding: '1px'}}>
+                            {!isAttempted && (
+                              <span style={{color: '#aaa'}}>Not attempted</span>
+                            )}
+                            {isAttempted && !isMastered && (
+                              <span style={{color: '#f88'}}>In progress</span>
+                            )}
+                            {isMastered && (
+                              <span style={{color: '#8f8'}}>Mastered ✓</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{marginTop: '5px', fontSize: '11px', color: '#ccc'}}>
+                Shows all characters in the current level regardless of whether they've been attempted.
+              </div>
+            </div>
+            
+            {/* Character Picker Debug Widget */}
+            <div style={{
+              marginTop: '15px', 
+              border: '2px solid #f00', 
+              padding: '5px', 
+              backgroundColor: 'rgba(80,0,0,0.3)'
+            }}>
+              <div style={{
+                fontWeight: 'bold', 
+                marginBottom: '2px', 
+                borderBottom: '1px solid #f88', 
+                paddingBottom: '2px', 
+                color: '#f88'
+              }}>
+                🔍 CHARACTER SELECTION DEBUG
+              </div>
+              
+              {lastPickerInputs ? (
+                <div>
+                  <div style={{marginBottom: '5px'}}>
+                    <div><strong>Last Character Selection:</strong></div>
+                    <div>Level: <span style={{color: '#f88'}}>{lastPickerInputs.levelName} ({lastPickerInputs.levelId})</span></div>
+                    <div>Current Char: <span style={{color: '#f88'}}>{currentChar || '(none)'}</span></div>
+                  </div>
+                  
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: '5px',
+                    padding: '4px',
+                    backgroundColor: 'rgba(50,0,0,0.4)',
+                    borderRadius: '3px'
+                  }}>
+                    <div>
+                      <div><strong>⚠️ Level Chars Used:</strong></div>
+                      <div style={{color: '#f88'}}>{lastPickerInputs.levelChars.join(', ')}</div>
+                    </div>
+                    <div>
+                      <div><strong>⚠️ State Chars:</strong></div>
+                      <div style={{color: '#f88'}}>{lastPickerInputs.stateChars.join(', ')}</div>
+                    </div>
+                  </div>
+                  
+                  <div style={{marginBottom: '5px'}}>
+                    <div><strong>Recently Mastered:</strong> <span style={{color: '#f88'}}>{lastPickerInputs.recentlyMasteredChar || 'None'}</span></div>
+                  </div>
+                  
+                  <div>
+                    <div><strong>Character Point Snapshot:</strong></div>
+                    <table style={{width: '100%', borderCollapse: 'collapse'}}>
+                      <thead>
+                        <tr>
+                          <th style={{textAlign: 'left', borderBottom: '1px solid #666'}}>Char</th>
+                          <th style={{textAlign: 'right', borderBottom: '1px solid #666'}}>Points</th>
+                          <th style={{textAlign: 'center', borderBottom: '1px solid #666'}}>In Level?</th>
+                          <th style={{textAlign: 'center', borderBottom: '1px solid #666'}}>In State?</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(lastPickerInputs.pointsSnapshot).map(([char, points]) => {
+                          const inLevel = lastPickerInputs.levelChars.includes(char);
+                          const inState = lastPickerInputs.stateChars.includes(char);
+                          const isCurrent = char === currentChar;
+                          
+                          return (
+                            <tr key={char} style={{
+                              backgroundColor: isCurrent ? 'rgba(80,80,0,0.3)' : 'transparent',
+                              color: isCurrent ? '#ff0' : (inLevel ? '#fff' : '#a55')
+                            }}>
+                              <td style={{padding: '1px'}}>{char} {isCurrent && '←'}</td>
+                              <td style={{textAlign: 'right', padding: '1px'}}>{points.toFixed(2)}</td>
+                              <td style={{textAlign: 'center', padding: '1px', color: inLevel ? '#8f8' : '#f55'}}>
+                                {inLevel ? '✓' : '✗'}
+                              </td>
+                              <td style={{textAlign: 'center', padding: '1px', color: inState ? '#8f8' : '#f55'}}>
+                                {inState ? '✓' : '✗'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  <div style={{marginTop: '8px', padding: '3px', backgroundColor: 'rgba(80,0,0,0.5)', borderRadius: '3px'}}>
+                    <div style={{color: '#f55', fontWeight: 'bold'}}>CHARACTER MISMATCH DETECTION:</div>
+                    <div>
+                      {lastPickerInputs.levelChars.join(',') !== lastPickerInputs.stateChars.join(',') ? (
+                        <div style={{color: '#f55'}}>
+                          ⚠️ <strong>MISMATCH DETECTED:</strong> Level chars and State chars are different!
+                        </div>
+                      ) : (
+                        <div style={{color: '#8f8'}}>
+                          Level chars and State chars match correctly.
+                        </div>
+                      )}
+                    </div>
+                    {lastPickerInputs.stateChars.some(c => !lastPickerInputs.levelChars.includes(c)) && (
+                      <div style={{color: '#f55', marginTop: '3px'}}>
+                        Found characters in State that don't belong in current level: 
+                        <strong>{lastPickerInputs.stateChars.filter(c => !lastPickerInputs.levelChars.includes(c)).join(', ')}</strong>
+                      </div>
+                    )}
+                    {currentChar && !lastPickerInputs.levelChars.includes(currentChar) && (
+                      <div style={{color: '#f00', marginTop: '3px', fontWeight: 'bold'}}>
+                        🚨 CRITICAL: Current char "{currentChar}" is not in level chars!
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div style={{color: '#aaa', fontStyle: 'italic'}}>No character selection recorded yet</div>
+              )}
+            </div>
           </div>
         </div>
       )}
