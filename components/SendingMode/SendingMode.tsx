@@ -588,37 +588,12 @@ const SendingMode: React.FC<SendingModeProps> = () => {
           allMastered
         });
         
-        // Only finish the test if:
-        // 1. All characters are mastered using the merged points
-        // 2. We've had at least 2x the number of characters in responses (to ensure we've practiced each char multiple times)
-        // 3. We've practiced each character at least once (use response times to check)
-        const minRequiredResponses = levelChars.length * 2;
-        const hasEnoughResponses = responseTimes.length >= minRequiredResponses;
-        
-        // Check if we've encountered each character at least once
-        const encounteredChars = new Set(responseTimes.map(rt => rt.char));
-        const allCharsEncountered = levelChars.every(c => encounteredChars.has(c));
-        
-        console.log(`Level completion diagnostics:`, {
-          allMastered,
-          responseCount: responseTimes.length,
-          minRequiredResponses,
-          hasEnoughResponses,
-          encounteredChars: Array.from(encounteredChars),
-          allCharsEncountered
-        });
-        
-        if (allMastered && hasEnoughResponses && allCharsEncountered) {
-          console.log(`✅ All requirements met - completing level:
-            - All ${levelChars.length} characters mastered
-            - ${responseTimes.length}/${minRequiredResponses} responses received
-            - All characters encountered at least once`);
+        // Simple completion check - just verify all characters in THIS level are mastered
+        if (allMastered) {
+          console.log(`✅ Level complete - all ${levelChars.length} characters are mastered`);
           finishTest(true);
         } else {
-          console.log(`⏳ Continuing test - completion requirements not yet met:
-            - All mastered: ${allMastered ? 'Yes' : 'No'}
-            - Enough responses: ${hasEnoughResponses ? 'Yes' : 'No'} (${responseTimes.length}/${minRequiredResponses})
-            - All chars practiced: ${allCharsEncountered ? 'Yes' : 'No'}`);
+          console.log(`⏳ Continuing test - not all characters mastered yet`);
           nextQuestion();
         }
       }, FEEDBACK_DELAY);
