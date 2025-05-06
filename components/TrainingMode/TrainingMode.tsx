@@ -3,6 +3,7 @@ import styles from './TrainingMode.module.css';
 import { useAppState } from '../../contexts/AppStateContext';
 import { createAudioContext, morseMap, isBrowser } from '../../utils/morse';
 import { trainingLevels } from '../../utils/levels';
+import { selectNextCharacter } from '../../utils/characterSelection';
 import MasteryDisplay from '../MasteryDisplay/MasteryDisplay';
 import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
 
@@ -54,6 +55,9 @@ const TrainingMode: React.FC = () => {
   // Track test start time
   const [testStartTime, setTestStartTime] = useState<number | null>(null);
   
+  // Reference to track recently mastered character
+  const recentlyMasteredCharRef = useRef<string | null>(null);
+  
   // Get current level
   const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
   const isCheckpoint = currentLevel?.type === 'checkpoint';
@@ -93,25 +97,15 @@ const TrainingMode: React.FC = () => {
     console.log('---------------------------------------');
   }, [state.selectedLevelId, state.chars, state.testActive]);
   
-  // Pick next character based on mastery weights
+  // Pick next character based on mastery weights - prioritize unmastered characters
   const pickNextChar = useCallback(() => {
-    if (!state.chars.length) return '';
-    
-    const pool = state.chars.map(char => {
-      const points = state.charPoints[char] || 0;
-      const weight = points >= TARGET_POINTS ? COMPLETED_WEIGHT : 1;
-      return { char, weight };
-    });
-    
-    const totalWeight = pool.reduce((sum, p) => sum + p.weight, 0);
-    let r = Math.random() * totalWeight;
-    
-    for (const p of pool) {
-      if (r < p.weight) return p.char;
-      r -= p.weight;
-    }
-    
-    return pool[pool.length - 1].char;
+    // Use the shared utility function
+    return selectNextCharacter(
+      state.chars,
+      state.charPoints,
+      TARGET_POINTS,
+      recentlyMasteredCharRef.current
+    );
   }, [state.chars, state.charPoints]);
   
   // Start next question
@@ -124,6 +118,9 @@ const TrainingMode: React.FC = () => {
     setStatus('');
     setHintText('');
     setWaitingForInput(false);
+    
+    // Do NOT reset recently mastered reference here
+    // Let it persist until the next mastery event
     
     try {
       await audioContextInstance.playMorse(nextChar);
@@ -207,7 +204,17 @@ const TrainingMode: React.FC = () => {
         }
         
         // Update character points
-        const newPoints = (state.charPoints[target] || 0) + pointsToAdd;
+        const currentPoints = state.charPoints[target] || 0;
+        const newPoints = currentPoints + pointsToAdd;
+        
+        // Check if character will reach mastery with this addition
+        const willCompleteMastery = newPoints >= TARGET_POINTS && currentPoints < TARGET_POINTS;
+        
+        // If this character will now be mastered, track it to avoid immediate reselection
+        if (willCompleteMastery) {
+          recentlyMasteredCharRef.current = target;
+        }
+        
         updateCharPoints(target, newPoints);
         
         console.log(`Character ${target} updated: ${state.charPoints[target] || 0} → ${newPoints} points (${pointsToAdd} added, response time: ${responseTime.toFixed(2)}s)`);

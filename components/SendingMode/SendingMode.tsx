@@ -6,6 +6,7 @@ import MasteryDisplay from '../MasteryDisplay/MasteryDisplay';
 import TestResultsSummary from '../TestResultsSummary/TestResultsSummary';
 import { trainingLevels } from '../../utils/levels';
 import { useIambicKeyer } from '../../hooks/useIambicKeyer';
+import { selectNextCharacter } from '../../utils/characterSelection';
 
 // Constants
 const TARGET_POINTS = 3;
@@ -62,6 +63,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Add a ref to store points between updates since the context isn't working correctly
   const charPointsRef = useRef<Record<string, number>>({});
+
+  // Reference to track recently mastered character
+  const recentlyMasteredCharRef = useRef<string | null>(null);
   
   // Track current environment
   const isClientRef = useRef(false);
@@ -180,25 +184,15 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     return 1 - ((seconds - MIN_RESPONSE_TIME) / (MAX_RESPONSE_TIME - MIN_RESPONSE_TIME));
   }, []);
   
-  // Pick next character to practice - use state.charPoints again
+  // Pick next character to practice sending - prioritize unmastered characters
   const pickNextChar = useCallback(() => {
-    if (!state.chars.length) return '';
-    
-    const pool = state.chars.map(char => {
-      const points = state.charPoints[char] || 0;
-      const weight = points >= TARGET_POINTS ? COMPLETED_WEIGHT : 1;
-      return { char, weight };
-    });
-    
-    const totalWeight = pool.reduce((sum, p) => sum + p.weight, 0);
-    let r = Math.random() * totalWeight;
-    
-    for (const p of pool) {
-      if (r < p.weight) return p.char;
-      r -= p.weight;
-    }
-    
-    return pool[pool.length - 1].char;
+    // Use the shared utility function
+    return selectNextCharacter(
+      state.chars,
+      state.charPoints, 
+      TARGET_POINTS,
+      recentlyMasteredCharRef.current
+    );
   }, [state.chars, state.charPoints]);
   
   // Show next character
@@ -217,6 +211,9 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     setMorseOutput('');
     setFeedbackState('none');
+    
+    // Do NOT reset recently mastered reference here
+    // Let it persist until the next mastery event
     
     // Set the start time for response time tracking
     charStartTimeRef.current = Date.now();
@@ -332,6 +329,14 @@ const SendingMode: React.FC<SendingModeProps> = () => {
       
       const newPoints = currentPoints + points; // Add to existing points
       console.log(`SendingMode: Updating points for "${successChar}" from ${currentPoints} to ${newPoints} (adding ${points})`);
+      
+      // Check if this character will now be mastered and wasn't before
+      const willCompleteMastery = newPoints >= TARGET_POINTS && currentPoints < TARGET_POINTS;
+      
+      // If this character will now be mastered, track it to avoid immediate reselection
+      if (willCompleteMastery) {
+        recentlyMasteredCharRef.current = successChar;
+      }
       
       // Update both our ref and the app state
       charPointsRef.current[successChar] = newPoints;
