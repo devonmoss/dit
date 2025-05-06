@@ -27,6 +27,37 @@ interface CharTiming {
   time: number;
 }
 
+// NEW: Direct level mapping to bypass the problematic find() operation
+const LEVEL_CHAR_MAP: Record<string, string[]> = {
+  'level-1': ['e', 't'], 
+  'level-2': ['e', 't', 'a', 'n'],
+  'level-3': ['e', 't', 'a', 'n', 's', 'o'],
+  'level-4': ['e', 't', 'a', 'n', 'i', 'm'],
+  'level-5': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r'],
+  'level-6': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k'],
+  'level-7': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g'],
+  'level-8': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v'],
+  'level-9': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l'],
+  'level-10': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l', 'p', 'j'],
+  'level-11': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l', 'p', 'j', 'b', 'x'],
+  'level-12': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l', 'p', 'j', 'b', 'x', 'c', 'y'],
+  'level-13': ['e', 't', 'a', 'n', 's', 'o', 'i', 'm', 'd', 'r', 'u', 'k', 'w', 'g', 'h', 'v', 'f', 'l', 'p', 'j', 'b', 'x', 'c', 'y', 'z', 'q']
+};
+
+// NEW: Function to get level characters without relying on find()
+const getLevelChars = (levelId: string): string[] => {
+  // Use our direct map first
+  if (LEVEL_CHAR_MAP[levelId]) {
+    console.log(`🔐 Using DIRECT LEVEL CHAR MAP for ${levelId}: ${LEVEL_CHAR_MAP[levelId].join(', ')}`);
+    return LEVEL_CHAR_MAP[levelId];
+  }
+  
+  // Fallback to finding in trainingLevels (but log a warning)
+  console.warn(`⚠️ No direct mapping for level ${levelId} - falling back to find()`);
+  const level = trainingLevels.find(l => l.id === levelId);
+  return level ? level.chars : [];
+};
+
 const SendingMode: React.FC<SendingModeProps> = () => {
   const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel, startTestWithLevelId } = useAppState();
   
@@ -94,13 +125,13 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Utility function to verify and fix character sets
   const verifyAndFixCharacterSet = useCallback(() => {
-    const level = trainingLevels.find(l => l.id === state.selectedLevelId);
-    if (!level) {
-      console.error(`🛑 Could not find level with ID: ${state.selectedLevelId}`);
+    // CRITICAL FIX: Use direct character mapping instead of find()
+    const levelChars = getLevelChars(state.selectedLevelId);
+    if (levelChars.length === 0) {
+      console.error(`🛑 Could not find characters for level ID: ${state.selectedLevelId}`);
       return false;
     }
     
-    const levelChars = level.chars;
     const stateChars = state.chars;
     
     // Check for match
@@ -115,18 +146,18 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     
     // Log the mismatch
     console.warn('⚠️ Character set mismatch detected:');
-    console.warn(`- Level: ${level.name} (${level.id})`);
+    console.warn(`- Level: ${state.selectedLevelId}`);
     console.warn(`- Level chars (${levelChars.length}): ${levelChars.join(', ')}`);
     console.warn(`- State chars (${stateChars.length}): ${stateChars.join(', ')}`);
     
     // Attempt to fix by re-selecting the level
-    console.log('🔧 Fixing by re-selecting level:', level.id);
+    console.log('🔧 Fixing by re-selecting level:', state.selectedLevelId);
     
     // Reset local character points to ensure clean slate
     localCharPointsRef.current = {};
     
     // Use our custom handler for proper reset
-    handleLevelSelection(level.id);
+    handleLevelSelection(state.selectedLevelId);
     return false;
   }, [state.selectedLevelId, state.chars, handleLevelSelection]);
   
@@ -247,6 +278,25 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     localCharPointsRef.current = {};
     console.log('Reset localCharPointsRef due to level change');
   }, [state.selectedLevelId, state.chars]);
+    
+  // NEW: Add a synchronization effect to force consistent level ID
+  useEffect(() => {
+    // This is a critical synchronization check that runs on mount
+    if (!state.selectedLevelId) return;
+    
+    console.log(`🔐 CRITICAL LEVEL SYNC CHECK ON MOUNT`);
+    console.log(`Current level ID: ${state.selectedLevelId}`);
+    
+    // This ensures the level is properly registered with the app state
+    // and all internal state is consistent
+    selectLevel(state.selectedLevelId);
+    
+    // Reset any local state that could cause problems
+    localCharPointsRef.current = {};
+    recentlyMasteredCharRef.current = null;
+    
+    console.log(`🔒 Performed critical level sync to ensure consistency`);
+  }, []); // Empty dependency array - only runs once on mount
   
   // Keep currentCharRef in sync with currentChar state
   useEffect(() => {
@@ -346,72 +396,21 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   
   // Pick next character based on mastery weights
   const pickNextChar = useCallback(() => {
-    // Get the current level definition directly to ensure we have the correct characters
-    const levelDefinition = trainingLevels.find(level => level.id === state.selectedLevelId);
-    if (!levelDefinition) {
-      console.error(`SendingMode: Couldn't find level with ID: ${state.selectedLevelId}`);
-      return state.chars[0] || '';
-    }
-    
-    // CRITICAL FIX: Double-check that we have the correct level
-    console.log(`🔎 VALIDATING LEVEL SELECTION:`);
-    console.log(`- Selected level ID from state: ${state.selectedLevelId}`);
-    console.log(`- Found level ID: ${levelDefinition.id}`);
-    
-    // Ensure we're using the correct level - level ID should match the one in state
-    if (levelDefinition.id !== state.selectedLevelId) {
-      console.error(`🚨 CRITICAL: Level mismatch in pickNextChar - requested ${state.selectedLevelId} but got ${levelDefinition.id}`);
-      
-      // Force get the correct level to avoid character selection from wrong level
-      const correctLevel = trainingLevels.find(l => l.id === state.selectedLevelId);
-      if (!correctLevel) {
-        console.error(`Unable to find correct level with ID: ${state.selectedLevelId}`);
-        return state.chars[0] || '';
-      }
-      
-      console.log(`🛠️ Fixing by explicitly using level ${correctLevel.id} (${correctLevel.name})`);
-      
-      // Use the correct level chars
-      const levelChars = correctLevel.chars;
-      
-      // Store debugging info with corrected level
-      setLastPickerInputs({
-        levelId: correctLevel.id,
-        levelName: correctLevel.name,
-        levelChars: [...levelChars],
-        stateChars: [...state.chars],
-        pointsSnapshot: {...state.charPoints},
-        recentlyMasteredChar: recentlyMasteredCharRef.current
-      });
-      
-      // Use the corrected level's character list
-      return selectNextCharacter(
-        levelChars,
-        state.charPoints,
-        TARGET_POINTS,
-        recentlyMasteredCharRef.current
-      );
-    }
-    
-    // Use the level's character list directly rather than relying on state.chars
-    const levelChars = levelDefinition.chars;
-    
-    console.log(`SendingMode: Selecting next character from ${levelChars.length} characters (level ${levelDefinition.id}):`, levelChars);
-    console.log(`SendingMode: State.chars has ${state.chars.length} characters:`, state.chars);
-    console.log(`SendingMode: Current points:`, state.charPoints);
-    console.log(`SendingMode: Recently mastered char:`, recentlyMasteredCharRef.current);
+    // CRITICAL FIX: Bypass the problematic trainingLevels.find() and use direct map
+    const levelChars = getLevelChars(state.selectedLevelId);
+    console.log(`🛡️ DIRECT LEVEL LOOKUP: Using ${levelChars.length} characters for level ${state.selectedLevelId}: ${levelChars.join(', ')}`);
     
     // Store the inputs for debugging
     setLastPickerInputs({
-      levelId: levelDefinition.id,
-      levelName: levelDefinition.name,
+      levelId: state.selectedLevelId,
+      levelName: "Direct Lookup", // We don't need the name
       levelChars: [...levelChars],
       stateChars: [...state.chars],
       pointsSnapshot: {...state.charPoints},
       recentlyMasteredChar: recentlyMasteredCharRef.current
     });
     
-    // IMPORTANT: Use the level's character list directly instead of state.chars
+    // IMPORTANT: Use the DIRECT level character list
     return selectNextCharacter(
       levelChars,
       state.charPoints,
@@ -483,18 +482,14 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     console.log(`SendingMode: Next question with character: "${nextChar}"`);
     
     // SAFETY CHECK: Validate the nextChar is actually in the current level's character set
-    const currentLevelDef = trainingLevels.find(level => level.id === state.selectedLevelId);
-    if (!currentLevelDef) {
-      console.error(`SendingMode: Couldn't find level with ID: ${state.selectedLevelId} for character validation`);
-      return Promise.resolve();
-    }
+    const currentLevelChars = getLevelChars(state.selectedLevelId);
     
     // Check if the selected character is valid for this level
-    if (!currentLevelDef.chars.includes(nextChar)) {
-      console.error(`🚨 ERROR: Character "${nextChar}" not in current level (${currentLevelDef.id}) character set: ${currentLevelDef.chars.join(', ')}`);
+    if (!currentLevelChars.includes(nextChar)) {
+      console.error(`🚨 ERROR: Character "${nextChar}" not in current level (${state.selectedLevelId}) character set: ${currentLevelChars.join(', ')}`);
       
       // Force select a valid character from the current level
-      const validChar = currentLevelDef.chars[0]; // fallback to first char
+      const validChar = currentLevelChars[0]; // fallback to first char
       console.log(`🛠️ CORRECTION: Replacing invalid character "${nextChar}" with valid character "${validChar}"`);
       
       // Set the corrected character
@@ -851,6 +846,11 @@ const SendingMode: React.FC<SendingModeProps> = () => {
   const handleStartTest = useCallback(() => {
     console.log('SendingMode: Starting test - initializing state');
     
+    // CRITICAL FIX: Force level consistency before starting
+    const currentLevelId = state.selectedLevelId;
+    console.log(`🔄 FORCING LEVEL SYNC before test start: ${currentLevelId}`);
+    selectLevel(currentLevelId);
+    
     // Reset all state
     setCurrentChar('');
     setMorseOutput('');
@@ -882,7 +882,7 @@ const SendingMode: React.FC<SendingModeProps> = () => {
     setTimeout(() => {
       nextQuestion();
     }, 100);
-  }, [startTest, nextQuestion]);
+  }, [startTest, nextQuestion, state.selectedLevelId, selectLevel]);
   
   // Clean restart with time recording
   const startTestAndRecordTime = useCallback(() => {
