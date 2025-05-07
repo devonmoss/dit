@@ -177,12 +177,12 @@ const EnhancedRaceMode: React.FC = () => {
   
   // Add debug logging for replayCurrent function
   const debugReplayCurrent = useCallback(() => {
-    console.log('AUDIO DEBUG: replayCurrent called', {
-      currentCharIndex,
-      currentChar: raceText[currentCharIndex] || 'none',
-      raceStage,
-      raceMode
-    });
+    // console.log('AUDIO DEBUG: replayCurrent called', {
+    //   currentCharIndex,
+    //   currentChar: raceText[currentCharIndex] || 'none',
+    //   raceStage,
+    //   raceMode
+    // });
     return replayCurrent();
   }, [replayCurrent, currentCharIndex, raceText, raceStage, raceMode]);
   
@@ -195,7 +195,6 @@ const EnhancedRaceMode: React.FC = () => {
       // If we're in racing state, reset inactivity timer when participants are updated
       if (raceStatus === 'racing') {
         lastActivityTimeRef.current = Date.now();
-        console.log('Received participant updates - resetting inactivity timer');
       }
     }
   }, [raceParticipants, raceStatus]);
@@ -211,7 +210,6 @@ const EnhancedRaceMode: React.FC = () => {
   useEffect(() => {
     const handleRaceStatusChange = (event: any) => {
       const { status, startTime } = event.detail;
-      console.log('Race status changed:', status);
       
       // Update UI based on race status
       if (status === 'countdown') {
@@ -244,7 +242,6 @@ const EnhancedRaceMode: React.FC = () => {
     if (!currentUser) return;
     
     try {
-      console.log('Joining race:', raceId, 'as user:', currentUser.id);
       
       // Reset progress for a new race
       resetProgress();
@@ -254,7 +251,6 @@ const EnhancedRaceMode: React.FC = () => {
       
       // Get race details from API
       const race = await raceService.getRaceDetails(raceId);
-      console.log('Race data retrieved:', race);
       
       // Store the race creator
       if (race.created_by) {
@@ -267,7 +263,6 @@ const EnhancedRaceMode: React.FC = () => {
       
       // Store the level ID if it exists in the race data
       if (race.level_id) {
-        console.log('Setting race level ID:', race.level_id);
         selectLevel(race.level_id);
       }
       
@@ -286,8 +281,6 @@ const EnhancedRaceMode: React.FC = () => {
       });
       
       if (joinResult.participants) {
-        console.log('All participants:', joinResult.participants);
-        
         // Find this user's participant data
         const userParticipant = joinResult.participants.find(
           (p: { user_id: string; progress?: number; finished?: boolean; finish_time?: number; error_count?: number; race_time?: number }) => 
@@ -297,13 +290,11 @@ const EnhancedRaceMode: React.FC = () => {
         // If this user already participated and has progress or is finished
         if (userParticipant) {
           if (userParticipant.finished) {
-            console.log('User already finished the race - showing results');
             // Set user progress and mark as finished
             updateProgressInDatabase(race.text?.length || 0, participantUserId);
             setFinishTime(userParticipant.finish_time);
             setStartTime(race.start_time);
           } else if (userParticipant.progress > 0) {
-            console.log('User has existing progress:', userParticipant.progress);
             // Restore user progress
             updateProgressInDatabase(userParticipant.progress, participantUserId);
             // Set character index to their progress
@@ -401,16 +392,8 @@ const EnhancedRaceMode: React.FC = () => {
       setRaceStatus('racing');
       setStartTime(startTime);
       
-      // Debug: Log when race starts and first character should play soon
-      console.log('AUDIO DEBUG: Race started - first character should play soon', {
-        raceMode,
-        firstChar: raceText.length > 0 ? raceText[0] : 'none',
-        hasAudioContext: audioContext !== null
-      });
-      
       // Reset the activity timer when race starts
       lastActivityTimeRef.current = Date.now();
-      console.log('Race started - initializing activity timer');
     } catch (err) {
       console.error('Error starting race:', err);
     }
@@ -431,16 +414,12 @@ const EnhancedRaceMode: React.FC = () => {
     const dbUserId = getMappedUserId(currentUser.id, raceId || undefined);
     
     try {
-      console.log('User finished race - updating final state');
-      
       // Finish race through API
       await raceService.finishRace(raceId, dbUserId, {
         finish_time: endTime,
         error_count: errorCount,
         race_time: raceDuration
       });
-      
-      console.log('Race finish state persisted to database');
       
       // Award XP for race completion (only for authenticated users)
       if (user && !currentUser.id.startsWith('anon-')) {
@@ -547,7 +526,6 @@ const EnhancedRaceMode: React.FC = () => {
               `/api/races/${raceId}/progress-beacon`,
               formData
             );
-            console.log('Final progress sent via beacon before page unload');
           }
         } catch (e) {
           console.error('Failed to save progress before unload:', e);
@@ -572,10 +550,8 @@ const EnhancedRaceMode: React.FC = () => {
     
     // Use the checkInactivity function from the hook
     if (checkInactivity()) {
-      console.log('Race inactive for more than 10 seconds - ending race');
       raceService.updateRaceStatus(raceId, 'finished')
         .then(() => {
-          console.log('Race ended due to inactivity');
           setRaceStage(RaceStage.RESULTS);
           setRaceStatus('finished');
           stopAudio();
@@ -624,13 +600,6 @@ const EnhancedRaceMode: React.FC = () => {
     const mappedUserId = getMappedUserId(currentUser.id);
     const isCreator = mappedUserId === raceCreator;
     
-    console.log('Host check:', { 
-      currentUserId: currentUser.id, 
-      mappedUserId, 
-      raceCreator, 
-      isCreator 
-    });
-    
     return isCreator;
   }, [getCurrentUser, raceCreator, getMappedUserId]);
   
@@ -669,16 +638,16 @@ const EnhancedRaceMode: React.FC = () => {
   }, [stopAudio, router, resetProgress]);
   
   // Debugging to ensure host detection is working
-  useEffect(() => {
-    if (raceStage === RaceStage.SHARE) {
-      console.log('Race Share Stage: Host check', {
-        isHost: isRaceCreator(),
-        raceCreator,
-        currentUser: getCurrentUser()?.id,
-        mappedId: getCurrentUser()?.id.startsWith('anon-') ? anonUserIdMap[getCurrentUser()?.id] : null
-      });
-    }
-  }, [raceStage, isRaceCreator, raceCreator, getCurrentUser]);
+  // useEffect(() => {
+  //   if (raceStage === RaceStage.SHARE) {
+  //     console.log('Race Share Stage: Host check', {
+  //       isHost: isRaceCreator(),
+  //       raceCreator,
+  //       currentUser: getCurrentUser()?.id,
+  //       mappedId: getCurrentUser()?.id.startsWith('anon-') ? anonUserIdMap[getCurrentUser()?.id] : null
+  //     });
+  //   }
+  // }, [raceStage, isRaceCreator, raceCreator, getCurrentUser]);
   
   // Navigate to home page
   const handleNavigateHome = useCallback(() => {
@@ -975,17 +944,13 @@ const EnhancedRaceMode: React.FC = () => {
             // Use the index passed from the component instead of our own state
             // If actualIndex is not provided, fallback to currentCharIndex
             const indexToUse = typeof actualIndex === 'number' ? actualIndex : currentCharIndex;
-            console.log(`SendMode: onCharacterCorrect called with actualIndex=${actualIndex}, using index=${indexToUse}`);
             
             // Log the current character and next character for clarity
             const currentChar = raceText[indexToUse];
             const nextChar = raceText[indexToUse + 1];
-            console.log(`SendMode: Current char='${currentChar}', next char='${nextChar}'`);
             
             // Pass the actual index WITHOUT adding 1 - incrementProgress will add 1 internally
             incrementProgress(indexToUse, userId);
-            
-            console.log(`SendMode: After incrementProgress call with index ${indexToUse}`);
           }}
           onError={incrementErrorCount}
           onComplete={finishRace}
@@ -1000,7 +965,6 @@ const EnhancedRaceMode: React.FC = () => {
           isOpen={!!invitationDetails}
           inviterName={invitationDetails?.initiator_name || 'Someone'}
           onAccept={() => {
-            console.log('User accepted redirect to race', invitationDetails.new_race_id);
             if (invitationDetails.new_race_id) {
               window.location.href = `/race?id=${invitationDetails.new_race_id}`;
             }
@@ -1008,7 +972,6 @@ const EnhancedRaceMode: React.FC = () => {
           }}
           onDecline={() => {
             clearInvitation();
-            console.log('User declined redirect');
           }}
         />
       )}
