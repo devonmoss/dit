@@ -11,7 +11,6 @@ import { selectNextCharacter } from '../../utils/characterSelection';
 // Constants
 const TARGET_POINTS = 3;
 const FEEDBACK_DELAY = 750; // ms
-const COMPLETED_WEIGHT = 0.2; // Weight for already mastered characters
 const MIN_RESPONSE_TIME = 0.8; // seconds
 const MAX_RESPONSE_TIME = 7; // seconds
 const INCORRECT_PENALTY = 0.7; // 30% reduction
@@ -268,11 +267,9 @@ const SendingMode: React.FC = () => {
     const seconds = responseTime / 1000;
     
     if (seconds <= MIN_RESPONSE_TIME) {
-      console.log(`[SendingMode] Time <= MIN_RESPONSE_TIME (${MIN_RESPONSE_TIME}), returning 1`);
       return 1;
     }
     if (seconds >= MAX_RESPONSE_TIME) {
-      console.log(`[SendingMode] Time >= MAX_RESPONSE_TIME (${MAX_RESPONSE_TIME}), returning 0`);
       return 0;
     }
     
@@ -406,8 +403,9 @@ const SendingMode: React.FC = () => {
     if (!targetChar) {
       console.log('[SendingMode] No character to match against');
       return;
-    }
-    
+    } 
+    // console.log('[SendingMode] Character to match against:', targetChar);
+
     // Calculate response time using the ref for consistency
     const now = Date.now();
     // Default to current time if no start time is recorded
@@ -551,7 +549,6 @@ const SendingMode: React.FC = () => {
   
   // Create the keyer with stabilized callbacks
   const onWpmChange = useCallback((newWpm: number) => {
-    console.log(`WPM changed to ${newWpm}`);
   }, []);
   
   // Create the keyer
@@ -564,7 +561,7 @@ const SendingMode: React.FC = () => {
     onCharacter: handleCharacter,
     onWpmChange,
     onInvalidCharacter: (code) => {
-      console.debug(`Invalid morse code detected: ${code}`);
+      console.debug(`unknown morse code detected: ${code}`);
     }
   });
   
@@ -616,14 +613,14 @@ const SendingMode: React.FC = () => {
   // Clean restart with time recording (now handleStartTest already sets the time)
   // TODO: Remove this? I think it is redundant
   const startTestAndRecordTime = useCallback(() => {
-    console.log('[SendingMode] Starting test with time recording');
+    console.log('[SendingMode] If you see this you need to cleanup. Starting test with time recording');
     handleStartTest();
   }, [handleStartTest]);
   
   // Handle moving to specific level
-  // TODO: Remove this? I think it is redundant
+  // TODO: combine the various ways to start a test
   const startTestWithExplicitLevel = useCallback((levelId: string) => {
-    console.log(`[SendingMode] Starting test with explicit level: ${levelId}`);
+    // console.log(`[SendingMode] Starting test with explicit level: ${levelId}`);
     
     // Reset all state
     setCurrentChar('');
@@ -643,14 +640,12 @@ const SendingMode: React.FC = () => {
     keyerRef.current.clear();
     
     // Make sure the keyer is installed and listening for key events
-    console.log('[SendingMode] Installing keyer for new test with level:', levelId);
     keyerRef.current.install();
     
     // Set test start time - both ref and state
     const now = Date.now();
     testStartTimeRef.current = now;
     setTestStartTime(now);
-    console.log('[SendingMode] Setting test start time for level:', levelId, now);
     
     // Start test with level ID
     startTestWithLevelId(levelId);
@@ -664,13 +659,11 @@ const SendingMode: React.FC = () => {
   // Install keyer once on mount
   useEffect(() => {
     if (isBrowser) {
-      console.log('[SendingMode] Installing keyer');
       keyer.install();
     }
     
     return () => {
       // Clean up keyer
-      console.log('[SendingMode] Uninstalling keyer');
       keyerRef.current.uninstall();
       
       // Clean up any pending feedback timers
@@ -713,7 +706,7 @@ const SendingMode: React.FC = () => {
           };
         }
       } catch (e) {
-        console.log('[DEBUG] Error setting up debug hooks:', e);
+        console.error('[DEBUG] Error setting up debug hooks:', e);
       }
     }
   }, [currentChar, morseOutput, localCharPoints, keyer, state, feedbackState, charStartTime]);
