@@ -417,6 +417,13 @@ const TrainingMode: React.FC = () => {
     }
   }, [checkLevelChars]);
   
+  // Clear test results when level changes
+  useEffect(() => {
+    if (testResults) {
+      setTestResults(null);
+    }
+  }, [state.selectedLevelId]);
+  
   return (
     <div className={styles.trainingContainer}>
       {/* Debug state information - only visible on client in development */}
@@ -481,6 +488,10 @@ const TrainingMode: React.FC = () => {
             
             if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
               const nextLevel = trainingLevels[currentLevelIndex + 1];
+              
+              // Explicitly select the next level to update both state and UI
+              selectLevel(nextLevel.id);
+              
               setTestStartTime(Date.now());
               startTestWithLevelId(nextLevel.id);
               

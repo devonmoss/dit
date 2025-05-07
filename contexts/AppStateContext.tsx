@@ -13,16 +13,30 @@ interface CharTiming {
 }
 
 type Mode = 'copy' | 'send' | 'race';
- type TestType = 'training' | 'time' | 'words' | 'race' | 'zen';
+type TestType = 'training' | 'time' | 'words' | 'race' | 'zen' | 'pota';
 type Theme = 'default' | 'catppuccin-mocha';
 
+// Track completed levels by mode
+export interface CompletedLevels {
+  copy: string[];
+  send: string[];
+}
+
+// Track selected level by mode
+export interface SelectedLevels {
+  copy: string;
+  send: string; 
+}
+
 export interface AppState {
-  // Current selected level
+  // Current selected level for each mode
+  selectedLevels: SelectedLevels;
+  // Current selected level ID - used for the active mode
   selectedLevelId: string;
   // Character mastery points
   charPoints: CharPoints;
-  // Completed levels
-  completedLevels: string[];
+  // Completed levels by mode
+  completedLevels: CompletedLevels;
   // User settings
   wpm: number;
   volume: number;
@@ -45,6 +59,7 @@ interface AppStateContextType {
   selectLevel: (id: string) => void;
   getCurrentLevel: () => TrainingLevel | undefined;
   markLevelCompleted: (id: string) => void;
+  isLevelCompleted: (id: string) => boolean;
   
   // Test management
   startTest: () => void;
@@ -78,8 +93,15 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Set default values
     const initialState: AppState = {
       selectedLevelId: '',
+      selectedLevels: {
+        copy: '',
+        send: ''
+      },
       charPoints: {},
-      completedLevels: [],
+      completedLevels: {
+        copy: [],
+        send: []
+      },
       wpm: 20,
       volume: 75,
       sendWpm: 20,
@@ -118,19 +140,84 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Load completed levels from localStorage
       try {
-        const completedString = localStorage.getItem('morseCompleted');
-        if (completedString) {
-          initialState.completedLevels = JSON.parse(completedString);
+        // First try to load the new format (mode-specific completed levels)
+        const copyCompletedString = localStorage.getItem('morseCompletedCopy');
+        const sendCompletedString = localStorage.getItem('morseCompletedSend');
+        
+        if (copyCompletedString) {
+          initialState.completedLevels.copy = JSON.parse(copyCompletedString);
+        }
+        
+        if (sendCompletedString) {
+          initialState.completedLevels.send = JSON.parse(sendCompletedString);
+        }
+        
+        // Migrate from old format if needed
+        if (!copyCompletedString && !sendCompletedString) {
+          const legacyCompletedString = localStorage.getItem('morseCompleted');
+          if (legacyCompletedString) {
+            const legacyCompleted = JSON.parse(legacyCompletedString);
+            // Assume all legacy completed levels are in copy mode
+            initialState.completedLevels.copy = legacyCompleted;
+            
+            // Save in the new format for future use
+            localStorage.setItem('morseCompletedCopy', legacyCompletedString);
+          }
         }
       } catch (error) {
         console.error('Error loading completed levels from localStorage:', error);
       }
+      
+      // Load selected levels from localStorage - new format
+      try {
+        const copySelectedLevelId = localStorage.getItem('morseSelectedLevelCopy');
+        const sendSelectedLevelId = localStorage.getItem('morseSelectedLevelSend');
+        
+        if (copySelectedLevelId) {
+          initialState.selectedLevels.copy = copySelectedLevelId;
+        }
+        
+        if (sendSelectedLevelId) {
+          initialState.selectedLevels.send = sendSelectedLevelId;
+        }
+        
+        // Migration from old format for backward compatibility
+        if (!copySelectedLevelId && !sendSelectedLevelId) {
+          const legacySelectedLevelId = localStorage.getItem('morseSelectedLevel');
+          if (legacySelectedLevelId) {
+            // Store it in both modes for migration, but prioritize copy mode
+            initialState.selectedLevels.copy = legacySelectedLevelId;
+            
+            // Save in the new format for future use
+            localStorage.setItem('morseSelectedLevelCopy', legacySelectedLevelId);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading selected levels from localStorage:', error);
+      }
+      
+      // Load mode from localStorage
+      const storedMode = localStorage.getItem('morseMode');
+      if (storedMode === 'copy' || storedMode === 'send' || storedMode === 'race') {
+        initialState.mode = storedMode;
+      }
     }
     
-    // Determine initial selected level: first incomplete or last
-    if (trainingLevels.length > 0) {
+    // Calculate initial selectedLevelId based on current mode
+    const currentMode = initialState.mode === 'race' ? 'copy' : initialState.mode;
+    const currentSelectedLevelId = initialState.selectedLevels[currentMode];
+    
+    // If we have a saved level for the current mode, use it
+    if (currentSelectedLevelId) {
+      initialState.selectedLevelId = currentSelectedLevelId;
+    } 
+    // Otherwise find the first incomplete level for current mode
+    else if (trainingLevels.length > 0) {
+      // Get completed levels for the current mode
+      const currentModeCompletedLevels = initialState.completedLevels[currentMode];
+      
       const firstIncomplete = trainingLevels.find(
-        level => !initialState.completedLevels.includes(level.id)
+        level => !currentModeCompletedLevels.includes(level.id)
       );
       
       const selectedLevel = firstIncomplete 
@@ -138,9 +225,13 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
         : trainingLevels[trainingLevels.length - 1];
         
       initialState.selectedLevelId = selectedLevel.id;
-      
-      // Set the character set to match the selected level
-      initialState.chars = [...selectedLevel.chars];
+      initialState.selectedLevels[currentMode] = selectedLevel.id;
+    }
+    
+    // Set the character set to match the selected level
+    const level = trainingLevels.find(lvl => lvl.id === initialState.selectedLevelId);
+    if (level) {
+      initialState.chars = [...level.chars];
     }
     
     return initialState;
@@ -148,24 +239,57 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Level management functions
   const selectLevel = (id: string) => {
+    // Determine which mode's selected level to update
+    const modeToUpdate = state.mode === 'race' ? 'copy' : state.mode;
+    
     // Find the level to get its characters
     const level = trainingLevels.find(level => level.id === id);
     const levelChars = level ? [...level.chars] : [...defaultChars];
     
-    setState(prev => ({
-      ...prev,
-      selectedLevelId: id,
-      chars: levelChars,
-    }));
+    setState(prev => {
+      // Create updated selectedLevels
+      const updatedSelectedLevels = {
+        ...prev.selectedLevels,
+        [modeToUpdate]: id
+      };
+      
+      return {
+        ...prev,
+        selectedLevelId: id,
+        selectedLevels: updatedSelectedLevels,
+        chars: levelChars,
+      };
+    });
+    
+    // Store selected level in localStorage - both in legacy and new format
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('morseSelectedLevel', id); // Legacy format
+      localStorage.setItem(`morseSelectedLevel${modeToUpdate.charAt(0).toUpperCase() + modeToUpdate.slice(1)}`, id); // New format
+    }
   };
   
   const getCurrentLevel = () => {
     return trainingLevels.find(level => level.id === state.selectedLevelId);
   };
   
+  // Check if a level is completed in the current mode
+  const isLevelCompleted = (id: string) => {
+    // Use 'copy' mode for race since they share the same completed levels
+    const modeToCheck = state.mode === 'race' ? 'copy' : state.mode;
+    return state.completedLevels[modeToCheck].includes(id);
+  };
+  
   const markLevelCompleted = (id: string) => {
-    if (!state.completedLevels.includes(id)) {
-      const newCompletedLevels = [...state.completedLevels, id];
+    // Use 'copy' mode for race since they share the same completed levels
+    const modeToUpdate = state.mode === 'race' ? 'copy' : state.mode;
+    
+    if (!state.completedLevels[modeToUpdate].includes(id)) {
+      // Create a new completed levels object
+      const newCompletedLevels = {
+        ...state.completedLevels,
+        [modeToUpdate]: [...state.completedLevels[modeToUpdate], id]
+      };
+      
       setState(prev => ({
         ...prev,
         completedLevels: newCompletedLevels,
@@ -173,7 +297,20 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Save to localStorage
       if (typeof window !== 'undefined') {
-        localStorage.setItem('morseCompleted', JSON.stringify(newCompletedLevels));
+        localStorage.setItem(`morseCompleted${modeToUpdate.charAt(0).toUpperCase() + modeToUpdate.slice(1)}`, 
+          JSON.stringify(newCompletedLevels[modeToUpdate]));
+        
+        // Automatically advance the next level in localStorage ONLY
+        // This way when the user refreshes, they'll be at the next level
+        // but we don't immediately advance the UI
+        const currentLevelIndex = trainingLevels.findIndex(level => level.id === id);
+        if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
+          // Get the next level ID
+          const nextLevelId = trainingLevels[currentLevelIndex + 1].id;
+          
+          // Update localStorage only, without changing the current UI state
+          localStorage.setItem('morseSelectedLevel', nextLevelId);
+        }
       }
     }
   };
@@ -280,10 +417,31 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Mode and test type
   const setMode = (mode: Mode) => {
+    // Get the selected level for the target mode (or race → copy)
+    const targetMode = mode === 'race' ? 'copy' : mode;
+    const targetLevelId = state.selectedLevels[targetMode] || state.selectedLevelId;
+    
     setState(prev => ({
       ...prev,
       mode,
+      selectedLevelId: targetLevelId,
+      // End test when changing modes to ensure we return to start screen
+      testActive: false
     }));
+    
+    // Update the current level's characters
+    const targetLevel = trainingLevels.find(level => level.id === targetLevelId);
+    if (targetLevel) {
+      setState(prev => ({
+        ...prev,
+        chars: [...targetLevel.chars]
+      }));
+    }
+    
+    // Store mode in localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('morseMode', mode);
+    }
   };
   
   const setTestType = (testType: TestType) => {
@@ -361,6 +519,7 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       selectLevel,
       getCurrentLevel,
       markLevelCompleted,
+      isLevelCompleted,
       startTest,
       startTestWithLevelId,
       endTest,

@@ -573,16 +573,15 @@ const SendingMode: React.FC = () => {
     keyerRef.current = keyer;
   }, [keyer]);
   
-  // Start test
-  const handleStartTest = useCallback(() => {
-    
+  // Clean restart with time recording 
+  const startTestAndRecordTime = useCallback(() => {
     // Reset all state
     setCurrentChar('');
     setMorseOutput('');
     setFeedbackState('none');
     setIncorrectChar('');
     setStrikeCount(0);
-    strikeCountRef.current = 0; // Reset strike count ref
+    strikeCountRef.current = 0;
     setResponseTimes([]);
     setMistakesMap({});
     setTestResults(null);
@@ -596,26 +595,19 @@ const SendingMode: React.FC = () => {
     // Make sure the keyer is installed and listening for key events
     keyerRef.current.install();
     
-    // Always set the test start time when starting a test - both ref and state
+    // Set test start time
     const now = Date.now();
     testStartTimeRef.current = now;
     setTestStartTime(now);
     
-    // Start the test in the AppState
+    // Start the test in the AppState using the current selected level
     startTest();
     
-    // Need a slight delay to ensure state is updated
+    // Start the first question after a short delay
     setTimeout(() => {
       nextQuestion();
-    }, 100);
-  }, [startTest, nextQuestion, isCheckpoint, strikeLimit]);
-  
-  // Clean restart with time recording (now handleStartTest already sets the time)
-  // TODO: Remove this? I think it is redundant
-  const startTestAndRecordTime = useCallback(() => {
-    console.log('[SendingMode] If you see this you need to cleanup. Starting test with time recording');
-    handleStartTest();
-  }, [handleStartTest]);
+    }, 150);
+  }, [nextQuestion, startTest]);
   
   // Handle moving to specific level
   // TODO: combine the various ways to start a test
@@ -738,6 +730,9 @@ const SendingMode: React.FC = () => {
       // Move to next level
       const nextLevel = trainingLevels[currentLevelIndex + 1];
       
+      // Explicitly select the next level to update both state and UI
+      selectLevel(nextLevel.id);
+      
       // Set the test start time
       setTestStartTime(Date.now());
       
@@ -747,7 +742,7 @@ const SendingMode: React.FC = () => {
       // Restart current level if at end
       startTestAndRecordTime();
     }
-  }, [state.selectedLevelId, startTestWithExplicitLevel, startTestAndRecordTime]);
+  }, [state.selectedLevelId, startTestWithExplicitLevel, startTestAndRecordTime, selectLevel]);
   
   // Calculate progress - mastered characters using local points
   // Use levelCharsRef for consistent mastery calculations
@@ -815,6 +810,13 @@ const SendingMode: React.FC = () => {
     currentCharRef: currentCharRef.current,
     morseOutput
   };
+  
+  // Clear test results when level changes
+  useEffect(() => {
+    if (testResults) {
+      setTestResults(null);
+    }
+  }, [state.selectedLevelId]);
   
   return (
     <div className={styles.sendingTrainer}>
