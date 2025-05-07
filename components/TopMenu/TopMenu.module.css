@@ -243,5 +243,8 @@
 
 /* Icon styling for consistent icon sizes */
 .menuIcon {
-  font-size: 1.7rem;
+  font-size: 1.3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 } 
