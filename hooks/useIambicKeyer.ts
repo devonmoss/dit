@@ -54,24 +54,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   const charTimer = useRef<number | null>(null);
   const wordTimer = useRef<number | null>(null);
   
-  // Debug state
-  const debugEvents = useRef<Array<{type: string, value?: string, timestamp: number}>>([]);
-  
-  // Debug logging
-  const log = (msg: string) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[IambicKeyer] ${msg}`);
-    }
-  };
-  
-  const addEvent = (type: string, value?: string) => {
-    if (process.env.NODE_ENV === 'development') {
-      const event = { type, value, timestamp: Date.now() };
-      debugEvents.current = [...debugEvents.current.slice(-99), event];
-      log(`Event: ${type}${value ? ' - ' + value : ''}`);
-    }
-  };
-  
   // Update WPM
   const setWpm = (newWpm: number) => {
     wpm.current = newWpm;
@@ -80,7 +62,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       localStorage.setItem('morseSendWpm', String(newWpm));
     }
     opts.onWpmChange?.(newWpm);
-    addEvent('wpm_change', String(newWpm));
   };
   
   // Play a symbol and schedule the next one
@@ -92,7 +73,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     buffer.current += sym;
     
     // Play it
-    addEvent('play', sym);
     opts.onElement?.(sym);
     opts.playElement?.(sym);
     
@@ -103,8 +83,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     const symbolDuration = sym === '.' ? unit.current : unit.current * 3;
     const gapDuration = unit.current; // 1 unit gap between elements
     const totalDuration = symbolDuration + gapDuration;
-    
-    log(`Playing ${sym} for ${symbolDuration}ms, followed by ${gapDuration}ms gap`);
     
     // Schedule the next element after this one finishes
     elementTimer.current = window.setTimeout(() => {
@@ -121,33 +99,22 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     if (queuedElements.current.length > 0) {
       // Play the first queued element, regardless of current paddle state
       const nextElement = queuedElements.current.shift()!;
-      addEvent('from_queue', nextElement);
-      log(`Playing queued element: ${nextElement}`);
       playSymbol(nextElement);
       return;
     }
     
-    // Log current state
-    log(`Continue sequence: dot=${dotHeld.current}, dash=${dashHeld.current}, last=${lastSymbol.current}, queue=${queuedElements.current.length}`);
-    
     // Check current paddle state
     if (dotHeld.current && dashHeld.current) {
       // Both paddles held - alternate symbols (squeeze behavior)
-      addEvent('squeeze');
       const nextSymbol = lastSymbol.current === '.' ? '-' : '.';
       playSymbol(nextSymbol);
     } 
     else if (dotHeld.current) {
-      // Only dot paddle held
-      addEvent('continuous', 'dot');
       playSymbol('.');
     } else if (dashHeld.current) {
-      // Only dash paddle held
-      addEvent('continuous', 'dash');
       playSymbol('-');
     } else {
       // No paddles held - end of sequence
-      addEvent('sequence_end');
       scheduleChar();
     }
   };
@@ -168,14 +135,12 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
           
           const char = invMorseMap[code] || '';
           if (char) {
-            addEvent('char_before_new_sequence', char);
             opts.onCharacter?.(char);
           }
         }
       }
       
       // No element currently playing, start a new sequence
-      addEvent('start', sym);
       playSymbol(sym);
     }
     // Otherwise, the current element will finish and continueSequence will check state
@@ -191,9 +156,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       charTimer.current = null;
     }
     
-    addEvent('schedule_char', buffer.current);
-    log(`Scheduling character decode for buffer: ${buffer.current}`);
-    
     // Schedule decode after 3 unit gap
     charTimer.current = window.setTimeout(() => {
       charTimer.current = null;
@@ -206,33 +168,25 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       
       const char = invMorseMap[code] || '';
       if (char) {
-        addEvent('char', char);
-        log(`Decoded character: ${char} from ${code}`);
-        console.log(`[IAMBIC KEYER] CHARACTER DETECTED: '${char}' from Morse code '${code}'`);
         if (opts.onCharacter) {
-          console.log(`[IAMBIC KEYER] Calling onCharacter callback with character: '${char}'`);
           try {
             opts.onCharacter(char);
-            console.log(`[IAMBIC KEYER] onCharacter callback executed successfully for '${char}'`);
           } catch (err) {
             console.error(`[IAMBIC KEYER] Error in onCharacter callback:`, err);
           }
         } else {
-          console.log(`[IAMBIC KEYER] No onCharacter callback provided`);
+          console.debug(`[IAMBIC KEYER] No onCharacter callback provided`);
         }
       } else {
-        log(`No character found for code: ${code}`);
-        console.log(`[IAMBIC KEYER] INVALID CODE: No character found for '${code}'`);
+        console.debug(`[IAMBIC KEYER] No character found for code: ${code}`);
         if (opts.onInvalidCharacter) {
-          console.log(`[IAMBIC KEYER] Calling onInvalidCharacter callback with code: '${code}'`);
           try {
             opts.onInvalidCharacter(code);
-            console.log(`[IAMBIC KEYER] onInvalidCharacter callback executed successfully for '${code}'`);
           } catch (err) {
             console.error(`[IAMBIC KEYER] Error in onInvalidCharacter callback:`, err);
           }
         } else {
-          console.log(`[IAMBIC KEYER] No onInvalidCharacter callback provided`);
+          console.debug(`[IAMBIC KEYER] No onInvalidCharacter callback provided`);
         }
       }
     }, unit.current * 3);
@@ -249,19 +203,15 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     // Schedule word after 7 unit gap
     wordTimer.current = window.setTimeout(() => {
       wordTimer.current = null;
-      console.log(`[IAMBIC KEYER] WORD BOUNDARY DETECTED: After ${unit.current * 7}ms gap`);
       if (opts.onWord) {
-        console.log(`[IAMBIC KEYER] Calling onWord callback`);
         try {
           opts.onWord();
-          console.log(`[IAMBIC KEYER] onWord callback executed successfully`);
         } catch (err) {
           console.error(`[IAMBIC KEYER] Error in onWord callback:`, err);
         }
       } else {
-        console.log(`[IAMBIC KEYER] No onWord callback provided`);
+        console.debug(`[IAMBIC KEYER] No onWord callback provided`);
       }
-      addEvent('word');
     }, unit.current * 7);
   };
   
@@ -285,12 +235,9 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       // Left arrow down = dot paddle press
       if (!dotHeld.current) {
         dotHeld.current = true;
-        addEvent('key_down', 'dot');
-        
         // For a completely new action (after pause), make sure we've handled
         // any pending character from a previous sequence
         if (isNewUserAction && charTimer.current !== null) {
-          log("New user action detected - finalizing pending character");
           clearTimeout(charTimer.current);
           charTimer.current = null;
           
@@ -301,19 +248,14 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
             
             const char = invMorseMap[code] || '';
             if (char) {
-              addEvent('immediate_char', char);
-              log(`Immediate character: ${char} from ${code}`);
-              console.log(`[IAMBIC KEYER] IMMEDIATE CHARACTER: '${char}' from '${code}' (new user action)`);
               if (opts.onCharacter) {
-                console.log(`[IAMBIC KEYER] Calling onCharacter callback with immediate character: '${char}'`);
                 try {
                   opts.onCharacter(char);
-                  console.log(`[IAMBIC KEYER] Immediate onCharacter callback executed successfully for '${char}'`);
                 } catch (err) {
                   console.error(`[IAMBIC KEYER] Error in immediate onCharacter callback:`, err);
                 }
               } else {
-                console.log(`[IAMBIC KEYER] No onCharacter callback provided`);
+                console.debug(`[IAMBIC KEYER] No onCharacter callback provided`);
               }
             }
           }
@@ -324,8 +266,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
           // Only queue if we don't already have this element queued
           if (!queuedElements.current.includes('.')) {
             queuedElements.current.push('.');
-            addEvent('queue', 'dot');
-            log('Dot queued to play after current element');
           }
         } else {
           // Start with dot if nothing is playing
@@ -338,12 +278,10 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       // Right arrow down = dash paddle press
       if (!dashHeld.current) {
         dashHeld.current = true;
-        addEvent('key_down', 'dash');
         
         // For a completely new action (after pause), make sure we've handled
         // any pending character from a previous sequence
         if (isNewUserAction && charTimer.current !== null) {
-          log("New user action detected - finalizing pending character");
           clearTimeout(charTimer.current);
           charTimer.current = null;
           
@@ -354,19 +292,14 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
             
             const char = invMorseMap[code] || '';
             if (char) {
-              addEvent('immediate_char', char);
-              log(`Immediate character: ${char} from ${code}`);
-              console.log(`[IAMBIC KEYER] IMMEDIATE CHARACTER: '${char}' from '${code}' (new user action)`);
               if (opts.onCharacter) {
-                console.log(`[IAMBIC KEYER] Calling onCharacter callback with immediate character: '${char}'`);
                 try {
                   opts.onCharacter(char);
-                  console.log(`[IAMBIC KEYER] Immediate onCharacter callback executed successfully for '${char}'`);
                 } catch (err) {
                   console.error(`[IAMBIC KEYER] Error in immediate onCharacter callback:`, err);
                 }
               } else {
-                console.log(`[IAMBIC KEYER] No onCharacter callback provided`);
+                console.debug(`[IAMBIC KEYER] No onCharacter callback provided`);
               }
             }
           }
@@ -377,8 +310,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
           // Only queue if we don't already have this element queued
           if (!queuedElements.current.includes('-')) {
             queuedElements.current.push('-');
-            addEvent('queue', 'dash');
-            log('Dash queued to play after current element');
           }
         } else {
           // Start with dash if nothing is playing
@@ -405,7 +336,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       
       // Left arrow up = dot paddle release
       dotHeld.current = false;
-      addEvent('key_up', 'dot');
       
       // Note: We don't remove from the queue on key up - 
       // If the key was pressed during element playback, 
@@ -420,7 +350,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       
       // Right arrow up = dash paddle release
       dashHeld.current = false;
-      addEvent('key_up', 'dash');
       
       // Note: We don't remove from the queue on key up - 
       // If the key was pressed during element playback, 
@@ -437,14 +366,12 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
   const install = () => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    addEvent('install');
   };
   
   const uninstall = () => {
     window.removeEventListener('keydown', handleKeyDown);
     window.removeEventListener('keyup', handleKeyUp);
     clear();
-    addEvent('uninstall');
   };
   
   // Clear state
@@ -467,7 +394,6 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
       wordTimer.current = null;
     }
     
-    addEvent('clear');
   };
   
   // Set initial WPM
@@ -476,40 +402,11 @@ export function useIambicKeyer(opts: IambicKeyerOptions): IambicKeyer {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opts.wpm]);
   
-  // Create return object with debug for development
   const keyer: IambicKeyer = {
     install,
     uninstall,
     clear
   };
-  
-  // Add debug info in development
-  if (process.env.NODE_ENV === 'development') {
-    keyer.debug = {
-      dotHeld: dotHeld.current,
-      dashHeld: dashHeld.current,
-      buffer: buffer.current,
-      lastSymbol: lastSymbol.current,
-      wpm: wpm.current,
-      isActive: true,
-      addEvent: (event) => addEvent(event.type, event.value)
-    };
-    
-    // Update debug values
-    useEffect(() => {
-      const interval = setInterval(() => {
-        if (keyer.debug) {
-          keyer.debug.dotHeld = dotHeld.current;
-          keyer.debug.dashHeld = dashHeld.current;
-          keyer.debug.buffer = buffer.current;
-          keyer.debug.lastSymbol = lastSymbol.current;
-          keyer.debug.wpm = wpm.current;
-        }
-      }, 50);
-      
-      return () => clearInterval(interval);
-    }, [keyer]);
-  }
   
   return keyer;
 }

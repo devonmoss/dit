@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppState } from '../../contexts/AppStateContext';
-import { useIambicKeyer, IambicKeyer } from '../../hooks/useIambicKeyer';
+import { useIambicKeyer } from '../../hooks/useIambicKeyer';
 import { createAudioContext } from '../../utils/morse';
 import styles from './Zen.module.css';
 

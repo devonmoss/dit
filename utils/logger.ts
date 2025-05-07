@@ -16,7 +16,7 @@ export enum LogLevel {
 }
 
 // Default log level (can be adjusted at runtime)
-let globalLogLevel = DEBUG_MODE ? LogLevel.INFO : LogLevel.ERROR;
+let globalLogLevel = DEBUG_MODE ? LogLevel.DEBUG : LogLevel.ERROR;
 
 // Components that should have logging disabled/reduced
 const quietComponents: string[] = ['SendingMode'];
