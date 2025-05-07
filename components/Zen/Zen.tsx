@@ -41,10 +41,8 @@ const Zen: React.FC = () => {
     onWpmChange: (newWpm) => {
       setSendWpm(newWpm);
       audio.setWpm(newWpm);
-      console.log(`[Zen] WPM changed to ${newWpm}, audio timing updated`);
     },
     onInvalidCharacter: (code) => {
-      console.log(`Zen received invalid code: ${code}`);
       const emoji = getRandomEmoji();
       setText(t => t + emoji);
     },
@@ -62,14 +60,12 @@ const Zen: React.FC = () => {
   useEffect(() => {
     // Only install if not already installed
     if (!isInstalledRef.current) {
-      console.log('[Zen] Installing keyer (should happen only once)');
       keyer.install();
       isInstalledRef.current = true;
     }
     
     // Cleanup function - only uninstall on unmount
     return () => {
-      console.log('[Zen] Uninstalling keyer (should happen only on unmount)');
       keyer.uninstall();
       isInstalledRef.current = false;
     };

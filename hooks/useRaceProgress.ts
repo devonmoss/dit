@@ -60,12 +60,10 @@ export function useRaceProgress({
     const now = Date.now();
     // Only update if it's been more than 500ms since last update or if this is a forced update
     if (now - lastUpdateTimeRef.current > 500) {
-      console.log('Sending throttled database update, progress:', progress, 'errors:', errorCount);
       
       // Call the race service to update progress
       raceService.updateProgress(raceId, userId, progress, errorCount)
         .then(() => {
-          console.log('Progress updated successfully in database');
           
           // Update the last update timestamp
           lastUpdateTimeRef.current = now;
@@ -81,7 +79,6 @@ export function useRaceProgress({
           
           // Check if the race is complete
           if (progress >= raceText.length && !raceFinishedRef.current) {
-            console.log('Race completed in progress update');
             raceFinishedRef.current = true;
             if (onComplete) {
               onComplete();
@@ -94,18 +91,14 @@ export function useRaceProgress({
     } else {
       // If we're throttling, mark that we have a pending update
       pendingUpdateRef.current = true;
-      console.log('Throttling update, will send in next batch');
     }
   }, [raceId, errorCount, broadcastProgress, raceText.length, onComplete]);
 
   // Increment progress at a specific character index
   const incrementProgress = useCallback((characterIndex: number, userId: string) => {
-    console.log(`useRaceProgress: incrementProgress called with characterIndex=${characterIndex}`);
-    console.log(`useRaceProgress: current state before update: currentCharIndex=${currentCharIndex}, progress=${userProgress}%`);
     
     // Calculate new progress percentage
     const newProgress = Math.round(((characterIndex + 1) / raceText.length) * 100);
-    console.log(`useRaceProgress: setting new progress to ${newProgress}%`);
     setUserProgress(newProgress);
     
     // Update latest progress reference for database syncing
@@ -113,7 +106,6 @@ export function useRaceProgress({
     
     // Move to next character - adding 1 to move to the next character
     const nextCharIndex = characterIndex + 1;
-    console.log(`useRaceProgress: updating currentCharIndex from ${currentCharIndex} to ${nextCharIndex} (adding 1 to move to next character)`);
     setCurrentCharIndex(nextCharIndex);
     
     // Mark that we have a new update, but let the throttling handle when to actually send it
@@ -163,7 +155,6 @@ export function useRaceProgress({
       // Check if we have pending updates
       if (pendingUpdateRef.current && latestProgressRef.current > 0) {
         const userId = getMappedUserId(currentUser.id);
-        console.log('Sending periodic update for throttled progress:', latestProgressRef.current);
         updateProgress(latestProgressRef.current, userId);
       }
     }, 500); // Check every 500ms to match the throttle time
@@ -174,7 +165,6 @@ export function useRaceProgress({
       // Do a final update when unmounting if we have pending changes
       if (pendingUpdateRef.current && latestProgressRef.current > 0) {
         const userId = getMappedUserId(currentUser.id);
-        console.log('Sending final update before unmounting:', latestProgressRef.current);
         updateProgress(latestProgressRef.current, userId);
       }
     };
@@ -184,7 +174,6 @@ export function useRaceProgress({
   useEffect(() => {
     if (raceStatus === 'racing') {
       lastActivityTimeRef.current = Date.now();
-      console.log('Race started/status changed - initializing activity timer');
     }
   }, [raceStatus]);
 

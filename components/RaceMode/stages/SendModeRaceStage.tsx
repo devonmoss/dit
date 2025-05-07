@@ -54,7 +54,6 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
   useEffect(() => {
     const oldIndex = currentCharIndexRef.current;
     if (oldIndex !== currentCharIndex) {
-      console.log(`SendModeRaceStage: currentCharIndex prop updated from ${oldIndex} to ${currentCharIndex}`);
       currentCharIndexRef.current = currentCharIndex;
     }
   }, [currentCharIndex]);
@@ -74,7 +73,6 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
   
   // Handle invalid Morse code
   const handleInvalidCode = useCallback((code: string) => {
-    console.log(`Invalid Morse code: ${code}`);
     onError();
     
     if (audioContext) {
@@ -89,7 +87,6 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
   
   // Handle character detection
   const handleCharacter = useCallback((char: string) => {
-    console.log(`Character detected: ${char}, currentCharIndex: ${currentCharIndexRef.current}`);
     setLastDetectedChar(char);
     
     // Get the expected character from race text
@@ -97,16 +94,11 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
     
     // Compare detected and expected characters
     if (char.toLowerCase() === expectedChar.toLowerCase()) {
-      console.log(`✓ Correct character: ${char}, expected: ${expectedChar}, at index: ${currentCharIndexRef.current}`);
-      console.log(`BEFORE calling onCharacterCorrect - currentCharIndex is: ${currentCharIndexRef.current}`);
-      
       // Store the current index for completion check
       const currentIndex = currentCharIndexRef.current;
       
       // Call progress callback with the current index
       onCharacterCorrect(currentIndex);
-      
-      console.log(`AFTER calling onCharacterCorrect - currentCharIndexRef is: ${currentCharIndexRef.current}`);
       
       // Show correct indicator
       setShowCorrectIndicator(true);
@@ -175,7 +167,7 @@ const SendModeRaceStage: React.FC<SendModeRaceStageProps> = ({
   useEffect(() => {
     if (audioContext && audioContext.getRawContext && audioContext.getRawContext().state === 'suspended') {
       audioContext.getRawContext().resume()
-        .then(() => console.log('Audio context resumed'))
+        // .then(() => console.log('Audio context resumed'))
         .catch((err: Error) => console.error('Failed to resume audio context:', err));
     }
   }, [audioContext]);

@@ -165,11 +165,6 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
         
         try {
           const totalMistakes = Object.values(mistakesMap).reduce((a, b) => a + b, 0);
-          console.log('Calculating XP with:', { 
-            charsLength: responseTimes.length, 
-            totalMistakes, 
-            completed 
-          });
           
           trainingXp = calculateTrainingXp(
             responseTimes.length, // Characters studied
@@ -196,7 +191,6 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
             ...(levelCompletionXp.total > 0 ? { levelCompletion: levelCompletionXp.total } : {})
           };
           
-          console.log('XP calculation results:', { trainingXp, levelCompletionXp, totalXp, combinedBreakdown });
         } catch (error) {
           console.error('Error calculating XP:', error, { 
             responseTimes, 
@@ -221,7 +215,6 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
         // 5. Award XP to the user
         if (totalXp > 0) {
           try {
-            console.log('Awarding XP:', { userId: user.id, totalXp, mode: state.mode });
             const result = await awardXp(
               user.id,
               totalXp, 
