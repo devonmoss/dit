@@ -45,7 +45,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
   onNext
 }) => {
   const { user, refreshXpInfo, updateXp } = useAuth();
-  const { state, getCurrentLevel } = useAppState();
+  const { state, getCurrentLevel, isLevelCompleted } = useAppState();
   const [historyAvgTimes, setHistoryAvgTimes] = useState<Record<string, number>>({});
   /* eslint-disable @typescript-eslint/no-unused-vars */
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -177,7 +177,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
           const currentLevel = getCurrentLevel();
           levelCompletionXp = { total: 0, breakdown: {} };
           
-          if (completed && currentLevel && !state.completedLevels.includes(levelId)) {
+          if (completed && currentLevel && !isLevelCompleted(levelId)) {
             levelCompletionXp = calculateLevelCompletionXp(
               levelId, 
               currentLevel.type === 'checkpoint'
@@ -272,7 +272,7 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
     saveResults();
     
     // Only depend on completed state and user to minimize re-runs
-  }, [completed, user, levelId, responseTimes, mistakesMap, state.mode, state.completedLevels, getCurrentLevel, elapsedTime, replayCount, refreshXpInfo, updateXp]);
+  }, [completed, user, levelId, responseTimes, mistakesMap, state.mode, isLevelCompleted, getCurrentLevel, elapsedTime, replayCount, refreshXpInfo, updateXp]);
   // Format time as MM:SS with hover tooltip for precise seconds
   const formatTime = (totalSec: number) => {
     const minutes = Math.floor(totalSec / 60);

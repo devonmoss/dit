@@ -21,7 +21,8 @@ const TopMenu: React.FC = () => {
     setVolume, 
     setSendWpm,
     setTheme,
-    endTest
+    endTest,
+    isLevelCompleted
   } = useAppState();
   
   const router = useRouter();
@@ -249,7 +250,7 @@ const TopMenu: React.FC = () => {
                 {trainingLevels.map(level => (
                   <li 
                     key={level.id}
-                    className={`${styles.levelItem} ${state.completedLevels.includes(level.id) ? styles.completed : ''} ${state.selectedLevelId === level.id ? styles.selected : ''}`}
+                    className={`${styles.levelItem} ${isLevelCompleted(level.id) ? styles.completed : ''} ${state.selectedLevelId === level.id ? styles.selected : ''}`}
                     onClick={() => handleLevelClick(level.id)}
                   >
                     {level.name}
