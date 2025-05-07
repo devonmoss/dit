@@ -98,14 +98,19 @@ const TopMenu: React.FC = () => {
     // This ensures level selection works even when on the test results screen
     endTest(false);
     
+    // Select the level
     selectLevel(id);
     setShowLevels(false);
     
-    // Ensure we're in training mode and route to the home page
-    if (state.testType !== 'training') {
+    // Only navigate to training mode if we're not in race mode
+    if (state.testType !== 'training' && state.testType !== 'race') {
       setTestType('training');
       router.push('/');
+    } else if (state.testType === 'training') {
+      // If already in training mode, ensure we're on the home page
+      router.push('/');
     }
+    // If in race mode, do nothing - just stay on the race page with the new level selected
   };
   
   const handleSpeedChange = (event: React.ChangeEvent<HTMLInputElement>) => {
