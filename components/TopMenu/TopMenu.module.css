@@ -105,20 +105,11 @@
 }
 
 .menuItem.active {
-  color: var(--accent-color, #00e676);
+  color: var(--accent-color);
 }
 
-/* Special styling for race menu item */
-.menuItem[data-mode="race"],
-.raceMenuItem {
-  position: relative;
-  color: inherit; /* Reset color */
-  text-decoration: none; /* Remove underline */
-}
-
-.menuItem[data-mode="race"].active,
-.raceMenuItem.active {
-  color: var(--accent-color, #00e676); /* Use accent color from globals.css */
+.menuItem.active:hover {
+  color: var(--text-color, #e0e0e0);
 }
 
 .menuItem input[type="radio"] {
@@ -253,7 +244,4 @@
 /* Icon styling for consistent icon sizes */
 .menuIcon {
   font-size: 1.7rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 } 

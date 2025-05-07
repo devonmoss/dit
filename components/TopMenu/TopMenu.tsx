@@ -114,8 +114,8 @@ const TopMenu: React.FC = () => {
       // When returning to training, just navigate to home
       // We'll keep the current level and mode
       router.push('/');
-    } else if (testType === 'time') {
-      router.push('/time');
+    } else if (testType === 'pota') {
+      router.push('/pota');
     } else if (testType === 'words') {
       router.push('/words');
     }
@@ -197,28 +197,6 @@ const TopMenu: React.FC = () => {
         {/* Middle section - Test Types */}
         <div className={styles.menuSection}>
           <button 
-            className={`${styles.menuItem} ${state.testType === 'time' ? styles.active : ''}`}
-            onClick={() => handleTestTypeClick('time')}
-            disabled={true} // Feature not yet implemented
-            title="Coming soon! Complete as many characters as possible in a set amount of time."
-          >
-            time
-          </button>
-          <button 
-            className={`${styles.menuItem} ${state.testType === 'zen' ? styles.active : ''}`}
-            onClick={() => handleTestTypeClick('zen')}
-          >
-            zen
-          </button>
-          <button 
-            className={`${styles.menuItem} ${state.testType === 'words' ? styles.active : ''}`}
-            onClick={() => handleTestTypeClick('words')}
-            disabled={true} // Feature not yet implemented
-            title="Coming soon! Identify or send words of various sizes."
-          >
-            words
-          </button>
-          <button 
             className={`${styles.menuItem} ${state.testType === 'training' ? styles.active : ''}`}
             onClick={() => handleTestTypeClick('training')}
           >
@@ -230,6 +208,28 @@ const TopMenu: React.FC = () => {
             data-mode="race"
           >
             race
+          </button>
+          <button 
+            className={`${styles.menuItem} ${state.testType === 'zen' ? styles.active : ''}`}
+            onClick={() => handleTestTypeClick('zen')}
+          >
+            zen
+          </button>
+          <button 
+            className={`${styles.menuItem} ${state.testType === 'pota' ? styles.active : ''}`}
+            onClick={() => handleTestTypeClick('pota')}
+            disabled={true} // Feature not yet implemented
+            title="Coming soon! Get familiar with a POTA exchange. Practice hunting and activating."
+          >
+            pota
+          </button>
+          <button 
+            className={`${styles.menuItem} ${state.testType === 'words' ? styles.active : ''}`}
+            onClick={() => handleTestTypeClick('words')}
+            disabled={true} // Feature not yet implemented
+            title="Coming soon! Identify or send words of various sizes."
+          >
+            words
           </button>
         </div>
         
