@@ -26,16 +26,4 @@ const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Add debug logging to inspect the Supabase Realtime status
-console.log('📡 Supabase Realtime client created with config:', {
-  url: supabaseUrl ? `${supabaseUrl.substring(0, 8)}...` : 'missing',
-  hasKey: !!supabaseAnonKey,
-  eventsPerSecond: 10
-});
-
-// Log when in browser to help debug
-if (typeof window !== 'undefined') {
-  console.log('💻 Running in browser environment - Supabase Realtime should connect automatically');
-}
-
 export default supabaseClient; 
