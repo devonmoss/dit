@@ -85,6 +85,7 @@ This document captures feature ideas for future development of the Morse code tr
 ### 1. Technical Enhancements
 - **Analytics**: Implement Vercel analytics and performance tracking
 - **Debug Logging**: Cleanup excessive console logging
+- **Send Mode Bug Fixes**: Implement unknown character hook in send mode to properly clear the morse display when unrecognized characters are input
 
 ---
 

@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { trainingLevels, TrainingLevel } from '../utils/levels';
 import { defaultChars } from '../utils/morse';
+import { trackLevelCompleted } from '../utils/analytics';
 
 // Define types for our app state
 interface CharPoints {
@@ -295,6 +296,9 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
         completedLevels: newCompletedLevels,
       }));
       
+      // Track level completed event with mode
+      trackLevelCompleted(id, modeToUpdate);
+      
       // Save to localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem(`morseCompleted${modeToUpdate.charAt(0).toUpperCase() + modeToUpdate.slice(1)}`, 
@@ -339,6 +343,8 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       charPoints: newCharPoints,
       chars: [...level.chars],
     }));
+
+    // Track level completed when we start (remove this - we'll track on actual completion)
   };
   
   // Original startTest function (kept for backward compatibility)
@@ -357,14 +363,15 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       freshLevel.chars.forEach(char => {
         newCharPoints[char] = 0;
       });
-    } 
+    }
     
     setState(prev => ({
       ...prev,
       testActive: true,
       charPoints: newCharPoints,
-      chars: freshLevel ? [...freshLevel.chars] : [...defaultChars],
     }));
+
+    // Track level completed when we start (remove this - we'll track on actual completion)
   };
   
   const endTest = (completed = true) => {
