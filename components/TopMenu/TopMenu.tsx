@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppState } from '../../contexts/AppStateContext';
 import { trainingLevels } from '../../utils/levels';
 import ProgressDashboard from '../ProgressDashboard/ProgressDashboard';
@@ -33,10 +33,43 @@ const TopMenu: React.FC = () => {
   const [showProgress, setShowProgress] = useState(false);
   const [mounted, setMounted] = useState(false);
   
+  // Refs for dropdown containers
+  const levelDropdownRef = useRef<HTMLDivElement>(null);
+  const settingsDropdownRef = useRef<HTMLDivElement>(null);
+  
   // Only run client-side code after mount
   useEffect(() => {
     setMounted(true);
   }, []);
+  
+  // Handle clicks outside dropdown menus
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Close level dropdown if click is outside
+      if (showLevels && 
+          levelDropdownRef.current && 
+          !levelDropdownRef.current.contains(event.target as Node)) {
+        setShowLevels(false);
+      }
+      
+      // Close settings dropdown if click is outside
+      if (showSettings && 
+          settingsDropdownRef.current && 
+          !settingsDropdownRef.current.contains(event.target as Node)) {
+        setShowSettings(false);
+      }
+    };
+    
+    // Add event listener when dropdowns are open
+    if (showLevels || showSettings) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    // Clean up event listener
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLevels, showSettings]);
   
   // Handle mode change with proper navigation
   const handleModeChange = () => {
@@ -203,7 +236,7 @@ const TopMenu: React.FC = () => {
         {/* Right section - Levels and Settings */}
         <div className={styles.menuSection}>
           {/* Level selector */}
-          <div className={styles.levelSelector}>
+          <div className={styles.levelSelector} ref={levelDropdownRef}>
             <button 
               className={`${styles.menuItem} ${styles.active}`} 
               onClick={() => setShowLevels(!showLevels)}
@@ -227,84 +260,86 @@ const TopMenu: React.FC = () => {
           </div>
           
           {/* Settings gear icon */}
-          <button 
-            className={styles.menuItem}
-            onClick={() => setShowSettings(!showSettings)}
-          >
-            ⚙
-          </button>
-          
-          {showSettings && (
-            <ul className={styles.settingsDropdown}>
-              <li>
-                <label>
-                  Speed: <span>{state.wpm}</span> WPM
-                  <input 
-                    type="range" 
-                    min="5" 
-                    max="40" 
-                    step="1" 
-                    value={state.wpm} 
-                    onChange={handleSpeedChange} 
-                  />
-                </label>
-              </li>
-              <li>
-                <label>
-                  Volume: <span>{state.volume}</span>%
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="100" 
-                    step="1" 
-                    value={state.volume} 
-                    onChange={handleVolumeChange} 
-                  />
-                </label>
-              </li>
-              <li>
-                <label>
-                  Send Speed: <span>{state.sendWpm}</span> WPM
-                  <input 
-                    type="range" 
-                    min="5" 
-                    max="40" 
-                    step="1" 
-                    value={state.sendWpm} 
-                    onChange={handleSendSpeedChange} 
-                  />
-                </label>
-              </li>
-              <li>
-                <label>Theme:</label>
-                <div className={styles.themeOptions}>
+          <div ref={settingsDropdownRef}>
+            <button 
+              className={styles.menuItem}
+              onClick={() => setShowSettings(!showSettings)}
+            >
+              <span className={styles.menuIcon}>⚙</span>
+            </button>
+            
+            {showSettings && (
+              <ul className={styles.settingsDropdown}>
+                <li>
+                  <label>
+                    Speed: <span>{state.wpm}</span> WPM
+                    <input 
+                      type="range" 
+                      min="5" 
+                      max="40" 
+                      step="1" 
+                      value={state.wpm} 
+                      onChange={handleSpeedChange} 
+                    />
+                  </label>
+                </li>
+                <li>
+                  <label>
+                    Volume: <span>{state.volume}</span>%
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      step="1" 
+                      value={state.volume} 
+                      onChange={handleVolumeChange} 
+                    />
+                  </label>
+                </li>
+                <li>
+                  <label>
+                    Send Speed: <span>{state.sendWpm}</span> WPM
+                    <input 
+                      type="range" 
+                      min="5" 
+                      max="40" 
+                      step="1" 
+                      value={state.sendWpm} 
+                      onChange={handleSendSpeedChange} 
+                    />
+                  </label>
+                </li>
+                <li>
+                  <label>Theme:</label>
+                  <div className={styles.themeOptions}>
+                    <button 
+                      className={`${styles.themeButton} ${state.theme === 'default' ? styles.activeTheme : ''}`}
+                      onClick={() => handleThemeChange('default')}
+                    >
+                      default
+                    </button>
+                    <button 
+                      className={`${styles.themeButton} ${state.theme === 'catppuccin-mocha' ? styles.activeTheme : ''}`}
+                      onClick={() => handleThemeChange('catppuccin-mocha')}
+                    >
+                      catppuccin 
+                    </button>
+                  </div>
+                </li>
+                <li>
                   <button 
-                    className={`${styles.themeButton} ${state.theme === 'default' ? styles.activeTheme : ''}`}
-                    onClick={() => handleThemeChange('default')}
+                    className={styles.settingsItem}
+                    onClick={() => {
+                      setShowSettings(false);
+                      setShowProgress(true);
+                    }}
                   >
-                    default
+                    My Progress
                   </button>
-                  <button 
-                    className={`${styles.themeButton} ${state.theme === 'catppuccin-mocha' ? styles.activeTheme : ''}`}
-                    onClick={() => handleThemeChange('catppuccin-mocha')}
-                  >
-                    catppuccin 
-                  </button>
-                </div>
-              </li>
-              <li>
-                <button 
-                  className={styles.settingsItem}
-                  onClick={() => {
-                    setShowSettings(false);
-                    setShowProgress(true);
-                  }}
-                >
-                  My Progress
-                </button>
-              </li>
-            </ul>
-          )}
+                </li>
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </nav>

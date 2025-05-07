@@ -248,5 +248,12 @@
 
 .themeButton.activeTheme {
   background-color: var(--accent-color, #00e676);
-  color: var(--primary-bg, #1f1f1f);
+}
+
+/* Icon styling for consistent icon sizes */
+.menuIcon {
+  font-size: 1.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 } 
