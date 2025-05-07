@@ -23,14 +23,6 @@ export default function Home() {
     if (state.mode === 'send') {
       return <SendingMode />;
     }
-    
-    // Placeholder for other modes
-    return (
-      <div style={{ textAlign: 'center', padding: '3rem' }}>
-        <h2>Feature Coming Soon</h2>
-        <p>This mode is not yet implemented in the Next.js version.</p>
-      </div>
-    );
   };
 
   return (
