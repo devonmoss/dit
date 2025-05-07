@@ -194,6 +194,18 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       // Save to localStorage
       if (typeof window !== 'undefined') {
         localStorage.setItem('morseCompleted', JSON.stringify(newCompletedLevels));
+        
+        // Automatically advance the next level in localStorage ONLY
+        // This way when the user refreshes, they'll be at the next level
+        // but we don't immediately advance the UI
+        const currentLevelIndex = trainingLevels.findIndex(level => level.id === id);
+        if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
+          // Get the next level ID
+          const nextLevelId = trainingLevels[currentLevelIndex + 1].id;
+          
+          // Update localStorage only, without changing the current UI state
+          localStorage.setItem('morseSelectedLevel', nextLevelId);
+        }
       }
     }
   };

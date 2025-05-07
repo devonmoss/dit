@@ -488,6 +488,10 @@ const TrainingMode: React.FC = () => {
             
             if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
               const nextLevel = trainingLevels[currentLevelIndex + 1];
+              
+              // Explicitly select the next level to update both state and UI
+              selectLevel(nextLevel.id);
+              
               setTestStartTime(Date.now());
               startTestWithLevelId(nextLevel.id);
               

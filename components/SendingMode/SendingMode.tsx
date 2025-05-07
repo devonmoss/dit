@@ -730,6 +730,9 @@ const SendingMode: React.FC = () => {
       // Move to next level
       const nextLevel = trainingLevels[currentLevelIndex + 1];
       
+      // Explicitly select the next level to update both state and UI
+      selectLevel(nextLevel.id);
+      
       // Set the test start time
       setTestStartTime(Date.now());
       
@@ -739,7 +742,7 @@ const SendingMode: React.FC = () => {
       // Restart current level if at end
       startTestAndRecordTime();
     }
-  }, [state.selectedLevelId, startTestWithExplicitLevel, startTestAndRecordTime]);
+  }, [state.selectedLevelId, startTestWithExplicitLevel, startTestAndRecordTime, selectLevel]);
   
   // Calculate progress - mastered characters using local points
   // Use levelCharsRef for consistent mastery calculations
