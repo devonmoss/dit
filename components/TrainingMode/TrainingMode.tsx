@@ -417,6 +417,13 @@ const TrainingMode: React.FC = () => {
     }
   }, [checkLevelChars]);
   
+  // Clear test results when level changes
+  useEffect(() => {
+    if (testResults) {
+      setTestResults(null);
+    }
+  }, [state.selectedLevelId]);
+  
   return (
     <div className={styles.trainingContainer}>
       {/* Debug state information - only visible on client in development */}

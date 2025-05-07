@@ -125,10 +125,22 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       } catch (error) {
         console.error('Error loading completed levels from localStorage:', error);
       }
+      
+      // Load selected level from localStorage
+      const storedSelectedLevelId = localStorage.getItem('morseSelectedLevel');
+      if (storedSelectedLevelId) {
+        initialState.selectedLevelId = storedSelectedLevelId;
+      }
+      
+      // Load mode from localStorage
+      const storedMode = localStorage.getItem('morseMode');
+      if (storedMode === 'copy' || storedMode === 'send' || storedMode === 'race') {
+        initialState.mode = storedMode;
+      }
     }
     
-    // Determine initial selected level: first incomplete or last
-    if (trainingLevels.length > 0) {
+    // If no selected level is stored in localStorage, determine the initial selected level
+    if (!initialState.selectedLevelId && trainingLevels.length > 0) {
       const firstIncomplete = trainingLevels.find(
         level => !initialState.completedLevels.includes(level.id)
       );
@@ -138,9 +150,12 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
         : trainingLevels[trainingLevels.length - 1];
         
       initialState.selectedLevelId = selectedLevel.id;
-      
-      // Set the character set to match the selected level
-      initialState.chars = [...selectedLevel.chars];
+    }
+    
+    // Set the character set to match the selected level
+    const level = trainingLevels.find(lvl => lvl.id === initialState.selectedLevelId);
+    if (level) {
+      initialState.chars = [...level.chars];
     }
     
     return initialState;
@@ -157,6 +172,11 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       selectedLevelId: id,
       chars: levelChars,
     }));
+    
+    // Store selected level in localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('morseSelectedLevel', id);
+    }
   };
   
   const getCurrentLevel = () => {
@@ -283,7 +303,14 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     setState(prev => ({
       ...prev,
       mode,
+      // End test when changing modes to ensure we return to start screen
+      testActive: false
     }));
+    
+    // Store mode in localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('morseMode', mode);
+    }
   };
   
   const setTestType = (testType: TestType) => {

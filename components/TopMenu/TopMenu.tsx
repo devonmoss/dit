@@ -38,12 +38,38 @@ const TopMenu: React.FC = () => {
     setMounted(true);
   }, []);
   
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleModeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setMode(event.target.value as 'copy' | 'send');
+  // Handle mode change with proper navigation
+  const handleModeChange = () => {
+    // Toggle between copy and send mode
+    const newMode = state.mode === 'copy' ? 'send' : 'copy';
+    
+    // End any active test
+    if (state.testActive) {
+      endTest(false);
+    }
+    
+    // Set the new mode
+    setMode(newMode);
+    
+    // Ensure we're in training mode
+    if (state.testType !== 'training') {
+      setTestType('training');
+      router.push('/');
+    }
   };
   
   const handleTestTypeClick = (testType: TestType) => {
+    // End any active test
+    if (state.testActive) {
+      endTest(false);
+    }
+    
+    // Force test reset when clicking on "training"
+    // This ensures we go back to the start screen even from test results
+    if (testType === 'training') {
+      endTest(false);
+    }
+    
     setTestType(testType);
     
     // Handle navigation based on test type
@@ -52,6 +78,8 @@ const TopMenu: React.FC = () => {
     } else if (testType === 'zen') {
       router.push('/zen');
     } else if (testType === 'training') {
+      // When returning to training, just navigate to home
+      // We'll keep the current level and mode
       router.push('/');
     } else if (testType === 'time') {
       router.push('/time');
@@ -66,8 +94,18 @@ const TopMenu: React.FC = () => {
       endTest(false);
     }
     
+    // Force the test to reset to the start screen by ending it
+    // This ensures level selection works even when on the test results screen
+    endTest(false);
+    
     selectLevel(id);
     setShowLevels(false);
+    
+    // Ensure we're in training mode and route to the home page
+    if (state.testType !== 'training') {
+      setTestType('training');
+      router.push('/');
+    }
   };
   
   const handleSpeedChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,7 +148,7 @@ const TopMenu: React.FC = () => {
         <div className={styles.menuSection}>
           <div 
             className={styles.toggleTrack} 
-            onClick={() => setMode(state.mode === 'copy' ? 'send' : 'copy')}
+            onClick={handleModeChange}
           >
             <span className={`${styles.toggleLabel} ${state.mode === 'copy' ? styles.activeLabel : ''}`}>copy</span>
             <span className={`${styles.toggleLabel} ${state.mode === 'send' ? styles.activeLabel : ''}`}>send</span>
@@ -270,4 +308,4 @@ const TopMenu: React.FC = () => {
   );
 };
 
-export default TopMenu; 
+export default TopMenu;
