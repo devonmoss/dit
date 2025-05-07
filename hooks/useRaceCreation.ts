@@ -171,7 +171,6 @@ export const useRaceCreation = ({
       
       // CRITICAL: Save current race ID before creating a new race - needed for broadcast
       const currentRaceId = raceId;
-      console.log('[Race Again] Current race ID before creating new race:', currentRaceId);
       
       // Generate new race text with the same parameters
       const currentLevel = trainingLevels.find(level => level.id === state.selectedLevelId);
@@ -195,11 +194,9 @@ export const useRaceCreation = ({
       // BEFORE setting up the new race or changing any state
       // This ensures the channel for the old race is still active
       if (currentRaceId && broadcastRedirect) {
-        console.log('[Race Again] Broadcasting redirect from old race BEFORE creating new race');
         const initiatorName = getUserDisplayName(currentUser);
         
         // Create the new race but don't set local state yet
-        console.log('[Race Again] Creating new race...');
         const raceResult = await raceService.createRace({
           created_by: createdById,
           mode: raceMode,
@@ -209,31 +206,21 @@ export const useRaceCreation = ({
         });
         
         const newRaceId = raceResult.id;
-        console.log('[Race Again] New race created with ID:', newRaceId);
         
         // BROADCAST FIRST: Send notification to other participants about the new race
         // This happens while we're still on the old race page with the old channel active
         try {
-          console.log('[Race Again] Broadcasting redirect from race', currentRaceId, 'to new race:', newRaceId);
-          console.log('[Race Again] Attempting to broadcast redirect - waiting for completion...');
-          
           const broadcastSuccess = await broadcastRedirect(newRaceId, initiatorName);
-          console.log('[Race Again] Broadcast completed with result:', broadcastSuccess);
           
           if (!broadcastSuccess) {
             console.warn('[Race Again] Broadcast failed - other users may not receive the invitation');
           }
           
           // Give time for the message to be delivered
-          console.log('[Race Again] Waiting for broadcast to propagate...');
           await new Promise(resolve => setTimeout(resolve, 3000));
-          console.log('[Race Again] Done waiting, proceeding with state updates');
         } catch (broadcastError) {
           console.error('[Race Again] Error during broadcast:', broadcastError);
         }
-        
-        // THEN: Update local state and navigate to the new race
-        console.log('[Race Again] Updating local state with new race info');
         
         // Update local state
         setRaceId(newRaceId);
@@ -267,7 +254,6 @@ export const useRaceCreation = ({
         setRaceStage(RaceStage.SHARE);
         
         // Navigate to new race with full page reload AFTER broadcast and state updates
-        console.log('[Race Again] Navigating to new race URL:', `/race?id=${newRaceId}`);
         window.location.href = `/race?id=${newRaceId}`;
       } else {
         // Fallback: If no current race or broadcast function, just create new race normally
@@ -281,8 +267,6 @@ export const useRaceCreation = ({
           text: text,
           level_id: state.selectedLevelId
         });
-        
-        console.log('[Race Again] New race created with ID:', raceResult.id);
         
         // Update local state
         setRaceId(raceResult.id);
