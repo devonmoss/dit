@@ -367,8 +367,8 @@ const EnhancedRaceMode: React.FC = () => {
     if (!raceId) return;
     
     try {
-      // Track race started event with the number of participants
-      trackRaceStarted(participants.length);
+      // Track race started event with the number of participants and race mode
+      trackRaceStarted(participants.length, raceMode);
       
       // Update race status to countdown through API
       await raceService.startRaceCountdown(raceId);
@@ -380,7 +380,7 @@ const EnhancedRaceMode: React.FC = () => {
     } catch (err) {
       console.error('Error starting race:', err);
     }
-  }, [raceId, participants.length]);
+  }, [raceId, participants.length, raceMode]);
   
   // Start racing after countdown
   const startRacing = useCallback(async () => {

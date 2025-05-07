@@ -20,17 +20,19 @@ export async function trackServerEvent(eventName: string, properties?: Record<st
 }
 
 /**
- * Track when a level is started
- * @param levelId The ID of the level that was started
+ * Track when a level is completed
+ * @param levelId The ID of the level that was completed
+ * @param mode The mode (copy or send) that the level was completed in
  */
-export function trackLevelStarted(levelId: string) {
-  trackEvent('Level Started', { levelId });
+export function trackLevelCompleted(levelId: string, mode: 'copy' | 'send') {
+  trackEvent('Level Completed', { levelId, mode });
 }
 
 /**
  * Track when a race is started
  * @param participantCount The number of connected participants
+ * @param mode The mode (copy or send) of the race
  */
-export function trackRaceStarted(participantCount: number) {
-  trackEvent('Race Started', { participantCount });
+export function trackRaceStarted(participantCount: number, mode: 'copy' | 'send') {
+  trackEvent('Race Started', { participantCount, mode });
 } 
