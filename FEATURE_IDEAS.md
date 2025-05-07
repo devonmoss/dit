@@ -1,60 +1,91 @@
-<!--
-This file captures feature ideas for the app. Use this as a reference
-for planning and prioritization of next development steps.
--->
 # Feature Ideas
 
-Below is a list of proposed features for the Morse code training and POTA app. Each feature includes a brief description and rationale.
+This document captures feature ideas for future development of the Morse code training application. Items are organized by feature category with brief descriptions and rationales.
 
-## 1. Morse Code Sending Trainer
-- Mimic the use of an iambic paddle/electric keyer using left and right arrow keys.
-- Includes lessons and a “Zen” mode where users can freely key, view dits and dahs live,
-  then after a pause, translate input into English to review their transmissions.
+## Training Enhancements
 
-## 2. POTA Contact Exercises
-- Several exercises to prepare users for Parks on the Air (POTA) contacts as both hunters
-  and activators.
-- Primary objective: build confidence for real-world POTA participation.
+### 1. Advanced Learning Modules
+- **Prosign Training**: Add dedicated levels for copying and transmitting prosigns used in CW operations
+- **Punctuation Training**: Create structured lessons for common Morse punctuation marks
+- **Call Sign Practice**: Generate properly formatted call signs for practice exercises
 
-## 3. Continuous Mode
-- App plays a sequence of 5, 10, 15, 20, or 25 characters; user types responses live.
-- Variant: 3-strike continuous mode where characters stream until the user falls behind
-  or makes three mistakes.
+### 2. Specialized Practice Modes
+- **Continuous Mode**: 
+  - Stream sequences of 5-25 characters for user to type in real-time
+  - 3-strike variant where characters stream until the user falls behind or makes three mistakes
+- **Adaptive Difficulty**:
+  - Dynamically generate practice focusing on the user's weakest characters
+  - Gradually increase difficulty based on user performance
+- **Realistic Radio Conditions**:
+  - Introduce authentic static and signal distortions beyond simple noise
+  - Simulate challenging HAM radio conditions to build operator confidence
 
-## 4. Login and Account Management
-- Enable user registration and authentication (email/password, Google, GitHub).
-- Persist test results and level progress beyond localStorage to backend storage.
+### 3. POTA (Parks on the Air) Integration
+- **Contact Exercises**: Prepare users for POTA contacts as both hunters and activators
+- **Interactive Simulation**: Simulate full POTA-style interactions, including pileup scenarios
+- **Standard Scripts**: Incorporate common POTA scripts for guided practice
 
-## 5. Realistic Radio Distortion
-- Introduce realistic static and signal distortions (beyond simple noise)
-  to simulate HAM radio conditions and build user confidence.
+### 4. Training Mode UI Improvements
+- **Visual Feedback Animations**: Replace text indicators like "fast answer" with visual animations
+- **Sending Mode Feedback**: Provide visual feedback for sending training (currently only in copy mode)
+- **Sound Effects**:
+  - Level completion sounds
+  - Countdown audio cues
+  - Race finish sound effects
 
-## 6. Performance Metrics Tracking
-- Measure and store recognition time per character.
-- Provide dashboards so users can identify difficult characters and track improvement over time.
+### 5. Scoring and Mastery Refinements
+- **Send Mode Scoring Balance**: Refine send mode scoring to feel more satisfying like copy mode, accounting for the additional time needed for keying complete characters
+- **Mastery Progression**: Adjust mastery calculation in send mode to avoid leaving characters at "almost mastered" state
 
-## 7. Custom Call Sign Playback
-- Allow users to register their call signs.
-- Clicking a call sign plays it back in Morse code audio/visual format.
+## User Experience
 
-## 8. Advanced Levels and Prosigns
-- Add more learning levels that include copying and transmitting prosigns.
+### 1. Theme Customization
+- **Custom Color Schemes**: Allow users to create and preview custom UI themes
+- **Community Sharing**: Enable users to submit themes to a public repository
+- **Theme Gallery**: Provide in-app browsing and installation of community themes
 
-## 9. Custom Level Creation and Sharing
-- Users can craft custom practice levels based on specific character sets or themes.
-- Shared custom levels include leaderboards for friendly competition.
+### 2. UI Enhancement
+- **Iconography System**: Add consistent icons throughout the interface:
+  - Copy mode
+  - Send mode
+  - Time-based practice
+  - Word-based practice
+  - Training mode
+  - Race mode (checkered flag)
+  - Login/logout
+  - Settings
 
-## 10. Adaptive Weakness-Focused Levels
-- Dynamically generate practice levels focusing on each user’s weakest characters.
+### 3. User Profile and Statistics
+- **User Stats Dashboard**: Rename "My Progress" to "User Stats" with improved accessibility
+- **Activity Visualization**: Display heatmaps of user practice sessions
+- **Performance Metrics**:
+  - Track and visualize character recognition times
+  - Provide analytics to identify difficult characters
+  - Show improvement trends over time
 
-## 11. Interactive POTA Simulation
-- Simulate full POTA-style activator/hunter interactions, including pileup scenarios.
-- Incorporate standard POTA scripts for guided practice.
+### 4. Authentication Improvements
+- **Streamlined Signup**: Log users in immediately after account creation
+- **Profile Features**: Add custom call sign registration and playback
 
-## 12. Custom Color Schemes
-- Allow users to create and preview custom UI color schemes (backgrounds, text, keyer elements).
-- Enable submission of themes to a public GitHub repository for community sharing.
-- Provide an in-app gallery for browsing, previewing, and installing community-contributed schemes.
+## Community and Competition
+
+### 1. Custom Content Creation
+- **User-Created Levels**: Allow users to build custom practice levels based on specific characters/themes
+- **Sharing System**: Add functionality to share custom levels with other users
+- **Leaderboards**: Implement friendly competition with level-specific leaderboards
+
+### 2. Race Mode Refinements
+- **Race Replay**: Add "play again" functionality for race participants
+- **Character Set Selection**: Allow races with different character sets
+- **WPM Calculation**: Verify WPM calculation methodology for CW-specific metrics
+- **Technical Improvements**: Evaluate use of Supabase realtime schema
+
+## Miscellaneous
+
+### 1. Technical Enhancements
+- **Analytics**: Implement Vercel analytics and performance tracking
+- **Debug Logging**: Cleanup excessive console logging
 
 ---
-_Next steps_: Prioritize these features, estimate effort, and define a roadmap for implementation.
+
+_Next steps_: Prioritize these features based on user needs, estimate development effort, and incorporate into the development roadmap.

@@ -141,9 +141,6 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Set the character set to match the selected level
       initialState.chars = [...selectedLevel.chars];
-      
-      console.log('Initial state setup - Setting level ID to:', selectedLevel.id);
-      console.log('Initial state setup - Setting chars to:', selectedLevel.chars);
     }
     
     return initialState;
@@ -154,10 +151,6 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Find the level to get its characters
     const level = trainingLevels.find(level => level.id === id);
     const levelChars = level ? [...level.chars] : [...defaultChars];
-    
-    console.log('======== selectLevel ========');
-    console.log('Setting level ID to:', id);
-    console.log('Level chars:', levelChars);
     
     setState(prev => ({
       ...prev,
@@ -188,11 +181,8 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Test management with explicit level ID
   const startTestWithLevelId = (levelId: string) => {
     console.log('======== startTestWithLevelId ========');
-    console.log('Using explicit level ID:', levelId);
-    
     // Get fresh level data directly
     const level = trainingLevels.find(l => l.id === levelId);
-    console.log('Level found:', level);
     
     if (!level) {
       console.error('Level not found for ID:', levelId);
@@ -204,8 +194,6 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     level.chars.forEach(char => {
       newCharPoints[char] = 0;
     });
-    
-    console.log('Setting chars to:', level.chars);
     
     setState(prev => ({
       ...prev,
@@ -224,9 +212,7 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     const freshLevelId = state.selectedLevelId;
     const freshLevel = trainingLevels.find(level => level.id === freshLevelId);
     
-    console.log('======== startTest ========');
-    console.log('Current level ID:', freshLevelId);
-    console.log('Fresh level object:', freshLevel);
+    // console.log('======== startTest ========');
     
     const newCharPoints: CharPoints = {};
     
@@ -234,13 +220,7 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       freshLevel.chars.forEach(char => {
         newCharPoints[char] = 0;
       });
-      console.log('Setting chars directly from trainingLevels definition');
-    } else {
-      console.warn('Level not found, using default chars');
-    }
-    
-    console.log('New char points:', newCharPoints);
-    console.log('Setting chars to:', freshLevel ? freshLevel.chars : defaultChars);
+    } 
     
     setState(prev => ({
       ...prev,
@@ -346,7 +326,6 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Save back to localStorage
       localStorage.setItem('morseResponseTimes', JSON.stringify(updatedTimes));
-      console.log('Saved response times to localStorage', newEntry);
     } catch (error) {
       console.error('Error saving response times to localStorage:', error);
     }

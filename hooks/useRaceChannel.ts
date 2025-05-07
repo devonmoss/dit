@@ -52,7 +52,6 @@ export const useRaceChannel = (
           const ageInMinutes = (now - invitationTime) / (1000 * 60);
           
           if (ageInMinutes < 10) {
-            console.log('[Race Channel] Recovered invitation from localStorage:', parsedInvitation);
             setInvitationDetails({
               new_race_id: parsedInvitation.new_race_id,
               initiator_id: parsedInvitation.initiator_id,
@@ -60,7 +59,6 @@ export const useRaceChannel = (
             });
           } else {
             // Clear old invitations
-            console.log('[Race Channel] Found expired invitation, removing it');
             window.localStorage.removeItem('race_invitation');
           }
         }
@@ -80,12 +78,9 @@ export const useRaceChannel = (
     const setupChannel = () => {
       // Only set up a channel if we have a race ID and user ID
       if (!raceId || !userId) {
-        console.log('[Race Channel] Cannot set up channel: missing raceId or userId', { raceId, userId });
         setIsChannelReady(false);
         return null;
       }
-      
-      console.log(`[Race Channel] Setting up realtime channel for race: ${raceId}, user: ${userId}`);
       
       try {
         // Open a realtime channel with presence enabled and broadcast self enabled
@@ -95,10 +90,6 @@ export const useRaceChannel = (
             presence: { key: userId }
           }
         });
-        
-        console.log(`[Race Channel] Channel created: ${newChannel.topic}`);
-        
-        // Set up event handlers
         
         // Handle progress updates via broadcast
         newChannel.on('broadcast', { event: 'progress_update' }, (payload) => {
@@ -111,13 +102,9 @@ export const useRaceChannel = (
         });
         
         // Listen for race redirect events
-        console.log(`[Race Channel] Setting up race_redirect listener for user: ${userId}`);
         newChannel.on('broadcast', { event: 'race_redirect' }, (event) => {
-          console.log(`[Race Channel] ★★★ Received race_redirect broadcast for user: ${userId} ★★★`, event);
-          
           // Extract payload safely
           const payload = event.payload || event;
-          console.log('[Race Channel] Race redirect payload:', payload);
           
           // Enhanced validation for the payload
           const { new_race_id, initiator_id, initiator_name } = payload;
@@ -127,19 +114,10 @@ export const useRaceChannel = (
             return;
           }
           
-          console.log(`[Race Channel] Race redirect info: user=${userId}, initiator=${initiator_id}, redirecting to=${new_race_id}`);
-          
           // Don't redirect the initiator (they're already being redirected)
           if (initiator_id === userId) {
-            console.log('[Race Channel] Not redirecting - user is the initiator');
             return;
           }
-          
-          console.log(`[Race Channel] Received redirect to new race: ${new_race_id} from ${initiator_name}`);
-          
-          // Show a notification in the console that's very visible
-          console.log('%c RACE INVITATION RECEIVED! ', 'background: #00ff00; color: #000000; font-size: 20px;');
-          console.log(`%c ${initiator_name} has invited you to a new race! `, 'font-size: 16px; color: #00aa00;');
           
           // Store the redirect information locally in case we need to recover it
           try {
@@ -150,7 +128,6 @@ export const useRaceChannel = (
                 initiator_name,
                 timestamp: Date.now()
               }));
-              console.log('[Race Channel] Saved invitation to localStorage as backup');
             }
           } catch (storageError) {
             console.error('[Race Channel] Failed to save invitation to localStorage:', storageError);
@@ -159,12 +136,6 @@ export const useRaceChannel = (
           // Set invitation details for modal and trigger UI update
           try {
             setInvitationDetails({
-              new_race_id,
-              initiator_id,
-              initiator_name
-            });
-            
-            console.log('[Race Channel] Invitation details successfully set:', {
               new_race_id,
               initiator_id,
               initiator_name
@@ -188,14 +159,12 @@ export const useRaceChannel = (
         });
         
         // Listen for race status changes
-        console.log(`[Race Channel] Setting up race_status_changed listener for user: ${userId}`);
         newChannel.on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
           table: 'races',
           filter: `id=eq.${raceId}`
         }, (payload: { new: any }) => {
-          console.log('Race update received:', payload);
           
           // We don't directly update the race status here
           // Instead, emit a race status changed event that the component can listen to
@@ -209,14 +178,12 @@ export const useRaceChannel = (
         });
         
         // Listen for participant changes via database
-        console.log(`[Race Channel] Setting up race_participants_changed listener for user: ${userId}`);
         newChannel.on('postgres_changes', {
           event: '*',
           schema: 'public',
           table: 'race_participants',
           filter: `race_id=eq.${raceId}`
         }, (payload: { new: any }) => {
-          console.log('Participant database change:', payload);
           
           const changedParticipant = payload.new;
           if (!changedParticipant) return;
@@ -301,17 +268,13 @@ export const useRaceChannel = (
         
         // Subscribe to channel with improved error handling
         newChannel.subscribe((status: string) => {
-          console.log(`[Race Channel] Subscription status: ${status}`);
-          
           if (status === 'SUBSCRIBED') {
-            console.log(`[Race Channel] Successfully subscribed to ${newChannel.topic}`);
             
             // Register our presence
             newChannel.track({ 
               user_id: userId, 
               name: userName 
             }).then(() => {
-              console.log(`[Race Channel] Presence tracked for user: ${userId}`);
               setIsChannelReady(true);
             }).catch(err => {
               console.error(`[Race Channel] Error tracking presence: ${err.message}`);
@@ -327,8 +290,6 @@ export const useRaceChannel = (
             
             setTimeout(() => {
               if (newChannel) {
-                console.log(`[Race Channel] Retry ${retryCount}: Attempting to resubscribe...`);
-                
                 try {
                   // Try to resubscribe
                   newChannel.subscribe();
@@ -343,7 +304,6 @@ export const useRaceChannel = (
             setIsChannelReady(false);
             
           } else if (status === 'CLOSED') {
-            console.log(`[Race Channel] Channel closed`);
             setIsChannelReady(false);
             
           } else if (status === 'TIMED_OUT') {
@@ -351,7 +311,7 @@ export const useRaceChannel = (
             setIsChannelReady(false);
             
           } else {
-            console.log(`[Race Channel] Unhandled subscription status: ${status}`);
+            console.warn(`[Race Channel] Unhandled subscription status: ${status}`);
           }
         });
         
@@ -370,7 +330,6 @@ export const useRaceChannel = (
     // Clean up function
     return () => {
       if (channel) {
-        console.log(`[Race Channel] Removing channel for race: ${raceId}`);
         // Try/catch to prevent any cleanup errors
         try {
           supabase.removeChannel(channel);
@@ -410,9 +369,7 @@ export const useRaceChannel = (
       
       // If channel exists but isn't ready, try to re-subscribe before sending
       try {
-        console.log('[Race Channel] Attempting to re-subscribe to channel before broadcasting');
         await channelRef.current.subscribe();
-        console.log('[Race Channel] Re-subscribe attempt completed, continuing with broadcast');
       } catch (e) {
         console.error('[Race Channel] Re-subscribe attempt failed:', e);
         return false;
@@ -425,23 +382,12 @@ export const useRaceChannel = (
     }
     
     try {
-      // Log the current channel topic to verify we're broadcasting to the correct channel
-      // This should be the OLD race ID, not the new one
-      const channelTopic = channelRef.current.topic;
-      const currentRaceIdFromChannel = channelTopic.replace('realtime:race_', '');
-      
-      console.log(`[Race Channel] Broadcasting redirect using channel for race: ${currentRaceIdFromChannel}`);
-      console.log(`[Race Channel] Redirect target is new race: ${newRaceId}`);
-      
       // Check channel state
       if (channelRef.current) {
         const channel = channelRef.current;
-        console.log('[Race Channel] Channel state properties:', Object.keys(channel));
-        
         // Get the actual channel state if available via internal properties
         try {
           const channelState = typeof channel.subscribe === 'function' ? 'has subscribe method' : 'no subscribe method';
-          console.log('[Race Channel] Channel subscription state:', channelState);
         } catch (e) {
           console.error('[Race Channel] Unable to access channel state:', e);
         }
@@ -449,10 +395,6 @@ export const useRaceChannel = (
       
       // Get current presence state to verify users are online
       const presenceState = channelRef.current.presenceState();
-      const onlineUserCount = Object.keys(presenceState).length;
-      
-      console.log(`[Race Channel] Current online users before broadcast: ${onlineUserCount}`, 
-        'Presence state:', presenceState);
       
       const payload = {
         new_race_id: newRaceId,
@@ -460,21 +402,17 @@ export const useRaceChannel = (
         initiator_name: initiatorName
       };
       
-      console.log('[Race Channel] Preparing to send broadcast with payload:', payload);
-      
       // Make multiple attempts to broadcast the message
       let broadcastSuccess = false;
       const maxAttempts = 3;
       
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          console.log(`[Race Channel] Broadcast attempt ${attempt}/${maxAttempts}...`);
           
           // Before each attempt, try to ensure the channel is working
           if (attempt > 1) {
             // On retries, make sure we're still subscribed
             try {
-              console.log(`[Race Channel] Re-tracking presence before retry ${attempt}`);
               await channelRef.current.track({
                 user_id: userId,
                 name: initiatorName
@@ -491,7 +429,6 @@ export const useRaceChannel = (
             payload
           });
           
-          console.log(`[Race Channel] Broadcast attempt ${attempt} sent successfully`);
           broadcastSuccess = true;
           break;
         } catch (err) {
@@ -500,22 +437,12 @@ export const useRaceChannel = (
           if (attempt < maxAttempts) {
             // Wait before retrying (increasing delay with each attempt)
             const delay = attempt * 500;
-            console.log(`[Race Channel] Will retry in ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
       }
       
       if (broadcastSuccess) {
-        console.log('[Race Channel] Broadcast successfully sent after attempts, with new_race_id:', newRaceId);
-        
-        // Explicitly log online users who should have received the message
-        console.log('[Race Channel] Users who should have received the broadcast:');
-        Object.keys(presenceState).forEach(key => {
-          const userMeta = presenceState[key];
-          console.log(`- User ${key}:`, userMeta);
-        });
-        
         return true;
       } else {
         console.error('[Race Channel] All broadcast attempts failed');

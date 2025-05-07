@@ -38,8 +38,6 @@ const IambicSimplePage: React.FC = () => {
       gain.gain.value = 0.5;
       gain.connect(ctx.destination);
       gainNodeRef.current = gain;
-      
-      console.log('Audio context initialized');
     }
     
     return () => {
@@ -110,8 +108,6 @@ const IambicSimplePage: React.FC = () => {
   };
   
   const playElement = (symbol: '.' | '-') => {
-    console.log(`Playing ${symbol}`);
-    
     if (!audioContextRef.current || !gainNodeRef.current) {
       console.error('Audio context not initialized');
       return;
@@ -185,10 +181,8 @@ const IambicSimplePage: React.FC = () => {
   
   // Install on mount, only once
   useEffect(() => {
-    console.log('Installing keyer');
     keyer.install();
     return () => {
-      console.log('Uninstalling keyer');
       keyer.uninstall();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

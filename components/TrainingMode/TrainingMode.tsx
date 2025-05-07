@@ -76,26 +76,11 @@ const TrainingMode: React.FC = () => {
       const noExtraChars = stateChars.every(c => levelChars.includes(c));
       
       if (!(sameLength && allCharsPresent && noExtraChars)) {
-        console.log('Characters mismatch detected on mount:');
-        console.log('Current level:', state.selectedLevelId);
-        console.log('Expected chars:', levelChars);
-        console.log('Actual chars:', stateChars);
-        
         // Re-select the level to fix characters
         selectLevel(state.selectedLevelId);
       }
     }
   }, [currentLevel, state.chars, state.selectedLevelId, selectLevel]);
-  
-  // Debug logging
-  useEffect(() => {
-    console.log('---------------------------------------');
-    console.log(`[${new Date().toISOString()}] State Update`);
-    console.log('Level ID:', state.selectedLevelId);
-    console.log('Characters in state:', JSON.stringify(state.chars));
-    console.log('testActive:', state.testActive);
-    console.log('---------------------------------------');
-  }, [state.selectedLevelId, state.chars, state.testActive]);
   
   // Pick next character based on mastery weights - prioritize unmastered characters
   const pickNextChar = useCallback(() => {
@@ -217,8 +202,6 @@ const TrainingMode: React.FC = () => {
         
         updateCharPoints(target, newPoints);
         
-        console.log(`Character ${target} updated: ${state.charPoints[target] || 0} → ${newPoints} points (${pointsToAdd} added, response time: ${responseTime.toFixed(2)}s)`);
-        
         // Delay before next question
         setTimeout(() => {
           // Create a simulated updated charPoints object that includes the most recent update
@@ -226,11 +209,6 @@ const TrainingMode: React.FC = () => {
           
           // Check if all characters are mastered using the updated points
           const allMastered = state.chars.every(c => (updatedCharPoints[c] || 0) >= TARGET_POINTS);
-          
-          console.log('Completion check:', { 
-            updatedCharPoints,
-            allMastered
-          });
           
           if (allMastered) {
             finishTest(true);
@@ -422,25 +400,6 @@ const TrainingMode: React.FC = () => {
       console.error("❌ Cannot find level with ID:", state.selectedLevelId);
       return;
     }
-    
-    console.log("🔍 LEVEL CHARS CHECK");
-    console.log("Level ID:", state.selectedLevelId);
-    console.log("Expected chars:", currentLevel.chars);
-    console.log("Actual chars:", state.chars);
-    
-    // Check for missing characters
-    const missing = currentLevel.chars.filter(c => !state.chars.includes(c));
-    if (missing.length > 0) {
-      console.error("❌ Missing characters:", missing);
-    } else {
-      console.log("✅ All expected characters present");
-    }
-    
-    // Check for extra characters
-    const extra = state.chars.filter(c => !currentLevel.chars.includes(c));
-    if (extra.length > 0) {
-      console.warn("⚠️ Extra characters present:", extra);
-    }
   }, [state.selectedLevelId, state.chars]);
   
   // Add our check function to the debug panel only in development
@@ -502,7 +461,6 @@ const TrainingMode: React.FC = () => {
             startTestAndRecordTime();
           }}
           onNext={() => {
-            console.log("🔄 onNext triggered");
             setTestResults(null);
             
             // Reset all test state variables
@@ -520,22 +478,10 @@ const TrainingMode: React.FC = () => {
             
             // Get current level index
             const currentLevelIndex = trainingLevels.findIndex(l => l.id === state.selectedLevelId);
-            console.log('Moving from level index:', currentLevelIndex);
             
             if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
-              // Move to next level
               const nextLevel = trainingLevels[currentLevelIndex + 1];
-              console.log('Current level chars:', trainingLevels[currentLevelIndex].chars);
-              console.log('Next level chars:', nextLevel.chars);
-              console.log('New characters:', nextLevel.chars.filter(c => !trainingLevels[currentLevelIndex].chars.includes(c)));
-              
-              // Use the new function that takes the level ID directly
-              console.log("🔄 Starting test with explicit level ID:", nextLevel.id);
-              
-              // Set the test start time
               setTestStartTime(Date.now());
-              
-              // Start the test with the explicit next level ID
               startTestWithLevelId(nextLevel.id);
               
               // Set up the first question after a short delay

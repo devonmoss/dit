@@ -74,8 +74,6 @@ export function useRaceInputHandler({
     const sendUnit = 1200 / (sendWpm || 20);
     const duration = symbol === '.' ? sendUnit : sendUnit * 3;
     
-    console.log(`Playing ${symbol} with duration ${duration}ms`);
-    
     // Use the audio context to play the tone
     if (audioContext) {
       try {
@@ -93,22 +91,14 @@ export function useRaceInputHandler({
     const currentUser = getCurrentUser();
     if (!currentUser) return;
     
-    // Add debug logging
-    console.log("EVALUATING INPUT:", word);
-    console.log("Current char index:", currentCharIndex);
-    
     const expectedChar = raceText[currentCharIndex]?.toLowerCase();
     if (!expectedChar) {
-      console.log("No expected char found!");
       return;
     }
-    
-    console.log("Expected char:", expectedChar);
     
     // Check if the sent word matches the current character
     if (word.toLowerCase() === expectedChar.toLowerCase()) {
       // Correct match
-      console.log("CORRECT MATCH!");
       setShowCorrectIndicator(true);
       
       // Slight pause before continuing
@@ -132,7 +122,6 @@ export function useRaceInputHandler({
       }, 400); // 400ms pause
     } else {
       // Incorrect
-      console.log("INCORRECT MATCH!");
       incrementErrorCount();
       
       // Reset keyer state
@@ -204,11 +193,8 @@ export function useRaceInputHandler({
           
           // Word complete: evaluate
           if (localWordBuffer) {
-            console.log("WORD COMPLETE - calling handleWordComplete with:", localWordBuffer);
             handleWordComplete(localWordBuffer);
-          } else {
-            console.log("No word buffer to evaluate");
-          }
+          } 
           
           // Clear displays
           setKeyerOutput('');
@@ -222,9 +208,7 @@ export function useRaceInputHandler({
         
         // Letter gap detection: >=3 units
         if (gap >= sendUnit * 3 && localCodeBuffer) {
-          console.log("LETTER GAP DETECTED - morse:", localCodeBuffer);
           const letter = invMorseMap[localCodeBuffer] || "?";
-          console.log("Decoded to letter:", letter);
           setWordBuffer(prev => prev + letter);
           localWordBuffer += letter;
           localCodeBuffer = '';
@@ -263,13 +247,11 @@ export function useRaceInputHandler({
         
         if (symbol) {
           // play and display symbol
-          console.log("PLAYING SYMBOL:", symbol);
           await playSendSymbol(symbol);
           setKeyerOutput(prev => prev + symbol);
           setCodeBuffer(prev => prev + symbol);
           localCodeBuffer += symbol;
           lastSymbol = symbol;
-          console.log("Local buffer now:", localCodeBuffer);
           
           // inter-element gap
           await wait(sendUnit);
@@ -293,13 +275,7 @@ export function useRaceInputHandler({
   const replayCurrent = useCallback(() => {
     if (raceStage === RaceStage.RACING && raceMode === 'copy' && currentCharIndex < raceText.length) {
       const currentChar = raceText[currentCharIndex];
-      console.log('AUDIO DEBUG: Replaying current character', { 
-        currentChar, 
-        currentCharIndex,
-        raceStage,
-        raceMode,
-        hasAudioContext: !!audioContext
-      });
+
       
       if (currentChar && audioContext) {
         playMorseChar(currentChar).catch(err => {
@@ -312,12 +288,7 @@ export function useRaceInputHandler({
   // Auto-play first character when race starts
   useEffect(() => {
     if (raceStage === RaceStage.RACING && raceMode === 'copy' && currentCharIndex === 0 && raceText.length > 0) {
-      console.log('AUDIO DEBUG: Auto-playing first character on race start', {
-        firstChar: raceText[0],
-        raceStage,
-        raceMode,
-        currentCharIndex,
-        hasAudioContext: !!audioContext
+      setTimeout(() => {
       });
       
       // Small delay to ensure everything is ready

@@ -1,6 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 .vscode
 .mockups
+.swc
 # dependencies
 /node_modules
 /.pnp
@@ -43,5 +44,7 @@ yarn-error.log*
 next-env.d.ts
 
 # playwright
-playwright-report/
-test-results/
+playwright-report
+test-results
+
+**/.claude/settings.local.json

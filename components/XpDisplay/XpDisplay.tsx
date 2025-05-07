@@ -79,8 +79,6 @@ const XpDisplay: React.FC<XpDisplayProps> = ({ compact = false, onClick, transpa
       // User has leveled up, enable the leveledUp animation
       setLeveledUp(true);
       localStorage.setItem('leveledUp', 'true');
-      
-      console.log('Level up detected! Animation enabled.');
     }
     
     // Update references
