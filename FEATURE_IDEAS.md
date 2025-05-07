@@ -33,6 +33,10 @@ This document captures feature ideas for future development of the Morse code tr
   - Countdown audio cues
   - Race finish sound effects
 
+### 5. Scoring and Mastery Refinements
+- **Send Mode Scoring Balance**: Refine send mode scoring to feel more satisfying like copy mode, accounting for the additional time needed for keying complete characters
+- **Mastery Progression**: Adjust mastery calculation in send mode to avoid leaving characters at "almost mastered" state
+
 ## User Experience
 
 ### 1. Theme Customization
