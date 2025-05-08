@@ -594,11 +594,26 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       completedLevels: state.completedLevels
     });
     
-    // Get the selected level for the target mode (or race → copy)
+    // Get the target mode (or race → copy)
     const targetMode = mode === 'race' ? 'copy' : mode;
-    const targetLevelId = state.selectedLevels[targetMode] || state.selectedLevelId;
     
-    console.log(`[AppState] Target mode: ${targetMode}, target level ID: ${targetLevelId}`);
+    // Check if we have a saved level for this mode
+    let targetLevelId = state.selectedLevels[targetMode];
+    
+    // If no saved level exists for this mode, default to level-1
+    if (!targetLevelId) {
+      console.log(`[AppState] No saved level for ${targetMode} mode, defaulting to level-1`);
+      targetLevelId = trainingLevels[0].id;
+      
+      // Save this default to localStorage for the mode
+      if (typeof window !== 'undefined') {
+        const selectedLevelKey = `morseSelectedLevel${targetMode.charAt(0).toUpperCase() + targetMode.slice(1)}`;
+        console.log(`[AppState] Saving default level to localStorage: ${selectedLevelKey}=${targetLevelId}`);
+        localStorage.setItem(selectedLevelKey, targetLevelId);
+      }
+    } else {
+      console.log(`[AppState] Found saved level for ${targetMode} mode: ${targetLevelId}`);
+    }
     
     setState(prev => ({
       ...prev,
