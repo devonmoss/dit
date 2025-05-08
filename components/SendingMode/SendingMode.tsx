@@ -711,31 +711,31 @@ const SendingMode: React.FC = () => {
     };
   }, []);
   
-  // Add global event interceptor as an extra safety measure
-  useEffect(() => {
-    // Only add this when test results are showing
-    if (!testResults) return;
+  // // Add global event interceptor as an extra safety measure
+  // useEffect(() => {
+  //   // Only add this when test results are showing
+  //   if (!testResults) return;
     
-    const blockKeyerKeys = (e: KeyboardEvent) => {
-      // Block arrow keys and tab which are used by the keyer
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
-          e.key === 'ArrowUp' || e.key === 'ArrowDown' || 
-          e.key === 'Tab' || e.code === 'ControlLeft' || e.code === 'ControlRight') {
-        console.log(`[SendingMode] Blocking keyer key event: ${e.key} during results display`);
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
+  //   const blockKeyerKeys = (e: KeyboardEvent) => {
+  //     // Block arrow keys and tab which are used by the keyer
+  //     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
+  //         e.key === 'ArrowUp' || e.key === 'ArrowDown' || 
+  //         e.key === 'Tab' || e.code === 'ControlLeft' || e.code === 'ControlRight') {
+  //       console.log(`[SendingMode] Blocking keyer key event: ${e.key} during results display`);
+  //       e.preventDefault();
+  //       e.stopPropagation();
+  //     }
+  //   };
     
-    // Capture phase to intercept before any other handlers
-    document.addEventListener('keydown', blockKeyerKeys, { capture: true });
-    document.addEventListener('keyup', blockKeyerKeys, { capture: true });
+  //   // Capture phase to intercept before any other handlers
+  //   document.addEventListener('keydown', blockKeyerKeys, { capture: true });
+  //   document.addEventListener('keyup', blockKeyerKeys, { capture: true });
     
-    return () => {
-      document.removeEventListener('keydown', blockKeyerKeys, { capture: true });
-      document.removeEventListener('keyup', blockKeyerKeys, { capture: true });
-    };
-  }, [testResults]);
+  //   return () => {
+  //     document.removeEventListener('keydown', blockKeyerKeys, { capture: true });
+  //     document.removeEventListener('keyup', blockKeyerKeys, { capture: true });
+  //   };
+  // }, [testResults]);
   
   // Add escape key handler
   useEffect(() => {
@@ -752,8 +752,10 @@ const SendingMode: React.FC = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [state.testActive, finishTest]);
   
-  // Clean restart with time recording 
-  const startTestAndRecordTime = useCallback(() => {
+  // Create a unified function to start a level (whether initial, repeat, or next level)
+  const startLevel = useCallback((levelId: string = state.selectedLevelId) => {
+    console.log(`[SendingMode] Starting level ${levelId} with unified function`);
+    
     // Reset all state
     setCurrentChar('');
     setMorseOutput('');
@@ -768,44 +770,34 @@ const SendingMode: React.FC = () => {
     // Reset recently mastered character
     recentlyMasteredCharRef.current = null;
     
-    // Clear any pending keyer state
-    keyerRef.current.clear();
-    
-    // Set test start time
-    const now = Date.now();
-    testStartTimeRef.current = now;
-    setTestStartTime(now);
-    
     // Update the current level ID ref
-    currentLevelIdRef.current = state.selectedLevelId;
-    console.log(`[SendingMode] startTestAndRecordTime - setting currentLevelIdRef to: ${currentLevelIdRef.current}`);
+    currentLevelIdRef.current = levelId;
     
-    // Start the test in the AppState using the current selected level
-    startTest();
+    // Find the level data
+    const level = trainingLevels.find(l => l.id === levelId);
+    if (!level) {
+      console.error(`[SendingMode] Could not find level with ID ${levelId}`);
+      return;
+    }
     
-    // Start the first question after a short delay
-    setTimeout(() => {
-      nextQuestion();
-    }, 150);
-  }, [nextQuestion, startTest, state.selectedLevelId, keyerRef]);
-  
-  // Handle moving to specific level
-  const startTestWithExplicitLevel = useCallback((levelId: string) => {
-    console.log(`[SendingMode] Starting test with explicit level: ${levelId}`);
+    // Always explicitly select the level to ensure state is updated
+    selectLevel(levelId);
     
-    // Reset all state
-    setCurrentChar('');
-    setMorseOutput('');
-    setFeedbackState('none');
-    setIncorrectChar('');
-    setStrikeCount(0);
-    strikeCountRef.current = 0; // Reset strike count ref
-    setResponseTimes([]);
-    setMistakesMap({});
-    setTestResults(null);
+    console.log(`[SendingMode] Level found: ${level.id}. Initializing with ${level.chars.length} characters`);
     
-    // Reset recently mastered character
-    recentlyMasteredCharRef.current = null;
+    // Initialize level characters and character points
+    levelCharsRef.current = [...level.chars];
+    
+    // Create a new object with character points for the level
+    const levelCharPoints: Record<string, number> = {};
+    level.chars.forEach(char => {
+      // Initialize with app state values or 0
+      levelCharPoints[char] = state.charPoints[char] || 0;
+    });
+    
+    // Update both the state and ref
+    setLocalCharPoints(levelCharPoints);
+    charPointsRef.current = { ...levelCharPoints };
     
     // Clear any pending keyer state
     keyerRef.current.clear();
@@ -815,58 +807,48 @@ const SendingMode: React.FC = () => {
     testStartTimeRef.current = now;
     setTestStartTime(now);
     
-    // Update the current level ID ref to match the explicit level ID
-    currentLevelIdRef.current = levelId;
-    console.log(`[SendingMode] startTestWithExplicitLevel - setting currentLevelIdRef to: ${currentLevelIdRef.current}`);
-    
-    // Start test with level ID
+    // Start the test in the AppState
     startTestWithLevelId(levelId);
     
-    // Start the first question after a short delay
+    // Start the first question after a short delay to ensure everything is initialized
     setTimeout(() => {
+      console.log(`[SendingMode] Calling nextQuestion for level ${levelId}`);
       nextQuestion();
     }, 150);
-  }, [startTestWithLevelId, nextQuestion, keyerRef]);
+  }, [selectLevel, startTestWithLevelId, nextQuestion, state.selectedLevelId, state.charPoints]);
   
+  // Replace the existing test-starting functions
+  const startTestAndRecordTime = useCallback(() => {
+    startLevel(state.selectedLevelId);
+  }, [startLevel, state.selectedLevelId]);
+
+  const startTestWithExplicitLevel = useCallback((levelId: string) => {
+    startLevel(levelId);
+  }, [startLevel]);
+
   // Handle level repeat
   const handleRepeatLevel = useCallback(() => {
     console.log(`[SendingMode] handleRepeatLevel called, restarting current level`);
     
-    // Reset test results
-    setTestResults(null);
-    
     // Cancel any pending timers
     if (feedbackTimerRef.current !== null) {
       clearTimeout(feedbackTimerRef.current);
       feedbackTimerRef.current = null;
     }
     
-    // Start the test
-    startTestAndRecordTime();
-  }, [startTestAndRecordTime]);
-  
+    // Use the unified level start function
+    startLevel(state.selectedLevelId);
+  }, [startLevel, state.selectedLevelId]);
+
   // Handle next level
   const handleNextLevel = useCallback(() => {
     console.log(`[SendingMode] handleNextLevel called, current level: ${state.selectedLevelId}, ref level: ${currentLevelIdRef.current}`);
     
-    // Reset test results
-    setTestResults(null);
-    
     // Cancel any pending timers
     if (feedbackTimerRef.current !== null) {
       clearTimeout(feedbackTimerRef.current);
       feedbackTimerRef.current = null;
     }
-    
-    // Reset state
-    setCurrentChar('');
-    setMorseOutput('');
-    setFeedbackState('none');
-    setIncorrectChar('');
-    setStrikeCount(0);
-    strikeCountRef.current = 0; // Reset strike count ref
-    setResponseTimes([]);
-    setMistakesMap({});
     
     // Get current level index
     const currentLevelIndex = trainingLevels.findIndex(l => l.id === state.selectedLevelId);
@@ -876,30 +858,15 @@ const SendingMode: React.FC = () => {
       const nextLevel = trainingLevels[currentLevelIndex + 1];
       console.log(`[SendingMode] Moving to next level: ${nextLevel.id}`);
       
-      // Update level ID ref
-      currentLevelIdRef.current = nextLevel.id;
-      console.log(`[SendingMode] Updated currentLevelIdRef to: ${currentLevelIdRef.current}`);
-      
-      // Explicitly select the next level to update both state and UI
-      selectLevel(nextLevel.id);
-      
-      // Set the test start time
-      setTestStartTime(Date.now());
-      
-      // Start test with the next level ID
-      console.log(`[SendingMode] Starting test with next level: ${nextLevel.id}`);
-      startTestWithExplicitLevel(nextLevel.id);
+      // Start the next level with the unified function
+      startLevel(nextLevel.id);
     } else {
       console.log(`[SendingMode] Already at the last level, restarting current level`);
       
-      // Update level ID ref for consistency
-      currentLevelIdRef.current = state.selectedLevelId;
-      console.log(`[SendingMode] Updated currentLevelIdRef for restart: ${currentLevelIdRef.current}`);
-      
       // Restart current level if at end
-      startTestAndRecordTime();
+      startLevel(state.selectedLevelId);
     }
-  }, [selectLevel, startTestWithExplicitLevel, startTestAndRecordTime, state.selectedLevelId]);
+  }, [startLevel, state.selectedLevelId]);
   
   // Add missing declarations needed for the JSX
   
