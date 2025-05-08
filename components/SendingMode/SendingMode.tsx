@@ -297,6 +297,22 @@ const SendingMode: React.FC = () => {
     }
     
     console.debug(`unknown morse code detected: ${code}`);
+    
+    // Clear the morse output display so user knows the sequence was invalid
+    setMorseOutput('');
+    
+    // Provide visual feedback (optional) by briefly flashing incorrect feedback
+    setFeedbackState('incorrect');
+    setIncorrectChar('?');
+    
+    // Clear incorrect feedback after a short delay
+    if (feedbackTimerRef.current !== null) {
+      clearTimeout(feedbackTimerRef.current);
+    }
+    
+    feedbackTimerRef.current = window.setTimeout(() => {
+      setFeedbackState('none');
+    }, 500);
   }, []);
   
   const playElement = useCallback((symbol: '.' | '-') => {
