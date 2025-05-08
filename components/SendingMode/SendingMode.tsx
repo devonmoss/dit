@@ -21,7 +21,7 @@ interface CharTiming {
 }
 
 const SendingMode: React.FC = () => {
-  const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel, startTestWithLevelId } = useAppState();
+  const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel, startTestWithLevelId, setSendWpm } = useAppState();
   // Local UI state
   const [currentChar, setCurrentChar] = useState('');
   const [morseOutput, setMorseOutput] = useState('');
@@ -313,6 +313,12 @@ const SendingMode: React.FC = () => {
   
   // Present next question - now using direct level chars
   const nextQuestion = useCallback(() => {
+    // Skip if test results are showing
+    if (testResults) {
+      console.log('[SendingMode] nextQuestion called while test results are showing - ignoring');
+      return Promise.resolve();
+    }
+    
     const nextChar = pickNextChar();
     
     if (!nextChar) {
@@ -339,7 +345,7 @@ const SendingMode: React.FC = () => {
     
     // Return a promise that resolves immediately
     return Promise.resolve();
-  }, [pickNextChar, currentLevel]);
+  }, [pickNextChar, currentLevel, testResults]);
   
   // Store current character in a ref for stable access
   const currentCharRef = useRef<string>(currentChar);
@@ -348,6 +354,26 @@ const SendingMode: React.FC = () => {
   useEffect(() => {
     currentCharRef.current = currentChar;
   }, [currentChar]);
+  
+  // Effect to handle keyer installation/uninstallation based on testResults
+  useEffect(() => {
+    // If test results are showing, uninstall the keyer to prevent inputs
+    if (testResults) {
+      console.log(`[SendingMode] Test results screen is showing, uninstalling keyer`);
+      keyerRef.current.uninstall();
+    } 
+    // Only reinstall keyer when state.testActive is true and we're not showing results
+    else if (state.testActive && !testResults) {
+      console.log(`[SendingMode] Test is active and no results showing, installing keyer`);
+      keyerRef.current.install();
+    }
+    
+    // Cleanup on component unmount or mode change
+    return () => {
+      console.log(`[SendingMode] Cleanup effect - uninstalling keyer`);
+      keyerRef.current.uninstall();
+    };
+  }, [testResults, state.testActive]);
   
   // Finish the test
   const finishTest = useCallback((completed = true) => {
@@ -386,8 +412,26 @@ const SendingMode: React.FC = () => {
       saveResponseTimes(responseTimes);
     }
     
-    // Uninstall keyer to disable key listening
+    // COMPREHENSIVE CLEANUP: Cancel ALL timers and operations
+    
+    // 1. Uninstall keyer to disable key listening
+    console.log(`[SendingMode] Uninstalling keyer in finishTest`);
     keyerRef.current.uninstall();
+    keyerRef.current.clear();
+    
+    // 2. Clear any pending feedback timers
+    if (feedbackTimerRef.current !== null) {
+      console.log(`[SendingMode] Clearing feedback timer in finishTest`);
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
+    }
+    
+    // 3. Stop any audio that might be playing
+    stopSound();
+    
+    // 4. Clear current character to prevent further processing
+    setCurrentChar('');
+    currentCharRef.current = '';
     
     console.log(`[SendingMode] Calling endTest(${completed}, ${levelIdToComplete}) which will mark the level completed if appropriate`);
     
@@ -401,7 +445,7 @@ const SendingMode: React.FC = () => {
     });
     
     console.log(`[SendingMode] Test results set, UI should now show completion dialog`);
-  }, [testStartTime, responseTimes, saveResponseTimes, endTest, state.selectedLevelId, state.mode]);
+  }, [testStartTime, responseTimes, saveResponseTimes, endTest, state.selectedLevelId, state.mode, stopSound]);
   
   // Clean restart with time recording 
   const startTestAndRecordTime = useCallback(() => {
@@ -421,9 +465,6 @@ const SendingMode: React.FC = () => {
     
     // Clear any pending keyer state
     keyerRef.current.clear();
-    
-    // Make sure the keyer is installed and listening for key events
-    keyerRef.current.install();
     
     // Set test start time
     const now = Date.now();
@@ -465,9 +506,6 @@ const SendingMode: React.FC = () => {
     // Clear any pending keyer state
     keyerRef.current.clear();
     
-    // Make sure the keyer is installed and listening for key events
-    keyerRef.current.install();
-    
     // Set test start time - both ref and state
     const now = Date.now();
     testStartTimeRef.current = now;
@@ -488,6 +526,12 @@ const SendingMode: React.FC = () => {
   
   // Handle character input from the keyer
   const handleCharacter = useCallback((char: string) => {
+    // Ignore character input if test results are showing
+    if (testResults) {
+      console.log('[SendingMode] Ignoring character input while test results are showing');
+      return;
+    }
+    
     if (!char) {
       console.log('[SendingMode] Received empty character, ignoring');
       return;
@@ -536,6 +580,12 @@ const SendingMode: React.FC = () => {
       
       // Delay before next question or finishing
       feedbackTimerRef.current = window.setTimeout(() => {
+        // IMPORTANT: Guard against continuing if test was finished while timer was active
+        if (testResults) {
+          console.log('[SendingMode] Test results are showing after feedback delay - not continuing');
+          return;
+        }
+        
         // Use merged points from both sources for most accuracy
         const mergedPoints: Record<string, number> = {};
         levelCharsRef.current.forEach(char => {
@@ -618,6 +668,12 @@ const SendingMode: React.FC = () => {
           
           // Show the incorrect feedback for a moment before finishing
           feedbackTimerRef.current = window.setTimeout(() => {
+            // Guard against continuing if test was finished while timer was active
+            if (testResults) {
+              console.log('[SendingMode] Test results are showing after strike limit reached - not calling finishTest again');
+              return;
+            }
+            
             finishTest(false);
           }, 1000);
           return;
@@ -634,6 +690,12 @@ const SendingMode: React.FC = () => {
       
       // Clear feedback after delay but KEEP the same character
       feedbackTimerRef.current = window.setTimeout(() => {
+        // Guard against continuing if test was finished while timer was active
+        if (testResults) {
+          console.log('[SendingMode] Test results are showing after incorrect feedback delay - not clearing feedback');
+          return;
+        }
+        
         setFeedbackState('none');
         // Reset morse output so they can try again
         setMorseOutput('');
@@ -651,8 +713,9 @@ const SendingMode: React.FC = () => {
     strikeCount,
     playErrorSound,
     nextQuestion,
-    finishTest
-    // Removed currentLevel and charStartTime since we use refs now
+    finishTest,
+    testResults
+    // Added testResults dependency
   ]);
   
   // Handle an element (dot/dash) from the keyer
@@ -665,6 +728,15 @@ const SendingMode: React.FC = () => {
   
   // Create the keyer with stabilized callbacks
   const onWpmChange = useCallback((newWpm: number) => {
+    // Call the setSendWpm function to update app state WPM
+    if (newWpm > 0) {
+      setSendWpm(newWpm);
+    }
+  }, [setSendWpm]);
+  
+  // Empty onWord callback to avoid unnecessary console messages
+  const onWord = useCallback(() => {
+    // Intentionally empty to prevent "No onWord callback provided" messages
   }, []);
   
   // Create the keyer
@@ -676,6 +748,7 @@ const SendingMode: React.FC = () => {
     playElement: playElement,
     onCharacter: handleCharacter,
     onWpmChange,
+    onWord,
     onInvalidCharacter: (code) => {
       console.debug(`unknown morse code detected: ${code}`);
     }
@@ -726,17 +799,35 @@ const SendingMode: React.FC = () => {
     }
   }, [currentChar, morseOutput, localCharPoints, keyer, state, feedbackState, charStartTime]);
   
-  // Handle repeat level
+  // Handle level repeat
   const handleRepeatLevel = useCallback(() => {
+    console.log(`[SendingMode] handleRepeatLevel called, restarting current level`);
+    
+    // Reset test results
     setTestResults(null);
+    
+    // Cancel any pending timers
+    if (feedbackTimerRef.current !== null) {
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
+    }
+    
+    // Start the test
     startTestAndRecordTime();
   }, [startTestAndRecordTime]);
   
-  // Handle next level - aligned with TrainingMode
+  // Handle next level
   const handleNextLevel = useCallback(() => {
     console.log(`[SendingMode] handleNextLevel called, current level: ${state.selectedLevelId}, ref level: ${currentLevelIdRef.current}`);
     
+    // Reset test results
     setTestResults(null);
+    
+    // Cancel any pending timers
+    if (feedbackTimerRef.current !== null) {
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
+    }
     
     // Reset state
     setCurrentChar('');
