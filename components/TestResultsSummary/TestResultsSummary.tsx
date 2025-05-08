@@ -60,16 +60,18 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Tab') {
         e.preventDefault();
+        console.log(`[TestResultsSummary] Tab key pressed, calling onRepeat for level ${levelId}`);
         onRepeat();
       } else if (e.key === 'Enter' && completed) {
         e.preventDefault();
+        console.log(`[TestResultsSummary] Enter key pressed, calling onNext for level ${levelId}, mode ${state.mode}`);
         onNext();
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onRepeat, onNext, completed]);
+  }, [onRepeat, onNext, completed, levelId, state.mode]);
   
   // Fetch historical average times for user if logged in
   useEffect(() => {
@@ -397,13 +399,19 @@ const TestResultsSummary: React.FC<TestResultsSummaryProps> = ({
       <div className={styles.actions}>
         <button 
           className={styles.repeatButton} 
-          onClick={onRepeat}
+          onClick={() => {
+            console.log(`[TestResultsSummary] Repeat button clicked for level ${levelId}`);
+            onRepeat();
+          }}
         >
           Repeat Lesson
         </button>
         <button 
           className={styles.nextButton} 
-          onClick={onNext}
+          onClick={() => {
+            console.log(`[TestResultsSummary] Next button clicked for level ${levelId}, mode ${state.mode}`);
+            onNext();
+          }}
           disabled={!completed}
         >
           Next Lesson

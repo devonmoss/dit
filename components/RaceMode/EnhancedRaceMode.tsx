@@ -46,7 +46,6 @@ import {
   useRacePlayStage,
   useRaceResultsStage
 } from '../../hooks/raceStages';
-import { trackRaceStarted } from '../../utils/analytics';
 
 const EnhancedRaceMode: React.FC = () => {
   const router = useRouter();
@@ -367,9 +366,6 @@ const EnhancedRaceMode: React.FC = () => {
     if (!raceId) return;
     
     try {
-      // Track race started event with the number of participants and race mode
-      trackRaceStarted(participants.length, raceMode);
-      
       // Update race status to countdown through API
       await raceService.startRaceCountdown(raceId);
       
@@ -380,7 +376,7 @@ const EnhancedRaceMode: React.FC = () => {
     } catch (err) {
       console.error('Error starting race:', err);
     }
-  }, [raceId, participants.length, raceMode]);
+  }, [raceId]);
   
   // Start racing after countdown
   const startRacing = useCallback(async () => {
