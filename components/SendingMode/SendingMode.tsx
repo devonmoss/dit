@@ -92,38 +92,8 @@ const SendingMode: React.FC = () => {
   const isCheckpoint = currentLevel?.type === 'checkpoint';
   const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
   
-  // Log information about the current level for debugging
-  // useEffect(() => {
-  //   if (currentLevel) {
-  //     console.log('[DEBUG] Current level loaded:', currentLevel.id);
-  //     console.log('[DEBUG] Level type:', currentLevel.type);
-  //     console.log('[DEBUG] Is checkpoint:', isCheckpoint);
-  //     console.log('[DEBUG] Strike limit:', strikeLimit);
-  //   }
-  // }, [currentLevel, isCheckpoint, strikeLimit]);
-  
-  // Debug logging to monitor character points in refs and state
-  // useEffect(() => {
-  //   if (process.env.NODE_ENV === 'development') {
-  //     console.log('[DEBUG] Character Points Changed:');
-  //     console.log('[DEBUG] - In State:', localCharPoints);
-  //     console.log('[DEBUG] - In Ref:', charPointsRef.current);
-  //   }
-  // }, [localCharPoints]);
-  
-  // Debug logging for troubleshooting
-  // useEffect(() => {
-  //   if (process.env.NODE_ENV === 'development') {
-  //     console.log('---------------------------------------');
-  //     console.log(`[${new Date().toISOString()}] State Update`);
-  //     console.log('Level ID:', state.selectedLevelId);
-  //     console.log('Current Level:', currentLevel);
-  //     console.log('Level Characters:', currentLevel?.chars);
-  //     console.log('Local Character Points:', localCharPoints);
-  //     console.log('testActive:', state.testActive);
-  //     console.log('---------------------------------------');
-  //   }
-  // }, [state.selectedLevelId, currentLevel, localCharPoints, state.testActive]);
+  // Reference to track if the keyer should be active
+  const keyerActiveRef = useRef<boolean>(false);
   
   // Initialize local character points from app state when level changes
   useEffect(() => {
@@ -237,6 +207,12 @@ const SendingMode: React.FC = () => {
   
   // Play element (dot/dash)
   const playElement = useCallback((symbol: '.' | '-') => {
+    // Skip if keyer should be inactive
+    if (!keyerActiveRef.current) {
+      console.log('[SendingMode] Ignoring play element request - keyer is inactive');
+      return;
+    }
+    
     if (!audioContextRef.current || !gainNodeRef.current) return;
     if (symbol !== '.' && symbol !== '-') return;
     
@@ -360,24 +336,56 @@ const SendingMode: React.FC = () => {
     // If test results are showing, uninstall the keyer to prevent inputs
     if (testResults) {
       console.log(`[SendingMode] Test results screen is showing, uninstalling keyer`);
+      keyerActiveRef.current = false;
       keyerRef.current.uninstall();
     } 
     // Only reinstall keyer when state.testActive is true and we're not showing results
     else if (state.testActive && !testResults) {
       console.log(`[SendingMode] Test is active and no results showing, installing keyer`);
+      keyerActiveRef.current = true;
       keyerRef.current.install();
     }
     
     // Cleanup on component unmount or mode change
     return () => {
       console.log(`[SendingMode] Cleanup effect - uninstalling keyer`);
+      keyerActiveRef.current = false;
       keyerRef.current.uninstall();
     };
   }, [testResults, state.testActive]);
   
+  // Add a global event interceptor for keyer keys when results are shown
+  useEffect(() => {
+    // Only add this when test results are showing
+    if (!testResults) return;
+    
+    const blockKeyerKeys = (e: KeyboardEvent) => {
+      // Block arrow keys and tab which are used by the keyer
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
+          e.key === 'ArrowUp' || e.key === 'ArrowDown' || 
+          e.key === 'Tab' || e.code === 'ControlLeft' || e.code === 'ControlRight') {
+        console.log(`[SendingMode] Blocking keyer key event: ${e.key} during results display`);
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    
+    // Capture phase to intercept before any other handlers
+    document.addEventListener('keydown', blockKeyerKeys, { capture: true });
+    document.addEventListener('keyup', blockKeyerKeys, { capture: true });
+    
+    return () => {
+      document.removeEventListener('keydown', blockKeyerKeys, { capture: true });
+      document.removeEventListener('keyup', blockKeyerKeys, { capture: true });
+    };
+  }, [testResults]);
+  
   // Finish the test
   const finishTest = useCallback((completed = true) => {
     console.log(`[SendingMode] Finishing test, completed: ${completed}, state.selectedLevelId: ${state.selectedLevelId}, ref.level: ${currentLevelIdRef.current}, mode: ${state.mode}`);
+    
+    // Immediately mark the keyer as inactive to block all callbacks
+    keyerActiveRef.current = false;
     
     // Use the ref for the level ID instead of state, which is more reliable
     const levelIdToComplete = currentLevelIdRef.current;
@@ -526,6 +534,12 @@ const SendingMode: React.FC = () => {
   
   // Handle character input from the keyer
   const handleCharacter = useCallback((char: string) => {
+    // Skip if keyer should be inactive
+    if (!keyerActiveRef.current) {
+      console.log('[SendingMode] Ignoring character input - keyer is inactive');
+      return;
+    }
+    
     // Ignore character input if test results are showing
     if (testResults) {
       console.log('[SendingMode] Ignoring character input while test results are showing');
@@ -720,6 +734,12 @@ const SendingMode: React.FC = () => {
   
   // Handle an element (dot/dash) from the keyer
   const handleElement = useCallback((symbol: '.' | '-') => {
+    // Skip if keyer should be inactive
+    if (!keyerActiveRef.current) {
+      console.log('[SendingMode] Ignoring element input - keyer is inactive');
+      return;
+    }
+    
     // Always append to morse output regardless of state
     if (symbol === '.' || symbol === '-') {
       setMorseOutput(prev => prev + symbol);
@@ -739,6 +759,17 @@ const SendingMode: React.FC = () => {
     // Intentionally empty to prevent "No onWord callback provided" messages
   }, []);
   
+  // Invalid character handler with protection
+  const handleInvalidCharacter = useCallback((code: string) => {
+    // Skip if keyer should be inactive
+    if (!keyerActiveRef.current) {
+      console.log('[SendingMode] Ignoring invalid character - keyer is inactive');
+      return;
+    }
+    
+    console.debug(`unknown morse code detected: ${code}`);
+  }, []);
+  
   // Create the keyer
   const keyer = useIambicKeyer({
     wpm: state.sendWpm,
@@ -749,9 +780,7 @@ const SendingMode: React.FC = () => {
     onCharacter: handleCharacter,
     onWpmChange,
     onWord,
-    onInvalidCharacter: (code) => {
-      console.debug(`unknown morse code detected: ${code}`);
-    }
+    onInvalidCharacter: handleInvalidCharacter
   });
   
   // Store keyer in ref for stable access
