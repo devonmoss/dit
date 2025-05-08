@@ -301,6 +301,14 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     return initialState;
   });
   
+  // Apply theme to document when component mounts or theme changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && state.theme) {
+      document.documentElement.setAttribute('data-theme', state.theme);
+      console.log(`[AppState] Applied theme on initialization/change: ${state.theme}`);
+    }
+  }, [state.theme]);
+  
   // Level management functions
   const selectLevel = (id: string) => {
     // Determine which mode's selected level to update
@@ -579,10 +587,21 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
   
   const setTheme = (theme: Theme) => {
+    // Update state
     setState(prev => ({
       ...prev,
       theme: theme,
     }));
+    
+    // Apply theme to document
+    if (typeof window !== 'undefined') {
+      // Set the data-theme attribute on documentElement (html tag)
+      document.documentElement.setAttribute('data-theme', theme);
+      
+      // Store theme in localStorage
+      localStorage.setItem('morseTheme', theme);
+      console.log(`[AppState] Theme set to ${theme} and saved to localStorage`);
+    }
   };
   
   // Mode and test type
