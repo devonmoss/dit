@@ -21,7 +21,7 @@ interface CharTiming {
 }
 
 const SendingMode: React.FC = () => {
-  const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel, startTestWithLevelId, setSendWpm } = useAppState();
+  const { state, startTest, endTest, updateCharPoints, saveResponseTimes, selectLevel, startTestWithLevelId, setSendWpm, markLevelCompleted } = useAppState();
   // Local UI state
   const [currentChar, setCurrentChar] = useState('');
   const [morseOutput, setMorseOutput] = useState('');
@@ -93,74 +93,7 @@ const SendingMode: React.FC = () => {
   const strikeLimit = isCheckpoint ? currentLevel?.strikeLimit : undefined;
   
   // Reference to track if the keyer should be active
-  const keyerActiveRef = useRef<boolean>(false);
-  
-  // Initialize local character points from app state when level changes
-  useEffect(() => {
-    if (currentLevel) {
-      // Store the current level's chars in a ref for immediate access across render cycles
-      levelCharsRef.current = [...currentLevel.chars];
-      
-      // Create a new object with ONLY the character points for the current level
-      const levelCharPoints: Record<string, number> = {};
-      currentLevel.chars.forEach(char => {
-        // Initialize with app state values or 0
-        levelCharPoints[char] = state.charPoints[char] || 0;
-      });
-      
-      // Update both the state and ref
-      setLocalCharPoints(levelCharPoints);
-      charPointsRef.current = { ...levelCharPoints };
-    }
-  }, [currentLevel, state.charPoints, state.selectedLevelId]);
-  
-  // Initialize audio on first render
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        audioContextRef.current = ctx;
-        
-        const gain = ctx.createGain();
-        gain.gain.value = 0.5;
-        gain.connect(ctx.destination);
-        gainNodeRef.current = gain;
-      } catch (e) {
-        console.error('Failed to initialize audio context:', e);
-      }
-    }
-    
-    return () => {
-      stopSound();
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(e => console.error('Error closing audio context:', e));
-      }
-    };
-  }, []);
-  
-  // Pick next character based on mastery weights - using consistent values
-  const pickNextChar = useCallback(() => {
-    if (levelCharsRef.current.length === 0) {
-      console.error('[SendingMode] No characters in level chars ref');
-      return '';
-    }
-    
-    // For character selection, use a merged version with the highest values from both sources
-    const mergedPoints: Record<string, number> = {};
-    levelCharsRef.current.forEach(char => {
-      const stateValue = localCharPoints[char] || 0;
-      const refValue = charPointsRef.current[char] || 0;
-      mergedPoints[char] = Math.max(stateValue, refValue);
-    });
-    
-    // Use the merged points for character selection
-    return selectNextCharacter(
-      levelCharsRef.current,
-      mergedPoints,
-      TARGET_POINTS,
-      recentlyMasteredCharRef.current
-    );
-  }, [localCharPoints]);
+  const keyerEnabledRef = useRef<boolean>(false);
   
   // Stop any current sound
   const stopSound = useCallback(() => {
@@ -204,42 +137,6 @@ const SendingMode: React.FC = () => {
       console.error('Error playing error sound:', e);
     }
   }, [stopSound]);
-  
-  // Play element (dot/dash)
-  const playElement = useCallback((symbol: '.' | '-') => {
-    // Skip if keyer should be inactive
-    if (!keyerActiveRef.current) {
-      console.log('[SendingMode] Ignoring play element request - keyer is inactive');
-      return;
-    }
-    
-    if (!audioContextRef.current || !gainNodeRef.current) return;
-    if (symbol !== '.' && symbol !== '-') return;
-    
-    stopSound();
-    
-    try {
-      // Calculate timing based on current WPM
-      const unitMs = 1200 / state.sendWpm;
-      const duration = symbol === '.' ? unitMs : unitMs * 3;
-      
-      const osc = audioContextRef.current.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = 600;
-      osc.connect(gainNodeRef.current);
-      
-      oscillatorRef.current = osc;
-      osc.start();
-      
-      setTimeout(() => {
-        if (oscillatorRef.current === osc) {
-          stopSound();
-        }
-      }, duration);
-    } catch (e) {
-      console.error('Error playing element:', e);
-    }
-  }, [state.sendWpm, stopSound]);
   
   // Calculate response time points
   const calculatePointsForTime = useCallback((responseTime: number) => {
@@ -287,6 +184,30 @@ const SendingMode: React.FC = () => {
     }
   }, [updateCharPoints]);
   
+  // Pick next character based on mastery weights - using consistent values
+  const pickNextChar = useCallback(() => {
+    if (levelCharsRef.current.length === 0) {
+      console.error('[SendingMode] No characters in level chars ref');
+      return '';
+    }
+    
+    // For character selection, use a merged version with the highest values from both sources
+    const mergedPoints: Record<string, number> = {};
+    levelCharsRef.current.forEach(char => {
+      const stateValue = localCharPoints[char] || 0;
+      const refValue = charPointsRef.current[char] || 0;
+      mergedPoints[char] = Math.max(stateValue, refValue);
+    });
+    
+    // Use the merged points for character selection
+    return selectNextCharacter(
+      levelCharsRef.current,
+      mergedPoints,
+      TARGET_POINTS,
+      recentlyMasteredCharRef.current
+    );
+  }, [localCharPoints]);
+  
   // Present next question - now using direct level chars
   const nextQuestion = useCallback(() => {
     // Skip if test results are showing
@@ -331,61 +252,106 @@ const SendingMode: React.FC = () => {
     currentCharRef.current = currentChar;
   }, [currentChar]);
   
-  // Effect to handle keyer installation/uninstallation based on testResults
-  useEffect(() => {
-    // If test results are showing, uninstall the keyer to prevent inputs
-    if (testResults) {
-      console.log(`[SendingMode] Test results screen is showing, uninstalling keyer`);
-      keyerActiveRef.current = false;
-      keyerRef.current.uninstall();
-    } 
-    // Only reinstall keyer when state.testActive is true and we're not showing results
-    else if (state.testActive && !testResults) {
-      console.log(`[SendingMode] Test is active and no results showing, installing keyer`);
-      keyerActiveRef.current = true;
-      keyerRef.current.install();
+  // Safe wrapper to clear keyer
+  const safeKeyClear = useCallback(() => {
+    if (keyerRef.current) {
+      keyerRef.current.clear();
+    }
+  }, []);
+  
+  // Create callbacks for the keyer first
+  const handleElement = useCallback((symbol: '.' | '-') => {
+    // Skip if keyer should be inactive
+    if (!keyerEnabledRef.current) {
+      console.log('[SendingMode] Ignoring element input - keyer is inactive');
+      return;
     }
     
-    // Cleanup on component unmount or mode change
-    return () => {
-      console.log(`[SendingMode] Cleanup effect - uninstalling keyer`);
-      keyerActiveRef.current = false;
-      keyerRef.current.uninstall();
-    };
-  }, [testResults, state.testActive]);
+    // Always append to morse output regardless of state
+    if (symbol === '.' || symbol === '-') {
+      setMorseOutput(prev => prev + symbol);
+    }
+  }, []);
   
-  // Add a global event interceptor for keyer keys when results are shown
-  useEffect(() => {
-    // Only add this when test results are showing
-    if (!testResults) return;
-    
-    const blockKeyerKeys = (e: KeyboardEvent) => {
-      // Block arrow keys and tab which are used by the keyer
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
-          e.key === 'ArrowUp' || e.key === 'ArrowDown' || 
-          e.key === 'Tab' || e.code === 'ControlLeft' || e.code === 'ControlRight') {
-        console.log(`[SendingMode] Blocking keyer key event: ${e.key} during results display`);
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    
-    // Capture phase to intercept before any other handlers
-    document.addEventListener('keydown', blockKeyerKeys, { capture: true });
-    document.addEventListener('keyup', blockKeyerKeys, { capture: true });
-    
-    return () => {
-      document.removeEventListener('keydown', blockKeyerKeys, { capture: true });
-      document.removeEventListener('keyup', blockKeyerKeys, { capture: true });
-    };
-  }, [testResults]);
+  // Move the keyer-related functions up before handleCharacter
+  const onWpmChange = useCallback((newWpm: number) => {
+    // Call the setSendWpm function to update app state WPM
+    if (newWpm > 0) {
+      setSendWpm(newWpm);
+    }
+  }, [setSendWpm]);
   
-  // Finish the test
+  const onWord = useCallback(() => {
+    // Intentionally empty to prevent "No onWord callback provided" messages
+  }, []);
+  
+  const handleInvalidCharacter = useCallback((code: string) => {
+    // Skip if keyer should be inactive
+    if (!keyerEnabledRef.current) {
+      console.log('[SendingMode] Ignoring invalid character - keyer is inactive');
+      return;
+    }
+    
+    console.debug(`unknown morse code detected: ${code}`);
+  }, []);
+  
+  const playElement = useCallback((symbol: '.' | '-') => {
+    // Skip if keyer should be inactive
+    if (!keyerEnabledRef.current) {
+      console.log('[SendingMode] Ignoring play element request - keyer is inactive');
+      return;
+    }
+    
+    if (!audioContextRef.current || !gainNodeRef.current) return;
+    if (symbol !== '.' && symbol !== '-') return;
+    
+    stopSound();
+    
+    try {
+      // Calculate timing based on current WPM
+      const unitMs = 1200 / state.sendWpm;
+      const duration = symbol === '.' ? unitMs : unitMs * 3;
+      
+      const osc = audioContextRef.current.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = 600;
+      osc.connect(gainNodeRef.current);
+      
+      oscillatorRef.current = osc;
+      osc.start();
+      
+      setTimeout(() => {
+        if (oscillatorRef.current === osc) {
+          stopSound();
+        }
+      }, duration);
+    } catch (e) {
+      console.error('Error playing element:', e);
+    }
+  }, [state.sendWpm, stopSound]);
+  
+  // Define finishTest before it's used in handleCharacter
   const finishTest = useCallback((completed = true) => {
     console.log(`[SendingMode] Finishing test, completed: ${completed}, state.selectedLevelId: ${state.selectedLevelId}, ref.level: ${currentLevelIdRef.current}, mode: ${state.mode}`);
     
-    // Immediately mark the keyer as inactive to block all callbacks
-    keyerActiveRef.current = false;
+    // COMPREHENSIVE CLEANUP: Cancel ALL timers and operations
+    
+    // 1. Ensure keyer is completely uninstalled first, before any state changes
+    keyerEnabledRef.current = false;
+    
+    // Stop any audio that might be playing
+    stopSound();
+    
+    // Clear current character to prevent further processing
+    setCurrentChar('');
+    currentCharRef.current = '';
+    
+    // Clear any pending feedback timers
+    if (feedbackTimerRef.current !== null) {
+      console.log(`[SendingMode] Clearing feedback timer in finishTest`);
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
+    }
     
     // Use the ref for the level ID instead of state, which is more reliable
     const levelIdToComplete = currentLevelIdRef.current;
@@ -420,27 +386,6 @@ const SendingMode: React.FC = () => {
       saveResponseTimes(responseTimes);
     }
     
-    // COMPREHENSIVE CLEANUP: Cancel ALL timers and operations
-    
-    // 1. Uninstall keyer to disable key listening
-    console.log(`[SendingMode] Uninstalling keyer in finishTest`);
-    keyerRef.current.uninstall();
-    keyerRef.current.clear();
-    
-    // 2. Clear any pending feedback timers
-    if (feedbackTimerRef.current !== null) {
-      console.log(`[SendingMode] Clearing feedback timer in finishTest`);
-      clearTimeout(feedbackTimerRef.current);
-      feedbackTimerRef.current = null;
-    }
-    
-    // 3. Stop any audio that might be playing
-    stopSound();
-    
-    // 4. Clear current character to prevent further processing
-    setCurrentChar('');
-    currentCharRef.current = '';
-    
     console.log(`[SendingMode] Calling endTest(${completed}, ${levelIdToComplete}) which will mark the level completed if appropriate`);
     
     // End test - pass the levelIdToComplete explicitly rather than relying on state
@@ -453,89 +398,18 @@ const SendingMode: React.FC = () => {
     });
     
     console.log(`[SendingMode] Test results set, UI should now show completion dialog`);
+    
+    // Make sure the keyer is uninstalled - must be after all state updates
+    if (keyerRef.current) {
+      keyerRef.current.uninstall();
+      keyerRef.current.clear();
+    }
   }, [testStartTime, responseTimes, saveResponseTimes, endTest, state.selectedLevelId, state.mode, stopSound]);
   
-  // Clean restart with time recording 
-  const startTestAndRecordTime = useCallback(() => {
-    // Reset all state
-    setCurrentChar('');
-    setMorseOutput('');
-    setFeedbackState('none');
-    setIncorrectChar('');
-    setStrikeCount(0);
-    strikeCountRef.current = 0;
-    setResponseTimes([]);
-    setMistakesMap({});
-    setTestResults(null);
-    
-    // Reset recently mastered character
-    recentlyMasteredCharRef.current = null;
-    
-    // Clear any pending keyer state
-    keyerRef.current.clear();
-    
-    // Set test start time
-    const now = Date.now();
-    testStartTimeRef.current = now;
-    setTestStartTime(now);
-    
-    // Update the current level ID ref
-    currentLevelIdRef.current = state.selectedLevelId;
-    console.log(`[SendingMode] startTestAndRecordTime - setting currentLevelIdRef to: ${currentLevelIdRef.current}`);
-    
-    // Start the test in the AppState using the current selected level
-    startTest();
-    
-    // Start the first question after a short delay
-    setTimeout(() => {
-      nextQuestion();
-    }, 150);
-  }, [nextQuestion, startTest, state.selectedLevelId]);
-  
-  // Handle moving to specific level
-  // TODO: combine the various ways to start a test
-  const startTestWithExplicitLevel = useCallback((levelId: string) => {
-    console.log(`[SendingMode] Starting test with explicit level: ${levelId}`);
-    
-    // Reset all state
-    setCurrentChar('');
-    setMorseOutput('');
-    setFeedbackState('none');
-    setIncorrectChar('');
-    setStrikeCount(0);
-    strikeCountRef.current = 0; // Reset strike count ref
-    setResponseTimes([]);
-    setMistakesMap({});
-    setTestResults(null);
-    
-    // Reset recently mastered character
-    recentlyMasteredCharRef.current = null;
-    
-    // Clear any pending keyer state
-    keyerRef.current.clear();
-    
-    // Set test start time - both ref and state
-    const now = Date.now();
-    testStartTimeRef.current = now;
-    setTestStartTime(now);
-    
-    // Update the current level ID ref to match the explicit level ID
-    currentLevelIdRef.current = levelId;
-    console.log(`[SendingMode] startTestWithExplicitLevel - setting currentLevelIdRef to: ${currentLevelIdRef.current}`);
-    
-    // Start test with level ID
-    startTestWithLevelId(levelId);
-    
-    // Start the first question after a short delay
-    setTimeout(() => {
-      nextQuestion();
-    }, 150);
-  }, [startTestWithLevelId, nextQuestion]);
-  
-  // Handle character input from the keyer
+  // Now define handleCharacter after all its dependencies are defined
   const handleCharacter = useCallback((char: string) => {
-    // Skip if keyer should be inactive
-    if (!keyerActiveRef.current) {
+    // Skip processing if this ref is false
+    if (!keyerEnabledRef.current) {
       console.log('[SendingMode] Ignoring character input - keyer is inactive');
       return;
     }
@@ -729,48 +603,9 @@ const SendingMode: React.FC = () => {
     nextQuestion,
     finishTest,
     testResults
-    // Added testResults dependency
   ]);
   
-  // Handle an element (dot/dash) from the keyer
-  const handleElement = useCallback((symbol: '.' | '-') => {
-    // Skip if keyer should be inactive
-    if (!keyerActiveRef.current) {
-      console.log('[SendingMode] Ignoring element input - keyer is inactive');
-      return;
-    }
-    
-    // Always append to morse output regardless of state
-    if (symbol === '.' || symbol === '-') {
-      setMorseOutput(prev => prev + symbol);
-    }
-  }, []);
-  
-  // Create the keyer with stabilized callbacks
-  const onWpmChange = useCallback((newWpm: number) => {
-    // Call the setSendWpm function to update app state WPM
-    if (newWpm > 0) {
-      setSendWpm(newWpm);
-    }
-  }, [setSendWpm]);
-  
-  // Empty onWord callback to avoid unnecessary console messages
-  const onWord = useCallback(() => {
-    // Intentionally empty to prevent "No onWord callback provided" messages
-  }, []);
-  
-  // Invalid character handler with protection
-  const handleInvalidCharacter = useCallback((code: string) => {
-    // Skip if keyer should be inactive
-    if (!keyerActiveRef.current) {
-      console.log('[SendingMode] Ignoring invalid character - keyer is inactive');
-      return;
-    }
-    
-    console.debug(`unknown morse code detected: ${code}`);
-  }, []);
-  
-  // Create the keyer
+  // Create the keyer at the top level (this is the key fix - no more hook in a callback)
   const keyer = useIambicKeyer({
     wpm: state.sendWpm,
     minWpm: 5,
@@ -786,10 +621,121 @@ const SendingMode: React.FC = () => {
   // Store keyer in ref for stable access
   const keyerRef = useRef(keyer);
   
-  // Update refs when dependencies change
+  // Update keyer ref when dependencies change
   useEffect(() => {
     keyerRef.current = keyer;
   }, [keyer]);
+  
+  // Uninstall keyer - make it inactive but don't try to recreate it
+  const uninstallKeyer = useCallback(() => {
+    console.log('[SendingMode] Uninstalling keyer');
+    keyerEnabledRef.current = false;
+    keyerRef.current.uninstall();
+    keyerRef.current.clear();
+  }, []);
+  
+  // Install the keyer and make it active
+  const installKeyer = useCallback(() => {
+    console.log('[SendingMode] Installing keyer');
+    keyerRef.current.clear();
+    keyerRef.current.install();
+    keyerEnabledRef.current = true;
+  }, []);
+  
+  // Effect to manage keyer installation/uninstallation based on test state
+  useEffect(() => {
+    // If test results are showing, uninstall the keyer to prevent inputs
+    if (testResults) {
+      console.log(`[SendingMode] Test results screen is showing, uninstalling keyer`);
+      uninstallKeyer();
+    } 
+    // Only install keyer when state.testActive is true and no results are showing
+    else if (state.testActive && !testResults) {
+      console.log(`[SendingMode] Test is active and no results showing, installing keyer`);
+      keyerRef.current.clear(); // Clear any pending state
+      installKeyer();
+    }
+    // If test is not active, ensure keyer is uninstalled
+    else {
+      console.log(`[SendingMode] Test is not active, uninstalling keyer`);
+      uninstallKeyer();
+    }
+    
+    // Cleanup on component unmount or mode change
+    return () => {
+      console.log(`[SendingMode] Cleanup effect - uninstalling keyer`);
+      uninstallKeyer();
+    };
+  }, [testResults, state.testActive, installKeyer, uninstallKeyer]);
+  
+  // Initialize local character points from app state when level changes
+  useEffect(() => {
+    if (currentLevel) {
+      // Store the current level's chars in a ref for immediate access across render cycles
+      levelCharsRef.current = [...currentLevel.chars];
+      
+      // Create a new object with ONLY the character points for the current level
+      const levelCharPoints: Record<string, number> = {};
+      currentLevel.chars.forEach(char => {
+        // Initialize with app state values or 0
+        levelCharPoints[char] = state.charPoints[char] || 0;
+      });
+      
+      // Update both the state and ref
+      setLocalCharPoints(levelCharPoints);
+      charPointsRef.current = { ...levelCharPoints };
+    }
+  }, [currentLevel, state.charPoints, state.selectedLevelId]);
+  
+  // Initialize audio on first render
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = ctx;
+        
+        const gain = ctx.createGain();
+        gain.gain.value = 0.5;
+        gain.connect(ctx.destination);
+        gainNodeRef.current = gain;
+      } catch (e) {
+        console.error('Failed to initialize audio context:', e);
+      }
+    }
+    
+    return () => {
+      stopSound();
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(e => console.error('Error closing audio context:', e));
+      }
+    };
+  }, []);
+  
+  // Add global event interceptor as an extra safety measure
+  useEffect(() => {
+    // Only add this when test results are showing
+    if (!testResults) return;
+    
+    const blockKeyerKeys = (e: KeyboardEvent) => {
+      // Block arrow keys and tab which are used by the keyer
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
+          e.key === 'ArrowUp' || e.key === 'ArrowDown' || 
+          e.key === 'Tab' || e.code === 'ControlLeft' || e.code === 'ControlRight') {
+        console.log(`[SendingMode] Blocking keyer key event: ${e.key} during results display`);
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    
+    // Capture phase to intercept before any other handlers
+    document.addEventListener('keydown', blockKeyerKeys, { capture: true });
+    document.addEventListener('keyup', blockKeyerKeys, { capture: true });
+    
+    return () => {
+      document.removeEventListener('keydown', blockKeyerKeys, { capture: true });
+      document.removeEventListener('keyup', blockKeyerKeys, { capture: true });
+    };
+  }, [testResults]);
   
   // Add escape key handler
   useEffect(() => {
@@ -806,27 +752,81 @@ const SendingMode: React.FC = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [state.testActive, finishTest]);
   
-  // Add debugging hook
-  useEffect(() => {
-    if (isBrowser) {
-      try {
-        // Expose key state for debugging
-        if (window) {
-          (window as any).__sendingModeDebug = {
-            currentChar,
-            morseOutput,
-            charPoints: localCharPoints,
-            keyer,
-            state,
-            feedbackState,
-            charStartTime
-          };
-        }
-      } catch (e) {
-        console.error('[DEBUG] Error setting up debug hooks:', e);
-      }
-    }
-  }, [currentChar, morseOutput, localCharPoints, keyer, state, feedbackState, charStartTime]);
+  // Clean restart with time recording 
+  const startTestAndRecordTime = useCallback(() => {
+    // Reset all state
+    setCurrentChar('');
+    setMorseOutput('');
+    setFeedbackState('none');
+    setIncorrectChar('');
+    setStrikeCount(0);
+    strikeCountRef.current = 0;
+    setResponseTimes([]);
+    setMistakesMap({});
+    setTestResults(null);
+    
+    // Reset recently mastered character
+    recentlyMasteredCharRef.current = null;
+    
+    // Clear any pending keyer state
+    keyerRef.current.clear();
+    
+    // Set test start time
+    const now = Date.now();
+    testStartTimeRef.current = now;
+    setTestStartTime(now);
+    
+    // Update the current level ID ref
+    currentLevelIdRef.current = state.selectedLevelId;
+    console.log(`[SendingMode] startTestAndRecordTime - setting currentLevelIdRef to: ${currentLevelIdRef.current}`);
+    
+    // Start the test in the AppState using the current selected level
+    startTest();
+    
+    // Start the first question after a short delay
+    setTimeout(() => {
+      nextQuestion();
+    }, 150);
+  }, [nextQuestion, startTest, state.selectedLevelId, keyerRef]);
+  
+  // Handle moving to specific level
+  const startTestWithExplicitLevel = useCallback((levelId: string) => {
+    console.log(`[SendingMode] Starting test with explicit level: ${levelId}`);
+    
+    // Reset all state
+    setCurrentChar('');
+    setMorseOutput('');
+    setFeedbackState('none');
+    setIncorrectChar('');
+    setStrikeCount(0);
+    strikeCountRef.current = 0; // Reset strike count ref
+    setResponseTimes([]);
+    setMistakesMap({});
+    setTestResults(null);
+    
+    // Reset recently mastered character
+    recentlyMasteredCharRef.current = null;
+    
+    // Clear any pending keyer state
+    keyerRef.current.clear();
+    
+    // Set test start time - both ref and state
+    const now = Date.now();
+    testStartTimeRef.current = now;
+    setTestStartTime(now);
+    
+    // Update the current level ID ref to match the explicit level ID
+    currentLevelIdRef.current = levelId;
+    console.log(`[SendingMode] startTestWithExplicitLevel - setting currentLevelIdRef to: ${currentLevelIdRef.current}`);
+    
+    // Start test with level ID
+    startTestWithLevelId(levelId);
+    
+    // Start the first question after a short delay
+    setTimeout(() => {
+      nextQuestion();
+    }, 150);
+  }, [startTestWithLevelId, nextQuestion, keyerRef]);
   
   // Handle level repeat
   const handleRepeatLevel = useCallback(() => {
@@ -899,7 +899,17 @@ const SendingMode: React.FC = () => {
       // Restart current level if at end
       startTestAndRecordTime();
     }
-  }, [state.selectedLevelId, startTestWithExplicitLevel, startTestAndRecordTime, selectLevel]);
+  }, [selectLevel, startTestWithExplicitLevel, startTestAndRecordTime, state.selectedLevelId]);
+  
+  // Add missing declarations needed for the JSX
+  
+  // Debug info for development only
+  const debugInfo = {
+    level: state.selectedLevelId,
+    currentChar,
+    currentCharRef: currentCharRef.current,
+    morseOutput
+  };
   
   // Calculate progress - mastered characters using local points
   // Use levelCharsRef for consistent mastery calculations
@@ -959,14 +969,6 @@ const SendingMode: React.FC = () => {
       isDevelopmentRef.current = true;
     }
   }, []);
-  
-  // Debug info for development only
-  const debugInfo = {
-    level: state.selectedLevelId,
-    currentChar,
-    currentCharRef: currentCharRef.current,
-    morseOutput
-  };
   
   // Clear test results when level changes
   useEffect(() => {
