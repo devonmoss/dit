@@ -64,7 +64,7 @@ interface AppStateContextType {
   // Test management
   startTest: () => void;
   startTestWithLevelId: (levelId: string) => void;
-  endTest: (completed?: boolean) => void;
+  endTest: (completed?: boolean, levelIdOverride?: string) => void;
   
   // Settings
   setWpm: (wpm: number) => void;
@@ -140,32 +140,88 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Load completed levels from localStorage
       try {
+        console.log('[AppState][INIT] --- Loading completed levels from localStorage ---');
+        
         // First try to load the new format (mode-specific completed levels)
         const copyCompletedString = localStorage.getItem('morseCompletedCopy');
         const sendCompletedString = localStorage.getItem('morseCompletedSend');
         
+        console.log('[AppState][INIT] Raw values from localStorage:');
+        console.log('[AppState][INIT] - morseCompletedCopy:', copyCompletedString);
+        console.log('[AppState][INIT] - morseCompletedSend:', sendCompletedString);
+        
+        // Process copy mode completed levels
         if (copyCompletedString) {
-          initialState.completedLevels.copy = JSON.parse(copyCompletedString);
+          try {
+            const parsedCopyCompleted = JSON.parse(copyCompletedString);
+            initialState.completedLevels.copy = Array.isArray(parsedCopyCompleted) ? parsedCopyCompleted : [];
+            console.log('[AppState][INIT] Parsed copy completed levels:', initialState.completedLevels.copy);
+          } catch (parseError) {
+            console.error('[AppState][INIT] Error parsing copy completed levels:', parseError);
+            initialState.completedLevels.copy = [];
+          }
         }
         
+        // Process send mode completed levels
         if (sendCompletedString) {
-          initialState.completedLevels.send = JSON.parse(sendCompletedString);
+          try {
+            const parsedSendCompleted = JSON.parse(sendCompletedString);
+            initialState.completedLevels.send = Array.isArray(parsedSendCompleted) ? parsedSendCompleted : [];
+            console.log('[AppState][INIT] Parsed send completed levels:', initialState.completedLevels.send);
+          } catch (parseError) {
+            console.error('[AppState][INIT] Error parsing send completed levels:', parseError);
+            initialState.completedLevels.send = [];
+          }
         }
         
         // Migrate from old format if needed
-        if (!copyCompletedString && !sendCompletedString) {
+        if ((!copyCompletedString || initialState.completedLevels.copy.length === 0) && 
+            (!sendCompletedString || initialState.completedLevels.send.length === 0)) {
           const legacyCompletedString = localStorage.getItem('morseCompleted');
+          console.log('[AppState][INIT] No or empty mode-specific completed levels, checking legacy format:', legacyCompletedString);
+          
           if (legacyCompletedString) {
-            const legacyCompleted = JSON.parse(legacyCompletedString);
-            // Assume all legacy completed levels are in copy mode
-            initialState.completedLevels.copy = legacyCompleted;
-            
-            // Save in the new format for future use
-            localStorage.setItem('morseCompletedCopy', legacyCompletedString);
+            try {
+              const legacyCompleted = JSON.parse(legacyCompletedString);
+              
+              // Validate that we have an array
+              if (Array.isArray(legacyCompleted)) {
+                // Assume all legacy completed levels are in copy mode
+                initialState.completedLevels.copy = legacyCompleted;
+                
+                // Save in the new format for future use
+                localStorage.setItem('morseCompletedCopy', legacyCompletedString);
+                console.log('[AppState][INIT] Migrated legacy completed levels to copy mode:', initialState.completedLevels.copy);
+              } else {
+                console.error('[AppState][INIT] Legacy completed levels is not an array:', legacyCompleted);
+              }
+            } catch (legacyParseError) {
+              console.error('[AppState][INIT] Error parsing legacy completed levels:', legacyParseError);
+            }
           }
         }
+        
+        // Final sanity check to ensure we have arrays
+        if (!Array.isArray(initialState.completedLevels.copy)) {
+          console.warn('[AppState][INIT] Copy completed levels is not an array, resetting to empty array');
+          initialState.completedLevels.copy = [];
+        }
+        
+        if (!Array.isArray(initialState.completedLevels.send)) {
+          console.warn('[AppState][INIT] Send completed levels is not an array, resetting to empty array');
+          initialState.completedLevels.send = [];
+        }
+        
+        console.log('[AppState][INIT] Final completed levels state:');
+        console.log('[AppState][INIT] - copy:', initialState.completedLevels.copy);
+        console.log('[AppState][INIT] - send:', initialState.completedLevels.send);
       } catch (error) {
-        console.error('Error loading completed levels from localStorage:', error);
+        console.error('[AppState][INIT] Error loading completed levels from localStorage:', error);
+        // Reset to empty arrays as fallback
+        initialState.completedLevels = {
+          copy: [],
+          send: []
+        };
       }
       
       // Load selected levels from localStorage - new format
@@ -207,14 +263,20 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     const currentMode = initialState.mode === 'race' ? 'copy' : initialState.mode;
     const currentSelectedLevelId = initialState.selectedLevels[currentMode];
     
+    console.log(`[AppState][INIT] Determining initial level for mode: ${currentMode}`);
+    console.log(`[AppState][INIT] Selected level from localStorage: ${currentSelectedLevelId}`);
+    
     // If we have a saved level for the current mode, use it
     if (currentSelectedLevelId) {
       initialState.selectedLevelId = currentSelectedLevelId;
+      console.log(`[AppState][INIT] Using saved level ID: ${initialState.selectedLevelId}`);
     } 
     // Otherwise find the first incomplete level for current mode
     else if (trainingLevels.length > 0) {
       // Get completed levels for the current mode
       const currentModeCompletedLevels = initialState.completedLevels[currentMode];
+      console.log(`[AppState][INIT] No saved level, finding first incomplete level`);
+      console.log(`[AppState][INIT] Completed levels for ${currentMode}:`, currentModeCompletedLevels);
       
       const firstIncomplete = trainingLevels.find(
         level => !currentModeCompletedLevels.includes(level.id)
@@ -223,6 +285,8 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       const selectedLevel = firstIncomplete 
         ? firstIncomplete
         : trainingLevels[trainingLevels.length - 1];
+      
+      console.log(`[AppState][INIT] Selected ${firstIncomplete ? 'first incomplete' : 'last'} level:`, selectedLevel.id);
         
       initialState.selectedLevelId = selectedLevel.id;
       initialState.selectedLevels[currentMode] = selectedLevel.id;
@@ -246,6 +310,8 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     const level = trainingLevels.find(level => level.id === id);
     const levelChars = level ? [...level.chars] : [...defaultChars];
     
+    console.log(`[AppState] Selecting level: ${id}, mode: ${state.mode}, modeToUpdate: ${modeToUpdate}`);
+    
     setState(prev => {
       // Create updated selectedLevels
       const updatedSelectedLevels = {
@@ -263,8 +329,16 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     
     // Store selected level in localStorage - both in legacy and new format
     if (typeof window !== 'undefined') {
+      console.log(`[AppState] Saving to localStorage: morseSelectedLevel=${id} and morseSelectedLevel${modeToUpdate.charAt(0).toUpperCase() + modeToUpdate.slice(1)}=${id}`);
+      
       localStorage.setItem('morseSelectedLevel', id); // Legacy format
       localStorage.setItem(`morseSelectedLevel${modeToUpdate.charAt(0).toUpperCase() + modeToUpdate.slice(1)}`, id); // New format
+      
+      // Verify saving
+      const legacyValue = localStorage.getItem('morseSelectedLevel');
+      const newFormatValue = localStorage.getItem(`morseSelectedLevel${modeToUpdate.charAt(0).toUpperCase() + modeToUpdate.slice(1)}`);
+      console.log(`[AppState] Verification - localStorage.morseSelectedLevel: ${legacyValue}`);
+      console.log(`[AppState] Verification - localStorage.morseSelectedLevel${modeToUpdate.charAt(0).toUpperCase() + modeToUpdate.slice(1)}: ${newFormatValue}`);
     }
   };
   
@@ -283,13 +357,26 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Use 'copy' mode for race since they share the same completed levels
     const modeToUpdate = state.mode === 'race' ? 'copy' : state.mode;
     
-    if (!state.completedLevels[modeToUpdate].includes(id)) {
+    console.log(`[AppState] =============================================`);
+    console.log(`[AppState] MARK LEVEL COMPLETED CALLED`);
+    console.log(`[AppState] Level ID: ${id}`);
+    console.log(`[AppState] Mode: ${modeToUpdate}`);
+    console.log(`[AppState] Current completedLevels.${modeToUpdate}:`, state.completedLevels[modeToUpdate]);
+    
+    // Check if the level is already marked as completed
+    const isAlreadyCompleted = state.completedLevels[modeToUpdate].includes(id);
+    console.log(`[AppState] Is level already completed: ${isAlreadyCompleted}`);
+    
+    if (!isAlreadyCompleted) {
       // Create a new completed levels object
       const newCompletedLevels = {
         ...state.completedLevels,
         [modeToUpdate]: [...state.completedLevels[modeToUpdate], id]
       };
       
+      console.log(`[AppState] New completedLevels.${modeToUpdate}:`, newCompletedLevels[modeToUpdate]);
+      
+      // Update state first
       setState(prev => ({
         ...prev,
         completedLevels: newCompletedLevels,
@@ -297,8 +384,70 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Save to localStorage
       if (typeof window !== 'undefined') {
-        localStorage.setItem(`morseCompleted${modeToUpdate.charAt(0).toUpperCase() + modeToUpdate.slice(1)}`, 
-          JSON.stringify(newCompletedLevels[modeToUpdate]));
+        // Construct the correct storage key with consistent capitalization
+        const modeSuffix = modeToUpdate.charAt(0).toUpperCase() + modeToUpdate.slice(1);
+        const storageKey = `morseCompleted${modeSuffix}`;
+        
+        console.log(`[AppState] LOCALSTORAGE UPDATE START`);
+        console.log(`[AppState] Storage key: ${storageKey}`);
+        console.log(`[AppState] New array to save: ${JSON.stringify(newCompletedLevels[modeToUpdate])}`);
+        
+        try {
+          // To ensure we're not overwriting with stale data, read current localStorage first
+          const currentStoredValue = localStorage.getItem(storageKey);
+          console.log(`[AppState] Current stored value for ${storageKey}:`, currentStoredValue);
+          
+          // Parse the current stored value if it exists
+          let currentValues: string[] = [];
+          if (currentStoredValue) {
+            try {
+              currentValues = JSON.parse(currentStoredValue);
+              console.log(`[AppState] Parsed current values from localStorage:`, currentValues);
+              console.log(`[AppState] Type of parsed values:`, Array.isArray(currentValues) ? 'Array' : typeof currentValues);
+            } catch (parseError) {
+              console.error(`[AppState] Error parsing existing localStorage value for ${storageKey}:`, parseError);
+              console.log(`[AppState] Raw value that failed to parse:`, currentStoredValue);
+            }
+          }
+          
+          // Check if the level is already in localStorage
+          const levelAlreadyInStorage = Array.isArray(currentValues) && currentValues.includes(id);
+          console.log(`[AppState] Level ${id} already in storage: ${levelAlreadyInStorage}`);
+          
+          // Combine existing values with new completed level
+          if (!levelAlreadyInStorage) {
+            const updatedValues = Array.isArray(currentValues) ? [...currentValues, id] : [id];
+            console.log(`[AppState] Combined values to save:`, updatedValues);
+            
+            // Save the updated array
+            const jsonToSave = JSON.stringify(updatedValues);
+            console.log(`[AppState] JSON to save: ${jsonToSave}`);
+            localStorage.setItem(storageKey, jsonToSave);
+            console.log(`[AppState] Storage update complete`);
+            
+            // Verify storage
+            const verifyValue = localStorage.getItem(storageKey);
+            console.log(`[AppState] Verification - read back from storage: ${verifyValue}`);
+            if (verifyValue !== jsonToSave) {
+              console.error(`[AppState] WARNING: Storage verification failed!`);
+              console.log(`[AppState] Expected: ${jsonToSave}`);
+              console.log(`[AppState] Actual: ${verifyValue}`);
+            }
+          } else {
+            console.log(`[AppState] Level ${id} already in localStorage.${storageKey}, not updating`);
+          }
+          
+          // Dump all localStorage keys and values related to morse for verification
+          console.log('[AppState] All localStorage morse keys:');
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('morse')) {
+              console.log(`  - ${key}: ${localStorage.getItem(key)}`);
+            }
+          }
+        } catch (error) {
+          console.error(`[AppState] Error saving to localStorage: ${storageKey}`, error);
+        }
         
         // Automatically advance the next level in localStorage ONLY
         // This way when the user refreshes, they'll be at the next level
@@ -308,16 +457,33 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
           // Get the next level ID
           const nextLevelId = trainingLevels[currentLevelIndex + 1].id;
           
-          // Update localStorage only, without changing the current UI state
+          // Update legacy and mode-specific localStorage keys
+          console.log(`[AppState] Updating next level in localStorage: morseSelectedLevel=${nextLevelId}`);
           localStorage.setItem('morseSelectedLevel', nextLevelId);
+          
+          const selectedLevelKey = `morseSelectedLevel${modeSuffix}`;
+          console.log(`[AppState] Updating next level in localStorage: ${selectedLevelKey}=${nextLevelId}`);
+          localStorage.setItem(selectedLevelKey, nextLevelId);
+          
+          // Verify selected level updates
+          const verifyLegacy = localStorage.getItem('morseSelectedLevel');
+          const verifyModeSpecific = localStorage.getItem(selectedLevelKey);
+          console.log(`[AppState] Verification - legacy selected level: ${verifyLegacy}`);
+          console.log(`[AppState] Verification - mode-specific selected level: ${verifyModeSpecific}`);
         }
+        
+        console.log(`[AppState] LOCALSTORAGE UPDATE COMPLETE`);
       }
+    } else {
+      console.log(`[AppState] Level ${id} already completed in ${modeToUpdate} mode, skipping`);
     }
+    console.log(`[AppState] =============================================`);
   };
   
   // Test management with explicit level ID
   const startTestWithLevelId = (levelId: string) => {
-    console.log('======== startTestWithLevelId ========');
+    console.log(`[AppState] Starting test with explicit level: ${levelId}, mode: ${state.mode}`);
+    
     // Get fresh level data directly
     const level = trainingLevels.find(l => l.id === levelId);
     
@@ -343,13 +509,13 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Original startTest function (kept for backward compatibility)
   const startTest = () => {
+    console.log(`[AppState] Starting test with current level: ${state.selectedLevelId}, mode: ${state.mode}`);
+    
     // Initialize character points for the current level
     // Get fresh data by directly finding the level rather than using state.selectedLevelId
     // which might not have been fully updated yet
     const freshLevelId = state.selectedLevelId;
     const freshLevel = trainingLevels.find(level => level.id === freshLevelId);
-    
-    // console.log('======== startTest ========');
     
     const newCharPoints: CharPoints = {};
     
@@ -367,59 +533,72 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     }));
   };
   
-  const endTest = (completed = true) => {
+  const endTest = (completed = true, levelIdOverride?: string) => {
+    console.log(`[AppState] Ending test, completed: ${completed}, level: ${levelIdOverride || state.selectedLevelId}, mode: ${state.mode}`);
+    
     setState(prev => ({
       ...prev,
       testActive: false,
     }));
     
-    if (completed && state.selectedLevelId) {
-      markLevelCompleted(state.selectedLevelId);
+    if (completed) {
+      // Use the override if provided, otherwise fall back to current selectedLevelId
+      const levelToComplete = levelIdOverride || state.selectedLevelId;
+      
+      if (levelToComplete) {
+        console.log(`[AppState] Test completed successfully, marking level completed: ${levelToComplete}`);
+        markLevelCompleted(levelToComplete);
+      } else {
+        console.log(`[AppState] Test not completed successfully, skipping markLevelCompleted`);
+      }
+    } else {
+      console.log(`[AppState] Test not completed successfully, skipping markLevelCompleted`);
     }
   };
   
-  // Settings management
+  // Settings
   const setWpm = (wpm: number) => {
     setState(prev => ({
       ...prev,
-      wpm,
+      wpm: wpm,
     }));
-    
-    // Save to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('morseWpm', wpm.toString());
-    }
   };
   
   const setVolume = (volume: number) => {
     setState(prev => ({
       ...prev,
-      volume,
+      volume: volume,
     }));
-    
-    // Save to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('morseVolume', volume.toString());
-    }
   };
   
-  const setSendWpm = (sendWpm: number) => {
+  const setSendWpm = (wpm: number) => {
     setState(prev => ({
       ...prev,
-      sendWpm,
+      sendWpm: wpm,
     }));
-    
-    // Save to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('morseSendWpm', sendWpm.toString());
-    }
+  };
+  
+  const setTheme = (theme: Theme) => {
+    setState(prev => ({
+      ...prev,
+      theme: theme,
+    }));
   };
   
   // Mode and test type
   const setMode = (mode: Mode) => {
+    console.log(`[AppState] Setting mode from ${state.mode} to ${mode}`);
+    console.log(`[AppState] Current state before mode change:`, {
+      selectedLevelId: state.selectedLevelId,
+      selectedLevels: state.selectedLevels,
+      completedLevels: state.completedLevels
+    });
+    
     // Get the selected level for the target mode (or race → copy)
     const targetMode = mode === 'race' ? 'copy' : mode;
     const targetLevelId = state.selectedLevels[targetMode] || state.selectedLevelId;
+    
+    console.log(`[AppState] Target mode: ${targetMode}, target level ID: ${targetLevelId}`);
     
     setState(prev => ({
       ...prev,
@@ -432,26 +611,30 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Update the current level's characters
     const targetLevel = trainingLevels.find(level => level.id === targetLevelId);
     if (targetLevel) {
+      console.log(`[AppState] Found target level:`, targetLevel.name);
       setState(prev => ({
         ...prev,
         chars: [...targetLevel.chars]
       }));
+    } else {
+      console.log(`[AppState] Warning: Could not find target level for ID ${targetLevelId}`);
     }
     
     // Store mode in localStorage
     if (typeof window !== 'undefined') {
+      console.log(`[AppState] Saving mode to localStorage: ${mode}`);
       localStorage.setItem('morseMode', mode);
     }
   };
   
-  const setTestType = (testType: TestType) => {
+  const setTestType = (type: TestType) => {
     setState(prev => ({
       ...prev,
-      testType,
+      testType: type,
     }));
   };
   
-  // Character points management
+  // Character points
   const updateCharPoints = (char: string, points: number) => {
     setState(prev => ({
       ...prev,
@@ -462,57 +645,11 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
     }));
   };
   
-  // Save response times to localStorage
+  // Response times
   const saveResponseTimes = (times: CharTiming[]) => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      // Get existing response times
-      const existingTimesStr = localStorage.getItem('morseResponseTimes');
-      const existingTimes = existingTimesStr ? JSON.parse(existingTimesStr) : [];
-      
-      // Add timestamp to the new batch
-      const newEntry = {
-        timestamp: new Date().toISOString(),
-        mode: state.mode,
-        level: state.selectedLevelId,
-        times
-      };
-      
-      // Add to existing data
-      const updatedTimes = [...existingTimes, newEntry];
-      
-      // Save back to localStorage
-      localStorage.setItem('morseResponseTimes', JSON.stringify(updatedTimes));
-    } catch (error) {
-      console.error('Error saving response times to localStorage:', error);
-    }
+    // Implementation needed
   };
   
-  // Theme setting function
-  const setTheme = (theme: Theme) => {
-    setState(prev => ({
-      ...prev,
-      theme
-    }));
-    
-    // Save to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('morseTheme', theme);
-      
-      // Apply the theme to the document root
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-  };
-  
-  // Apply theme from state when the app loads
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', state.theme);
-    }
-  }, [state.theme]);
-  
-  // Provide all the values to the context
   return (
     <AppStateContext.Provider value={{
       state,
@@ -530,18 +667,17 @@ export const AppStateProvider: React.FC<{ children: ReactNode }> = ({ children }
       setMode,
       setTestType,
       updateCharPoints,
-      saveResponseTimes
+      saveResponseTimes,
     }}>
       {children}
     </AppStateContext.Provider>
   );
 };
 
-// Custom hook to use the AppState context
 export const useAppState = () => {
   const context = useContext(AppStateContext);
   if (context === undefined) {
     throw new Error('useAppState must be used within an AppStateProvider');
   }
   return context;
-}; 
+};

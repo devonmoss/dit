@@ -47,6 +47,9 @@ const SendingMode: React.FC = () => {
   // Reference to track character points that's immediately available to callbacks
   const charPointsRef = useRef<Record<string, number>>({});
   
+  // Reference to track the current level ID (more reliable than state)
+  const currentLevelIdRef = useRef<string>(state.selectedLevelId);
+  
   // Test timing state - use both ref and state
   const testStartTimeRef = useRef<number | null>(null);
   const [testStartTime, setTestStartTime] = useState<number | null>(null);
@@ -308,49 +311,6 @@ const SendingMode: React.FC = () => {
     }
   }, [updateCharPoints]);
   
-  // Finish the test
-  const finishTest = useCallback((completed = true) => {
-    // Calculate elapsed time
-    const endTime = Date.now();
-    
-    // Prefer the ref for timing as it's more reliable, with various fallbacks
-    let elapsedSec = 0;
-    if (testStartTimeRef.current) {
-      // Primary source: Use ref (most reliable)
-      elapsedSec = (endTime - testStartTimeRef.current) / 1000;
-    } else if (testStartTime) {
-      // Secondary source: Use state
-      elapsedSec = (endTime - testStartTime) / 1000;
-    } else {
-      // Fallback: use the average time spent on all characters as estimate
-      if (responseTimes.length > 0) {
-        const totalResponseTime = responseTimes.reduce((sum, item) => sum + item.time, 0);
-        elapsedSec = totalResponseTime;
-      } else {
-        // Absolute minimum fallback - shouldn't happen with our fixes
-        elapsedSec = 60; // Default to 1 minute if we have nothing else
-        console.error(`[SendingMode] No timing data available. Using default: ${elapsedSec}s`);
-      }
-    }
-    
-    // Save response times
-    if (responseTimes.length > 0) {
-      saveResponseTimes(responseTimes);
-    }
-    
-    // Uninstall keyer to disable key listening
-    keyerRef.current.uninstall();
-    
-    // End test
-    endTest(completed);
-    
-    // Set test results
-    setTestResults({
-      completed,
-      elapsedTime: elapsedSec
-    });
-  }, [testStartTime, responseTimes, saveResponseTimes, endTest]);
-  
   // Present next question - now using direct level chars
   const nextQuestion = useCallback(() => {
     const nextChar = pickNextChar();
@@ -388,6 +348,143 @@ const SendingMode: React.FC = () => {
   useEffect(() => {
     currentCharRef.current = currentChar;
   }, [currentChar]);
+  
+  // Finish the test
+  const finishTest = useCallback((completed = true) => {
+    console.log(`[SendingMode] Finishing test, completed: ${completed}, state.selectedLevelId: ${state.selectedLevelId}, ref.level: ${currentLevelIdRef.current}, mode: ${state.mode}`);
+    
+    // Use the ref for the level ID instead of state, which is more reliable
+    const levelIdToComplete = currentLevelIdRef.current;
+    console.log(`[SendingMode] Level ID from ref to be marked as completed: ${levelIdToComplete}`);
+    
+    // Calculate elapsed time
+    const endTime = Date.now();
+    
+    // Prefer the ref for timing as it's more reliable, with various fallbacks
+    let elapsedSec = 0;
+    if (testStartTimeRef.current) {
+      // Primary source: Use ref (most reliable)
+      elapsedSec = (endTime - testStartTimeRef.current) / 1000;
+    } else if (testStartTime) {
+      // Secondary source: Use state
+      elapsedSec = (endTime - testStartTime) / 1000;
+    } else {
+      // Fallback: use the average time spent on all characters as estimate
+      if (responseTimes.length > 0) {
+        const totalResponseTime = responseTimes.reduce((sum, item) => sum + item.time, 0);
+        elapsedSec = totalResponseTime;
+      } else {
+        // Absolute minimum fallback - shouldn't happen with our fixes
+        elapsedSec = 60; // Default to 1 minute if we have nothing else
+        console.error(`[SendingMode] No timing data available. Using default: ${elapsedSec}s`);
+      }
+    }
+    
+    // Save response times
+    if (responseTimes.length > 0) {
+      console.log(`[SendingMode] Saving ${responseTimes.length} response times`);
+      saveResponseTimes(responseTimes);
+    }
+    
+    // Uninstall keyer to disable key listening
+    keyerRef.current.uninstall();
+    
+    console.log(`[SendingMode] Calling endTest(${completed}, ${levelIdToComplete}) which will mark the level completed if appropriate`);
+    
+    // End test - pass the levelIdToComplete explicitly rather than relying on state
+    endTest(completed, levelIdToComplete);
+    
+    // Set test results
+    setTestResults({
+      completed,
+      elapsedTime: elapsedSec
+    });
+    
+    console.log(`[SendingMode] Test results set, UI should now show completion dialog`);
+  }, [testStartTime, responseTimes, saveResponseTimes, endTest, state.selectedLevelId, state.mode]);
+  
+  // Clean restart with time recording 
+  const startTestAndRecordTime = useCallback(() => {
+    // Reset all state
+    setCurrentChar('');
+    setMorseOutput('');
+    setFeedbackState('none');
+    setIncorrectChar('');
+    setStrikeCount(0);
+    strikeCountRef.current = 0;
+    setResponseTimes([]);
+    setMistakesMap({});
+    setTestResults(null);
+    
+    // Reset recently mastered character
+    recentlyMasteredCharRef.current = null;
+    
+    // Clear any pending keyer state
+    keyerRef.current.clear();
+    
+    // Make sure the keyer is installed and listening for key events
+    keyerRef.current.install();
+    
+    // Set test start time
+    const now = Date.now();
+    testStartTimeRef.current = now;
+    setTestStartTime(now);
+    
+    // Update the current level ID ref
+    currentLevelIdRef.current = state.selectedLevelId;
+    console.log(`[SendingMode] startTestAndRecordTime - setting currentLevelIdRef to: ${currentLevelIdRef.current}`);
+    
+    // Start the test in the AppState using the current selected level
+    startTest();
+    
+    // Start the first question after a short delay
+    setTimeout(() => {
+      nextQuestion();
+    }, 150);
+  }, [nextQuestion, startTest, state.selectedLevelId]);
+  
+  // Handle moving to specific level
+  // TODO: combine the various ways to start a test
+  const startTestWithExplicitLevel = useCallback((levelId: string) => {
+    console.log(`[SendingMode] Starting test with explicit level: ${levelId}`);
+    
+    // Reset all state
+    setCurrentChar('');
+    setMorseOutput('');
+    setFeedbackState('none');
+    setIncorrectChar('');
+    setStrikeCount(0);
+    strikeCountRef.current = 0; // Reset strike count ref
+    setResponseTimes([]);
+    setMistakesMap({});
+    setTestResults(null);
+    
+    // Reset recently mastered character
+    recentlyMasteredCharRef.current = null;
+    
+    // Clear any pending keyer state
+    keyerRef.current.clear();
+    
+    // Make sure the keyer is installed and listening for key events
+    keyerRef.current.install();
+    
+    // Set test start time - both ref and state
+    const now = Date.now();
+    testStartTimeRef.current = now;
+    setTestStartTime(now);
+    
+    // Update the current level ID ref to match the explicit level ID
+    currentLevelIdRef.current = levelId;
+    console.log(`[SendingMode] startTestWithExplicitLevel - setting currentLevelIdRef to: ${currentLevelIdRef.current}`);
+    
+    // Start test with level ID
+    startTestWithLevelId(levelId);
+    
+    // Start the first question after a short delay
+    setTimeout(() => {
+      nextQuestion();
+    }, 150);
+  }, [startTestWithLevelId, nextQuestion]);
   
   // Handle character input from the keyer
   const handleCharacter = useCallback((char: string) => {
@@ -456,8 +553,27 @@ const SendingMode: React.FC = () => {
           });
         
         if (allMastered) {
+          console.log(`[SendingMode] All characters mastered, finishing test with success`);
+          console.log(`[SendingMode] State level ID: ${state.selectedLevelId}, ref level ID: ${currentLevelIdRef.current}`);
+          console.log(`[SendingMode] Character mastery status:`, 
+            levelCharsRef.current.map(c => ({
+              char: c,
+              points: mergedPoints[c] || 0,
+              mastered: (mergedPoints[c] || 0) >= TARGET_POINTS
+            }))
+          );
+          
+          // Call finishTest which will explicitly pass the current level ID from ref
           finishTest(true);
         } else {
+          // Some characters not mastered yet, continue with next question
+          const unmastered = levelCharsRef.current.filter(c => (mergedPoints[c] || 0) < TARGET_POINTS);
+          console.log(`[SendingMode] Some characters not mastered yet:`, 
+            unmastered.map(c => ({
+              char: c,
+              points: mergedPoints[c] || 0
+            }))
+          );
           nextQuestion();
         }
       }, FEEDBACK_DELAY);
@@ -573,99 +689,6 @@ const SendingMode: React.FC = () => {
     keyerRef.current = keyer;
   }, [keyer]);
   
-  // Clean restart with time recording 
-  const startTestAndRecordTime = useCallback(() => {
-    // Reset all state
-    setCurrentChar('');
-    setMorseOutput('');
-    setFeedbackState('none');
-    setIncorrectChar('');
-    setStrikeCount(0);
-    strikeCountRef.current = 0;
-    setResponseTimes([]);
-    setMistakesMap({});
-    setTestResults(null);
-    
-    // Reset recently mastered character
-    recentlyMasteredCharRef.current = null;
-    
-    // Clear any pending keyer state
-    keyerRef.current.clear();
-    
-    // Make sure the keyer is installed and listening for key events
-    keyerRef.current.install();
-    
-    // Set test start time
-    const now = Date.now();
-    testStartTimeRef.current = now;
-    setTestStartTime(now);
-    
-    // Start the test in the AppState using the current selected level
-    startTest();
-    
-    // Start the first question after a short delay
-    setTimeout(() => {
-      nextQuestion();
-    }, 150);
-  }, [nextQuestion, startTest]);
-  
-  // Handle moving to specific level
-  // TODO: combine the various ways to start a test
-  const startTestWithExplicitLevel = useCallback((levelId: string) => {
-    // console.log(`[SendingMode] Starting test with explicit level: ${levelId}`);
-    
-    // Reset all state
-    setCurrentChar('');
-    setMorseOutput('');
-    setFeedbackState('none');
-    setIncorrectChar('');
-    setStrikeCount(0);
-    strikeCountRef.current = 0; // Reset strike count ref
-    setResponseTimes([]);
-    setMistakesMap({});
-    setTestResults(null);
-    
-    // Reset recently mastered character
-    recentlyMasteredCharRef.current = null;
-    
-    // Clear any pending keyer state
-    keyerRef.current.clear();
-    
-    // Make sure the keyer is installed and listening for key events
-    keyerRef.current.install();
-    
-    // Set test start time - both ref and state
-    const now = Date.now();
-    testStartTimeRef.current = now;
-    setTestStartTime(now);
-    
-    // Start test with level ID
-    startTestWithLevelId(levelId);
-    
-    // Start the first question after a short delay
-    setTimeout(() => {
-      nextQuestion();
-    }, 150);
-  }, [startTestWithLevelId, nextQuestion]);
-  
-  // Install keyer once on mount
-  useEffect(() => {
-    if (isBrowser) {
-      keyer.install();
-    }
-    
-    return () => {
-      // Clean up keyer
-      keyerRef.current.uninstall();
-      
-      // Clean up any pending feedback timers
-      if (feedbackTimerRef.current !== null) {
-        clearTimeout(feedbackTimerRef.current);
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array ensures this only runs on mount/unmount
-  
   // Add escape key handler
   useEffect(() => {
     if (!isBrowser) return;
@@ -711,6 +734,8 @@ const SendingMode: React.FC = () => {
   
   // Handle next level - aligned with TrainingMode
   const handleNextLevel = useCallback(() => {
+    console.log(`[SendingMode] handleNextLevel called, current level: ${state.selectedLevelId}, ref level: ${currentLevelIdRef.current}`);
+    
     setTestResults(null);
     
     // Reset state
@@ -729,6 +754,11 @@ const SendingMode: React.FC = () => {
     if (currentLevelIndex >= 0 && currentLevelIndex < trainingLevels.length - 1) {
       // Move to next level
       const nextLevel = trainingLevels[currentLevelIndex + 1];
+      console.log(`[SendingMode] Moving to next level: ${nextLevel.id}`);
+      
+      // Update level ID ref
+      currentLevelIdRef.current = nextLevel.id;
+      console.log(`[SendingMode] Updated currentLevelIdRef to: ${currentLevelIdRef.current}`);
       
       // Explicitly select the next level to update both state and UI
       selectLevel(nextLevel.id);
@@ -737,8 +767,15 @@ const SendingMode: React.FC = () => {
       setTestStartTime(Date.now());
       
       // Start test with the next level ID
+      console.log(`[SendingMode] Starting test with next level: ${nextLevel.id}`);
       startTestWithExplicitLevel(nextLevel.id);
     } else {
+      console.log(`[SendingMode] Already at the last level, restarting current level`);
+      
+      // Update level ID ref for consistency
+      currentLevelIdRef.current = state.selectedLevelId;
+      console.log(`[SendingMode] Updated currentLevelIdRef for restart: ${currentLevelIdRef.current}`);
+      
       // Restart current level if at end
       startTestAndRecordTime();
     }
