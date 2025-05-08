@@ -95,6 +95,9 @@ const SendingMode: React.FC = () => {
   // Reference to track if the keyer should be active
   const keyerEnabledRef = useRef<boolean>(false);
   
+  // Reference to track if a test is currently starting (to avoid race conditions)
+  const testStartingRef = useRef<boolean>(false);
+  
   // Stop any current sound
   const stopSound = useCallback(() => {
     if (oscillatorRef.current) {
@@ -210,12 +213,13 @@ const SendingMode: React.FC = () => {
   
   // Present next question - now using direct level chars
   const nextQuestion = useCallback(() => {
-    // Skip if test results are showing
-    if (testResults) {
+    // Skip if test results are showing and we're not in the process of starting a new test
+    if (testResults && !testStartingRef.current) {
       console.log('[SendingMode] nextQuestion called while test results are showing - ignoring');
       return Promise.resolve();
     }
     
+    console.log('[SendingMode] Selecting next character for practice');
     const nextChar = pickNextChar();
     
     if (!nextChar) {
@@ -242,7 +246,7 @@ const SendingMode: React.FC = () => {
     
     // Return a promise that resolves immediately
     return Promise.resolve();
-  }, [pickNextChar, currentLevel, testResults]);
+  }, [pickNextChar, currentLevel, testResults, testStartingRef]);
   
   // Store current character in a ref for stable access
   const currentCharRef = useRef<string>(currentChar);
@@ -756,6 +760,9 @@ const SendingMode: React.FC = () => {
   const startLevel = useCallback((levelId: string = state.selectedLevelId) => {
     console.log(`[SendingMode] Starting level ${levelId} with unified function`);
     
+    // Set the starting flag first to ensure nextQuestion will run even if state updates aren't processed yet
+    testStartingRef.current = true;
+    
     // Reset all state
     setCurrentChar('');
     setMorseOutput('');
@@ -777,6 +784,7 @@ const SendingMode: React.FC = () => {
     const level = trainingLevels.find(l => l.id === levelId);
     if (!level) {
       console.error(`[SendingMode] Could not find level with ID ${levelId}`);
+      testStartingRef.current = false; // Reset flag on error
       return;
     }
     
@@ -813,7 +821,11 @@ const SendingMode: React.FC = () => {
     // Start the first question after a short delay to ensure everything is initialized
     setTimeout(() => {
       console.log(`[SendingMode] Calling nextQuestion for level ${levelId}`);
-      nextQuestion();
+      nextQuestion().then(() => {
+        // Clear the starting flag after nextQuestion has run
+        testStartingRef.current = false;
+        console.log('[SendingMode] Level start sequence completed');
+      });
     }, 150);
   }, [selectLevel, startTestWithLevelId, nextQuestion, state.selectedLevelId, state.charPoints]);
   
